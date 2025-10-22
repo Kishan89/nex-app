@@ -1,0 +1,226 @@
+const { prisma, resetConnection } = require('../config/database');
+const bcrypt = require('bcryptjs');
+const { OAuth2Client } = require('google-auth-library');
+require('dotenv').config();
+const HASH_SALT_ROUNDS = 10;
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const googleOAuthClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+const createUser = async ({ email, username, password }) => {
+  let retryCount = 0;
+  const maxRetries = 2;
+  
+  while (retryCount <= maxRetries) {
+    try {
+      const hashedPassword = await bcrypt.hash(password, HASH_SALT_ROUNDS);
+      const newUser = await prisma.user.create({
+        data: { email, username, password: hashedPassword },
+        select: { id: true, email: true, username: true, createdAt: true, avatar: true, bio: true },
+      });
+      return newUser;
+    } catch (error) {
+      console.error(`Error creating user in database (attempt ${retryCount + 1}):`, error);
+      
+      // Handle prepared statement conflicts with retry
+      if ((error.message?.includes('prepared statement') || error.code === 'P2010') && retryCount < maxRetries) {
+        console.log(`🔄 Retrying user creation after prepared statement error (attempt ${retryCount + 1})`);
+        await resetConnection();
+        retryCount++;
+        continue;
+      }
+      
+      if (error.code === 'P2002') {
+        throw new Error(error.message.includes('email') ? 'Email already in use.' : 'Username already taken.');
+      }
+      throw new Error('User creation failed. Please try again.');
+    }
+  }
+};
+
+const findUserByEmail = async (email) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, username: true, password: true, avatar: true, bio: true, banner_url: true, xp: true },
+    });
+    return user;
+  } catch (error) {
+    console.error('Error finding user by email:', error);
+    throw new Error('Could not retrieve user data.');
+  }
+};
+
+const findUserByUsername = async (username) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true, username: true, email: true, avatar: true, bio: true, website: true, location: true, verified: true, banner_url: true, xp: true },
+    });
+    return user;
+  } catch (error) {
+    console.error('Error finding user by username:', error);
+    throw new Error('Could not retrieve user data.');
+  }
+};
+
+const updateBanner = async (userId, bannerUrl) => {
+  return await updateUser(userId, { banner_url: bannerUrl });
+};
+
+const findUserById = async (id) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, username: true, avatar: true, bio: true, website: true, location: true, verified: true, banner_url: true, xp: true },
+    });
+    return user;
+  } catch (error) {
+    console.error('Error finding user by ID:', error);
+    throw new Error('Could not retrieve user data.');
+  }
+};
+
+const updateUser = async (id, updates) => {
+  try {
+    if (updates.password) delete updates.password;
+    
+    // Check if username is being updated and if it's already taken
+    if (updates.username) {
+      const existingUser = await prisma.user.findUnique({
+        where: { username: updates.username },
+        select: { id: true }
+      });
+      
+      if (existingUser && existingUser.id !== id) {
+        throw new Error('USERNAME_TAKEN');
+      }
+    }
+    
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: updates,
+      select: { id: true, email: true, username: true, avatar: true, bio: true, banner_url: true, xp: true },
+    });
+    return updatedUser;
+  } catch (error) {
+    console.error('Error updating user in database:', error);
+    if (error.message === 'USERNAME_TAKEN') {
+      throw new Error('Username is already taken. Please choose a different username.');
+    }
+    if (error.code === 'P2025') throw new Error('User not found.');
+    if (error.code === 'P2002' && error.meta?.target?.includes('username')) {
+      throw new Error('Username is already taken. Please choose a different username.');
+    }
+    throw new Error('User update failed. Please try again.');
+  }
+};
+
+const getBookmarks = async (userId) => {
+  try {
+    const bookmarks = await prisma.bookmark.findMany({
+      where: { userId },
+      include: {
+        post: {
+          include: {
+            user: { select: { id: true, username: true, avatar: true } },
+            _count: { select: { likes: true, comments: true, bookmarks: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return bookmarks
+      .filter(b => b.post)
+      .map(b => ({
+        ...b.post,
+        likes_count: b.post._count.likes,
+        comments_count: b.post._count.comments,
+        reposts_count: b.post._count.bookmarks,
+        author: b.post.user,
+      }));
+  } catch (error) {
+    console.error('Error fetching bookmarks:', error);
+    throw new Error('Could not retrieve bookmarks.');
+  }
+};
+
+const searchUsersByUsername = async (query) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { username: { contains: query, mode: 'insensitive' } },
+      select: { id: true, username: true, bio: true, avatar: true },
+      take: 20,
+    });
+
+    return users.map(user => ({ ...user, avatar_url: user.avatar, avatar: undefined }));
+  } catch (error) {
+    console.error('Error searching for users:', error);
+    throw new Error('Could not search for users.');
+  }
+};
+
+const findOrCreateUserByGoogleEmail = async (googleEmail, googleProfile = {}) => {
+  try {
+    let user = await findUserByEmail(googleEmail);
+
+    if (user) {
+      console.log('✅ Existing user found:', { id: user.id, email: user.email, username: user.username });
+      if (!user.avatar && googleProfile.picture) user = await updateUser(user.id, { avatar: googleProfile.picture });
+      return user;
+    } else {
+      const tempPassword = `google_temp_${Date.now()}`;
+      let baseUsername = googleProfile.name ? googleProfile.name.replace(/\s+/g, '_') : googleEmail.split('@')[0];
+      
+      // Generate unique username with retry logic
+      let uniqueUsername = baseUsername;
+      let attempt = 0;
+      const maxAttempts = 10;
+      
+      while (attempt < maxAttempts) {
+        try {
+          console.log(`🔄 Attempting to create user with username: ${uniqueUsername}`);
+          const newUser = await createUser({ email: googleEmail, username: uniqueUsername, password: tempPassword });
+          
+          console.log('✅ User created successfully:', { id: newUser.id, email: newUser.email, username: newUser.username });
+          
+          let createdUser = await findUserById(newUser.id);
+          if (createdUser) {
+            const profileUpdates = {};
+            if (googleProfile.picture && !createdUser.avatar) profileUpdates.avatar = googleProfile.picture;
+            if (Object.keys(profileUpdates).length > 0) createdUser = await updateUser(createdUser.id, profileUpdates);
+          }
+
+          return createdUser;
+        } catch (createError) {
+          if (createError.message?.includes('Username already taken')) {
+            attempt++;
+            uniqueUsername = `${baseUsername}_${attempt}`;
+            console.log(`⚠️ Username taken, trying: ${uniqueUsername}`);
+            continue;
+          } else {
+            throw createError;
+          }
+        }
+      }
+      
+      throw new Error('Could not generate unique username after multiple attempts');
+    }
+  } catch (error) {
+    console.error('Error finding or creating user by Google email:', error);
+    throw new Error('Failed to find or create user account via Google.');
+  }
+};
+
+module.exports = {
+  createUser,
+  findUserByEmail,
+  findUserByUsername,
+  findUserById,
+  updateUser,
+  getBookmarks,
+  searchUsersByUsername,
+  updateBanner,
+  findOrCreateUserByGoogleEmail,
+};

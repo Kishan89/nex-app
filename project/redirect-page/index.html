@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opening Nexeed App...</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .logo {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .message {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 2rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .fallback {
+            background: rgba(255,255,255,0.1);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .fallback a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .fallback a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo">Nexeed</div>
+    <div class="message">Opening Nexeed app...</div>
+    <div class="spinner"></div>
+    
+    <div class="fallback">
+        <p>App not opening?</p>
+        <p><a href="#" onclick="tryAppLink()">Try again</a> or <a href="https://play.google.com/store/apps/details?id=com.mycompany.nexeed1">Download Nexeed</a></p>
+    </div>
+
+    <script>
+        // Get post ID from URL
+        function getPostIdFromUrl() {
+            const path = window.location.pathname;
+            const match = path.match(/\/post\/([^\/]+)/);
+            return match ? match[1] : 'default';
+        }
+
+        // Try to open the app
+        function tryAppLink() {
+            const postId = getPostIdFromUrl();
+            const appUrl = `boltnexeed://post/${postId}`;
+            
+            console.log('🔗 Attempting to open app with:', appUrl);
+            
+            // Try multiple methods to open the app
+            try {
+                // Method 1: Direct window.location
+                window.location.href = appUrl;
+                
+                // Method 2: Create invisible iframe (fallback)
+                setTimeout(() => {
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = appUrl;
+                    document.body.appendChild(iframe);
+                    
+                    // Remove iframe after attempt
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                    }, 1000);
+                }, 500);
+                
+            } catch (error) {
+                console.error('🔗 Error opening app:', error);
+            }
+            
+            // Fallback after 3 seconds
+            setTimeout(() => {
+                console.log('🔗 App didn\'t open, showing fallback');
+                document.querySelector('.message').textContent = 'Nexeed app not installed?';
+                document.querySelector('.spinner').style.display = 'none';
+            }, 3000);
+        }
+
+        // Auto-try when page loads
+        window.onload = function() {
+            console.log('🔗 Page loaded, attempting to open Nexeed app...');
+            setTimeout(tryAppLink, 500);
+        };
+    </script>
+</body>
+</html>

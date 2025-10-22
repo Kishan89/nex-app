@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                     String            @id @default(cuid())
+  email                  String            @unique
+  username               String            @unique
+  name                   String?
+  avatar                 String?
+  bio                    String?
+  website                String?
+  location               String?
+  verified               Boolean           @default(false)
+  isOnline               Boolean           @default(false)
+  lastSeen               DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  /// This field stores the hashed password
+  password               String            @default("temp_password")
+  uuid_id                String?           @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  banner_url             String?
+  xp                     Int               @default(0)
+  pollVotes              PollVote[]
+  bookmarks              Bookmark[]
+  chatParticipants       ChatParticipant[]
+  comments               Comment[]
+  fcmTokens              FcmToken[]
+  following              Follow[]          @relation("UserFollowing")
+  followers              Follow[]          @relation("UserFollower")
+  likes                  Like[]
+  receivedMessages       Message[]         @relation("MessageReceiver")
+  sentMessages           Message[]         @relation("MessageSender")
+  triggeredNotifications Notification[]    @relation("NotificationFromUser")
+  notifications          Notification[]
+  posts                  Post[]
+  pushTokens             PushToken[]
+  blockedBy              UserBlock[]       @relation("UserBlocked")
+  blocking               UserBlock[]       @relation("UserBlocking")
+
+  @@map("users")
+}
+
+model Post {
+  id               String         @id @default(cuid())
+  content          String
+  imageUrl         String?
+  userId           String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  likesCount       Int            @default(0)
+  commentsCount    Int            @default(0)
+  bookmarksCount   Int            @default(0)
+  reportsCount     Int            @default(0)
+  youtubeAuthor    String?
+  youtubeDuration  String?
+  youtubeThumbnail String?
+  youtubeTitle     String?
+  youtubeUrl       String?
+  youtubeVideoId   String?
+  poll             Poll?
+  bookmarks        Bookmark[]
+  comments         Comment[]
+  likes            Like[]
+  notifications    Notification[]
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("posts")
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  text      String
+  postId    String
+  userId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  parentId  String?
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model Chat {
+  id           String            @id @default(cuid())
+  name         String?
+  isGroup      Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  participants ChatParticipant[]
+  messages     Message[]
+
+  @@map("chats")
+}
+
+model ChatParticipant {
+  id       String    @id @default(cuid())
+  chatId   String
+  userId   String
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+  // lastReadAt DateTime? // Temporarily commented out due to Prisma client generation issues
+  chat     Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([userId])
+  @@index([chatId])
+  @@map("chat_participants")
+}
+
+model Message {
+  id         String        @id @default(cuid())
+  content    String
+  senderId   String
+  receiverId String?
+  chatId     String?
+  status     MessageStatus @default(SENT)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  chat       Chat?         @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  receiver   User?         @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender     User          @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("likes")
+}
+
+model Bookmark {
+  id          String   @id @default(cuid())
+  userId      String
+  postId      String
+  createdAt   DateTime @default(now())
+  uuid_userid String?  @db.Uuid
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("bookmarks")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollower", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  type       NotificationType
+  userId     String
+  fromUserId String?
+  postId     String?
+  message    String?
+  read       Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+  fromUser   User?            @relation("NotificationFromUser", fields: [fromUserId], references: [id], onDelete: Cascade)
+  post       Post?            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("push_tokens")
+}
+
+model FcmToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  platform  String   @default("unknown")
+  isActive  Boolean  @default(true)
+  lastUsed  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("fcm_tokens")
+}
+
+model Poll {
+  id       String       @id @default(cuid())
+  question String
+  postId   String       @unique
+  post     Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  options  PollOption[]
+  votes    PollVote[]
+}
+
+model PollOption {
+  id         String     @id @default(cuid())
+  text       String
+  votesCount Int        @default(0)
+  pollId     String
+  poll       Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes      PollVote[]
+}
+
+model PollVote {
+  id           String     @id @default(cuid())
+  userId       String
+  pollId       String
+  pollOptionId String
+  poll         Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  pollOption   PollOption @relation(fields: [pollOptionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pollId])
+}
+
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocked   User     @relation("UserBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocker   User     @relation("UserBlocking", fields: [blockerId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@map("user_blocks")
+}
+
+enum MessageStatus {
+  SENDING
+  SENT
+  DELIVERED
+  READ
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+  MESSAGE
+}
