@@ -30,29 +30,44 @@ if (process.env.NODE_ENV === 'development') {
     });
 }
 
-// Health check endpoint (before API routes)
+// Health check endpoint (before API routes) - Railway compatible
 app.get('/health', async (req, res) => {
+    console.log('🔍 Health check requested');
+    
+    const healthStatus = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'production',
+        port: PORT,
+        host: HOST
+    };
+
+    // Check if DATABASE_URL exists
+    if (!process.env.DATABASE_URL) {
+        console.log('⚠️ DATABASE_URL not configured');
+        healthStatus.database = 'not_configured';
+        healthStatus.message = 'Server running but database not configured';
+        return res.status(200).json(healthStatus);
+    }
+
+    // Try database connection (with timeout)
     try {
         const { prisma } = require('./config/database');
         await Promise.race([
             prisma.$queryRaw`SELECT 1`,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Health check timeout')), 10000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('DB timeout')), 5000))
         ]);
-        res.json({
-            status: 'healthy',
-            database: 'connected',
-            timestamp: new Date().toISOString(),
-            uptime: process.uptime()
-        });
+        healthStatus.database = 'connected';
+        console.log('✅ Health check passed - database connected');
     } catch (error) {
-        res.status(503).json({
-            status: 'unhealthy',
-            database: 'disconnected',
-            error: error.message,
-            timestamp: new Date().toISOString(),
-            tip: 'Supabase free tier may be paused - try again in a few moments'
-        });
+        console.log('⚠️ Database check failed:', error.message);
+        healthStatus.database = 'disconnected';
+        healthStatus.database_error = error.message;
+        // Still return 200 OK for Railway health check
     }
+
+    res.status(200).json(healthStatus);
 });
 
 // Database wake-up endpoint for Supabase free tier

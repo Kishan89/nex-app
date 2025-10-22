@@ -3,23 +3,26 @@ const { createClient } = require('@supabase/supabase-js');
 
 const globalForPrisma = globalThis;
 
-// Optimized Prisma configuration for Render.com
+// Optimized Prisma configuration for Railway/Render
 const getDatabaseUrl = () => {
   const baseUrl = process.env.DATABASE_URL;
   if (!baseUrl) {
-    throw new Error('DATABASE_URL environment variable is not set');
+    console.warn('⚠️ DATABASE_URL environment variable is not set');
+    return null; // Return null instead of throwing error
   }
   
-  // Optimized connection settings for Render free tier
+  // Optimized connection settings for Railway/Render free tier
   const separator = baseUrl.includes('?') ? '&' : '?';
   return `${baseUrl}${separator}connection_limit=10&pool_timeout=20&connect_timeout=15&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true`;
 };
 
-const prisma = globalForPrisma.prisma || new PrismaClient({
+// Initialize Prisma client only if DATABASE_URL is available
+const databaseUrl = getDatabaseUrl();
+const prisma = databaseUrl ? (globalForPrisma.prisma || new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['error'] : ['error'],
   datasources: {
     db: {
-      url: getDatabaseUrl(),
+      url: databaseUrl,
     },
   },
   errorFormat: 'minimal',
@@ -30,7 +33,7 @@ const prisma = globalForPrisma.prisma || new PrismaClient({
       queryTimeout: 60000,
     },
   },
-});
+})) : null;
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
@@ -38,20 +41,25 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Ensure clean shutdown on process termination
 process.on('beforeExit', async () => {
-  await prisma.$disconnect();
+  if (prisma) await prisma.$disconnect();
 });
 
 process.on('SIGINT', async () => {
-  await prisma.$disconnect();
+  if (prisma) await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  await prisma.$disconnect();
+  if (prisma) await prisma.$disconnect();
   process.exit(0);
 });
 
 async function connectDatabase() {
+  if (!prisma) {
+    console.log('⚠️ Database not configured - skipping connection');
+    return false;
+  }
+  
   let retries = 3;
   
   while (retries > 0) {
