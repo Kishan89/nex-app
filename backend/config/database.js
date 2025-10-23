@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const globalForPrisma = globalThis;
 
-// Optimized Prisma configuration for Railway/Render with multiple connection strategies
+// Force pooler connection for IPv4 compatibility
 const getDatabaseUrl = () => {
   const baseUrl = process.env.DATABASE_URL;
   if (!baseUrl) {
@@ -13,11 +13,12 @@ const getDatabaseUrl = () => {
   
   console.log('🔍 Original DATABASE_URL host:', baseUrl.split('@')[1]?.split('/')[0]);
   
-  // Railway-optimized connection settings with direct connection (no pooler)
+  // Force pooler connection for IPv4 compatibility (Railway uses IPv4)
   const separator = baseUrl.includes('?') ? '&' : '?';
-  // Use direct connection to avoid pooler timeout issues
-  const directUrl = baseUrl.replace('.pooler.supabase.com', '.supabase.co');
-  return `${directUrl}${separator}connection_limit=5&pool_timeout=20&connect_timeout=10&statement_cache_size=0&prepared_statement_cache_queries=0&idle_in_transaction_session_timeout=10000&lock_timeout=10000`;
+  // Always use pooler for IPv4 compatibility
+  const poolerUrl = baseUrl.replace('.supabase.co', '.pooler.supabase.com');
+  console.log('🔄 Using pooler connection for IPv4 compatibility');
+  return `${poolerUrl}${separator}connection_limit=3&pool_timeout=30&connect_timeout=15&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true&idle_in_transaction_session_timeout=15000`;
 };
 
 // Alternative connection URL with pooler for fallback
@@ -91,24 +92,24 @@ async function connectDatabase() {
   console.log('🔍 Attempting database connection...');
   console.log('🔍 Database host:', originalUrl?.split('@')[1]?.split('/')[0]);
   
-  // Strategy 1: Try the original configured connection first
-  console.log('🔄 Trying original database configuration...');
-  let retries = 2;
+  // Strategy 1: Try pooler connection first (IPv4 compatibility)
+  console.log('🔄 Trying pooler connection for IPv4 compatibility...');
+  let retries = 3;
   
   while (retries > 0) {
     try {
       await prisma.$queryRaw`SELECT 1`;
-      console.log('✅ Database connected successfully (original configuration)');
+      console.log('✅ Database connected successfully (pooler connection - IPv4 compatible)');
       return true;
     } catch (error) {
-      console.error(`❌ Original connection failed (${3 - retries}/2):`, error.message);
+      console.error(`❌ Pooler connection failed (${4 - retries}/3):`, error.message);
       
       retries--;
       
       if (retries > 0) {
-        console.log(`🔄 Retrying original connection... (${retries} attempts left)`);
+        console.log(`🔄 Retrying pooler connection... (${retries} attempts left)`);
         await prisma.$disconnect();
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
       }
     }
   }
