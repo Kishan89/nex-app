@@ -1,8 +1,19 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import 'react-native-url-polyfill/auto';
 import { ErrorHandler } from './errorHandler';
+// Development vs Production API Configuration
+const getApiBaseUrl = () => {
+    // Check if we're in development mode
+    if (__DEV__) {
+        // In development, always use Railway URL for consistency
+        return process.env.EXPO_PUBLIC_API_URL || 'https://nex-app-production.up.railway.app';
+    }
+    // In production/release, use Railway URL
+    return process.env.EXPO_PUBLIC_API_URL || 'https://nex-app-production.up.railway.app';
+};
+
 const API_CONFIG = {
-    BASE_URL: `https://nex-app-production.up.railway.app/api`,
+    BASE_URL: `${getApiBaseUrl()}/api`,
     TIMEOUT: 60000,
 };
 const API_ENDPOINTS = {

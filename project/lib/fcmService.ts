@@ -49,39 +49,59 @@ class FCMService {
     try {
       // Check if FCM is supported on this platform
       if (!this.isSupported()) {
+        console.log('❌ FCM not supported on this platform');
         return;
       }
+      console.log('🔔 Initializing FCM service...');
+      
       // Check Google Play Services availability (Android only)
       if (Platform.OS === 'android') {
+        console.log('📱 Checking Google Play Services...');
         const gpsAvailable = await this.checkGooglePlayServices();
         if (!gpsAvailable) {
-          // Continue initialization without showing update prompts
+          console.log('⚠️ Google Play Services not available, continuing...');
+        } else {
+          console.log('✅ Google Play Services available');
         }
       }
       // Request permissions first
+      console.log('🔐 Requesting notification permissions...');
       const hasPermission = await this.requestPermission();
       if (!hasPermission) {
+        console.log('⚠️ Notification permissions denied');
         // Still initialize handlers for testing, but warn user
         Alert.alert(
           'Notifications Disabled',
           'Push notifications are disabled. You can enable them in Settings > Notifications.',
           [{ text: 'OK' }]
         );
+      } else {
+        console.log('✅ Notification permissions granted');
       }
       // Get and register FCM token with graceful error handling
+      console.log('🎫 Registering FCM token...');
       try {
         await this.registerToken();
+        console.log('✅ FCM token registration completed');
       } catch (tokenError) {
+        console.log('❌ FCM token registration failed:', tokenError.message);
         // Don't throw - app should work without FCM
       }
       // Set up message handlers
+      console.log('📬 Setting up message handlers...');
       this.setupMessageHandlers();
+      console.log('✅ Message handlers configured');
+      
       // Handle initial notification (app opened from killed state)
+      console.log('🚀 Checking for initial notification...');
       await this.handleInitialNotification();
+      
       this.isInitialized = true;
+      console.log('🎉 FCM service initialization completed successfully');
       // Log final status
       const token = await this.getStoredToken();
       } catch (error) {
+      console.log('❌ FCM service initialization failed:', error.message);
       // Don't throw error, just log it
       this.isInitialized = false;
     }
@@ -91,18 +111,23 @@ class FCMService {
    */
   private async requestPermission(): Promise<boolean> {
     try {
+      console.log('🔐 Checking notification permission status...');
       // Check if we already requested permission
       const alreadyRequested = await AsyncStorage.getItem(NOTIFICATION_PERMISSION_KEY);
       const messaging = getMessaging();
+      
       // In React Native Firebase v20.5.0, requestPermission returns a promise that resolves to void
       // We need to check permissions differently
       try {
+        console.log('🔐 Requesting FCM permission...');
         await requestPermission(messaging);
         // If we get here, permissions were granted or already exist
+        console.log('✅ FCM permission request completed');
         // Mark that we've requested permission
         await AsyncStorage.setItem(NOTIFICATION_PERMISSION_KEY, 'true');
         return true;
       } catch (error) {
+        console.log('❌ FCM permission request failed:', error);
         // Check if this is a permissions denied error
         if (error && typeof error === 'object' && 'code' in error) {
           const errorCode = (error as any).code;
@@ -154,6 +179,7 @@ class FCMService {
         }
         // Store token locally
         await AsyncStorage.setItem(FCM_TOKEN_KEY, fcmToken);
+        console.log('✅ FCM token obtained and stored locally');
         // Send token to backend
         await this.saveFCMTokenToBackend(fcmToken);
         } catch (error: any) {
@@ -668,27 +694,68 @@ class FCMService {
   }
 
   /**
-   * Test push notification functionality
+   * Simple test function to verify notifications work
    */
-  async testPushNotification(): Promise<void> {
+  async testNotifications(): Promise<void> {
+    console.log('🧪 Testing notification system...');
+
     try {
-      const token = await this.getStoredToken();
-      if (!token) {
-        console.log('🧪 No FCM token available for testing');
+      // Test 1: Check if FCM is available
+      if (!this.isSupported()) {
+        console.log('❌ FCM not supported on this platform');
         return;
       }
-      
-      console.log('🧪 Test push notification functionality');
-      console.log('🧪 FCM Token available:', !!token);
-      
-      // Log instructions for manual testing
-      console.log('🧪 To test push notifications:');
-      console.log('🧪 1. Put app in background');
-      console.log('🧪 2. Send a message from another user');
-      console.log('🧪 3. Check if push notification appears');
-      
+
+      // Test 2: Try to get FCM token (this tests Google Play Services)
+      const messaging = getMessaging();
+      const token = await getToken(messaging);
+      console.log('🧪 FCM Token test:', token ? 'SUCCESS' : 'FAILED');
+
+      // Test 3: Send test in-app notification
+      console.log('🧪 Sending test in-app notification...');
+      DeviceEventEmitter.emit('showNotificationBanner', {
+        title: '🧪 Test Notification',
+        body: 'FCM service is working! This is a test notification.',
+        data: {
+          type: 'test',
+          testId: 'fcm-test-' + Date.now()
+        },
+        onPress: () => {
+          console.log('✅ Test notification was pressed!');
+        }
+      });
+
+      // Test 4: Test different notification types
+      setTimeout(() => {
+        DeviceEventEmitter.emit('showNotificationBanner', {
+          title: 'Test User',
+          body: 'liked your post',
+          data: {
+            type: 'like',
+            postId: 'test-post-123',
+            username: 'test_user'
+          },
+          onPress: () => console.log('✅ Like notification test pressed')
+        });
+      }, 2000);
+
+      setTimeout(() => {
+        DeviceEventEmitter.emit('showNotificationBanner', {
+          title: 'Test User',
+          body: 'sent you a message',
+          data: {
+            type: 'message',
+            chatId: 'test-chat-456',
+            username: 'test_user'
+          },
+          onPress: () => console.log('✅ Message notification test pressed')
+        });
+      }, 4000);
+
+      console.log('✅ All notification tests sent! Check your screen.');
+
     } catch (error) {
-      console.error('Error in test push notification:', error);
+      console.log('❌ Notification test failed:', error);
     }
   }
 }
