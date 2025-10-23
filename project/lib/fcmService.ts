@@ -577,9 +577,13 @@ class FCMService {
     try {
       const messaging = getMessaging();
       await deleteToken(messaging);
+      // Clear stored token to force fresh registration
+      await AsyncStorage.removeItem(FCM_TOKEN_KEY);
       await this.registerToken();
-      } catch (error) {
-      }
+      console.log('✅ FCM token refreshed successfully');
+    } catch (error) {
+      console.error('❌ Error refreshing FCM token:', error);
+    }
   }
   /**
    * Set current chat ID when user enters a chat

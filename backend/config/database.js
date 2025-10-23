@@ -11,9 +11,9 @@ const getDatabaseUrl = () => {
     return null; // Return null instead of throwing error
   }
   
-  // Optimized connection settings for Railway/Render free tier
+  // Railway-optimized connection settings for production stability
   const separator = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${separator}connection_limit=10&pool_timeout=20&connect_timeout=15&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true`;
+  return `${baseUrl}${separator}connection_limit=25&pool_timeout=60&connect_timeout=30&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true&idle_in_transaction_session_timeout=30000&lock_timeout=30000`;
 };
 
 // Initialize Prisma client only if DATABASE_URL is available
@@ -26,11 +26,12 @@ const prisma = databaseUrl ? (globalForPrisma.prisma || new PrismaClient({
     },
   },
   errorFormat: 'minimal',
-  // Add connection pool configuration
+  // Railway-optimized engine configuration
   __internal: {
     engine: {
-      connectTimeout: 60000,
-      queryTimeout: 60000,
+      connectTimeout: 90000,    // 90 seconds for Railway latency
+      queryTimeout: 60000,      // 60 seconds for complex queries
+      requestTimeout: 60000,    // 60 seconds for request timeout
     },
   },
 })) : null;
