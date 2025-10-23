@@ -26,8 +26,19 @@ const getPoolerDatabaseUrl = () => {
   if (!baseUrl) return null;
   
   const separator = baseUrl.includes('?') ? '&' : '?';
-  // Use pooler connection as fallback
-  const poolerUrl = baseUrl.replace('.supabase.co', '.pooler.supabase.com');
+  // Use pooler connection as fallback - handle both cases
+  let poolerUrl;
+  if (baseUrl.includes('.pooler.supabase.com')) {
+    // Already has pooler, use as is
+    poolerUrl = baseUrl;
+  } else if (baseUrl.includes('.supabase.co')) {
+    // Convert direct to pooler
+    poolerUrl = baseUrl.replace('.supabase.co', '.pooler.supabase.com');
+  } else {
+    // Unknown format, return null
+    return null;
+  }
+  
   return `${poolerUrl}${separator}connection_limit=3&pool_timeout=15&connect_timeout=8&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true`;
 };
 
@@ -76,61 +87,75 @@ async function connectDatabase() {
     return false;
   }
   
-  // Try direct connection first
-  console.log('🔄 Attempting direct connection to Supabase...');
+  const originalUrl = process.env.DATABASE_URL;
+  console.log('🔍 Attempting database connection...');
+  console.log('🔍 Database host:', originalUrl?.split('@')[1]?.split('/')[0]);
+  
+  // Strategy 1: Try the original configured connection first
+  console.log('🔄 Trying original database configuration...');
   let retries = 2;
   
   while (retries > 0) {
     try {
-      // Test connection with a simple query
       await prisma.$queryRaw`SELECT 1`;
-      console.log('✅ Database connected successfully (direct connection)');
+      console.log('✅ Database connected successfully (original configuration)');
       return true;
     } catch (error) {
-      console.error(`❌ Direct connection failed (${3 - retries}/2):`, error.message);
+      console.error(`❌ Original connection failed (${3 - retries}/2):`, error.message);
       
       retries--;
       
       if (retries > 0) {
-        console.log(`🔄 Retrying direct connection... (${retries} attempts left)`);
+        console.log(`🔄 Retrying original connection... (${retries} attempts left)`);
         await prisma.$disconnect();
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
       }
     }
   }
   
-  // If direct connection fails, try pooler connection
-  console.log('🔄 Direct connection failed, trying pooler connection...');
-  const poolerUrl = getPoolerDatabaseUrl();
+  // Strategy 2: Try alternative connection strategy
+  console.log('🔄 Original connection failed, trying alternative strategy...');
   
-  if (poolerUrl) {
+  // If original was pooler, try direct; if original was direct, try pooler
+  let alternativeUrl;
+  if (originalUrl?.includes('.pooler.supabase.com')) {
+    // Original was pooler, try direct
+    alternativeUrl = originalUrl.replace('.pooler.supabase.com', '.supabase.co');
+    console.log('🔄 Switching from pooler to direct connection...');
+  } else if (originalUrl?.includes('.supabase.co')) {
+    // Original was direct, try pooler
+    alternativeUrl = originalUrl.replace('.supabase.co', '.pooler.supabase.com');
+    console.log('🔄 Switching from direct to pooler connection...');
+  }
+  
+  if (alternativeUrl) {
     try {
-      // Create new Prisma client with pooler URL
-      const poolerPrisma = new PrismaClient({
+      const alternativePrisma = new PrismaClient({
         log: ['error'],
         datasources: {
           db: {
-            url: poolerUrl,
+            url: alternativeUrl,
           },
         },
         errorFormat: 'minimal',
       });
       
-      await poolerPrisma.$queryRaw`SELECT 1`;
-      console.log('✅ Database connected successfully (pooler connection)');
+      await alternativePrisma.$queryRaw`SELECT 1`;
+      console.log('✅ Database connected successfully (alternative strategy)');
       
       // Replace the global prisma instance
       await prisma.$disconnect();
-      globalForPrisma.prisma = poolerPrisma;
+      globalForPrisma.prisma = alternativePrisma;
       
       return true;
-    } catch (poolerError) {
-      console.error('❌ Pooler connection also failed:', poolerError.message);
+    } catch (altError) {
+      console.error('❌ Alternative connection also failed:', altError.message);
     }
   }
   
   console.log('❌ All database connection attempts failed');
-  console.log('⚠️ Database connection delayed, but server is running');
+  console.log('⚠️ This appears to be a Supabase service issue');
+  console.log('⚠️ Server continues running - database will retry automatically');
   return false;
 }
 
