@@ -13,6 +13,10 @@ if (!admin.apps.length) {
       serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
     } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PROJECT_ID) {
       // Load from individual environment variables
+      console.log('🔧 Using individual Firebase environment variables');
+      console.log('🔧 Project ID:', process.env.FIREBASE_PROJECT_ID);
+      console.log('🔧 Client Email:', process.env.FIREBASE_CLIENT_EMAIL);
+      console.log('🔧 Private Key Length:', process.env.FIREBASE_PRIVATE_KEY?.length);
       serviceAccount = {
         type: "service_account",
         project_id: process.env.FIREBASE_PROJECT_ID,
