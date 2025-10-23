@@ -13,11 +13,19 @@
     "node": ">=18.0.0",
     "npm": ">=8.0.0"
   },
-  "keywords": ["social-media", "react-native", "nodejs", "express"],
+  "keywords": [
+    "social-media",
+    "react-native",
+    "nodejs",
+    "express"
+  ],
   "author": "Kishan",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/Kishan89/nex-app.git"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
   }
 }

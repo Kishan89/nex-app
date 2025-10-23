@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const globalForPrisma = globalThis;
 
-// Force pooler connection for IPv4 compatibility
+// Optimized Prisma configuration for Railway/Render
 const getDatabaseUrl = () => {
   const baseUrl = process.env.DATABASE_URL;
   if (!baseUrl) {
@@ -11,36 +11,9 @@ const getDatabaseUrl = () => {
     return null; // Return null instead of throwing error
   }
   
-  console.log('🔍 Original DATABASE_URL host:', baseUrl.split('@')[1]?.split('/')[0]);
-  
-  // Force pooler connection for IPv4 compatibility (Railway uses IPv4)
+  // Railway-optimized connection settings for production stability
   const separator = baseUrl.includes('?') ? '&' : '?';
-  // Always use pooler for IPv4 compatibility
-  const poolerUrl = baseUrl.replace('.supabase.co', '.pooler.supabase.com');
-  console.log('🔄 Using pooler connection for IPv4 compatibility');
-  return `${poolerUrl}${separator}connection_limit=3&pool_timeout=30&connect_timeout=15&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true&idle_in_transaction_session_timeout=15000`;
-};
-
-// Alternative connection URL with pooler for fallback
-const getPoolerDatabaseUrl = () => {
-  const baseUrl = process.env.DATABASE_URL;
-  if (!baseUrl) return null;
-  
-  const separator = baseUrl.includes('?') ? '&' : '?';
-  // Use pooler connection as fallback - handle both cases
-  let poolerUrl;
-  if (baseUrl.includes('.pooler.supabase.com')) {
-    // Already has pooler, use as is
-    poolerUrl = baseUrl;
-  } else if (baseUrl.includes('.supabase.co')) {
-    // Convert direct to pooler
-    poolerUrl = baseUrl.replace('.supabase.co', '.pooler.supabase.com');
-  } else {
-    // Unknown format, return null
-    return null;
-  }
-  
-  return `${poolerUrl}${separator}connection_limit=3&pool_timeout=15&connect_timeout=8&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true`;
+  return `${baseUrl}${separator}connection_limit=25&pool_timeout=60&connect_timeout=30&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true&idle_in_transaction_session_timeout=30000&lock_timeout=30000`;
 };
 
 // Initialize Prisma client only if DATABASE_URL is available
@@ -88,75 +61,42 @@ async function connectDatabase() {
     return false;
   }
   
-  const originalUrl = process.env.DATABASE_URL;
-  console.log('🔍 Attempting database connection...');
-  console.log('🔍 Database host:', originalUrl?.split('@')[1]?.split('/')[0]);
-  
-  // Strategy 1: Try pooler connection first (IPv4 compatibility)
-  console.log('🔄 Trying pooler connection for IPv4 compatibility...');
   let retries = 3;
   
   while (retries > 0) {
     try {
+      // Test connection with a simple query
       await prisma.$queryRaw`SELECT 1`;
-      console.log('✅ Database connected successfully (pooler connection - IPv4 compatible)');
+      console.log('✅ Database connected successfully');
       return true;
     } catch (error) {
-      console.error(`❌ Pooler connection failed (${4 - retries}/3):`, error.message);
+      console.error(`❌ Database connection failed (${4 - retries}/3):`, error.message);
+      
+      // Handle specific connection pool errors
+      if (error.code === 'P2024' || error.message?.includes('connection pool')) {
+        console.log('🔄 Connection pool timeout, resetting connection...');
+        await prisma.$disconnect();
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      }
+      
+      // If it's a prepared statement error, try to reset the connection
+      if (error.message?.includes('prepared statement') || error.code === 'P2010') {
+        console.log('🔄 Prepared statement error, resetting connection...');
+        await prisma.$disconnect();
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      }
       
       retries--;
-      
-      if (retries > 0) {
-        console.log(`🔄 Retrying pooler connection... (${retries} attempts left)`);
-        await prisma.$disconnect();
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+      if (retries === 0) {
+        console.error('❌ All database connection attempts failed');
+        return false;
       }
+      
+      console.log(`🔄 Retrying database connection... (${retries} attempts left)`);
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds before retry
     }
   }
   
-  // Strategy 2: Try alternative connection strategy
-  console.log('🔄 Original connection failed, trying alternative strategy...');
-  
-  // If original was pooler, try direct; if original was direct, try pooler
-  let alternativeUrl;
-  if (originalUrl?.includes('.pooler.supabase.com')) {
-    // Original was pooler, try direct
-    alternativeUrl = originalUrl.replace('.pooler.supabase.com', '.supabase.co');
-    console.log('🔄 Switching from pooler to direct connection...');
-  } else if (originalUrl?.includes('.supabase.co')) {
-    // Original was direct, try pooler
-    alternativeUrl = originalUrl.replace('.supabase.co', '.pooler.supabase.com');
-    console.log('🔄 Switching from direct to pooler connection...');
-  }
-  
-  if (alternativeUrl) {
-    try {
-      const alternativePrisma = new PrismaClient({
-        log: ['error'],
-        datasources: {
-          db: {
-            url: alternativeUrl,
-          },
-        },
-        errorFormat: 'minimal',
-      });
-      
-      await alternativePrisma.$queryRaw`SELECT 1`;
-      console.log('✅ Database connected successfully (alternative strategy)');
-      
-      // Replace the global prisma instance
-      await prisma.$disconnect();
-      globalForPrisma.prisma = alternativePrisma;
-      
-      return true;
-    } catch (altError) {
-      console.error('❌ Alternative connection also failed:', altError.message);
-    }
-  }
-  
-  console.log('❌ All database connection attempts failed');
-  console.log('⚠️ This appears to be a Supabase service issue');
-  console.log('⚠️ Server continues running - database will retry automatically');
   return false;
 }
 
