@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import 'react-native-url-polyfill/auto';
+import { ErrorHandler } from './errorHandler';
 const API_CONFIG = {
     BASE_URL: `https://nex-app-production.up.railway.app/api`,
     TIMEOUT: 60000,
@@ -186,28 +187,30 @@ class ApiService {
         try {
             return await this.post<AuthResponse>(API_ENDPOINTS.GOOGLE_LOGIN, { idToken }); 
         } catch (error: any) {
-            console.error('Google Login Backend Error:', error);
+            // Only log in development
+            if (__DEV__) {
+                console.error('Google Login Backend Error:', error);
+            }
             
-            // Handle specific backend connection errors
+            // Handle specific backend connection errors with user-friendly messages
             if (error.code === 'NETWORK_ERROR' || !error.response) {
                 throw new Error('Unable to connect to server. Please check your internet connection and try again.');
             }
             
-            if (error.response?.status === 503) {
-                throw new Error('Server is temporarily unavailable. Database connection issue. Please try again in a few moments.');
-            }
-            
-            if (error.response?.status === 500) {
-                throw new Error('Server database error. Please try again in a moment.');
+            if (error.response?.status === 503 || error.response?.status === 500) {
+                throw new Error('Server is temporarily busy. Please try again in a moment.');
             }
             
             if (error.response?.status === 408) {
                 throw new Error('Request timeout. Please try again.');
             }
             
-            // Pass through other errors with more context
-            const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
-            throw new Error(`Login failed: ${errorMessage}`);
+            if (error.response?.status === 400) {
+                throw new Error('Invalid login credentials. Please try again.');
+            }
+            
+            // Generic user-friendly error message
+            throw new Error('Login failed. Please try again.');
         }
     }
     async getPosts(page: number = 1, limit: number = 10): Promise<any[]> {

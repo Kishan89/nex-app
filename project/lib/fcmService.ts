@@ -302,7 +302,7 @@ class FCMService {
         // Register with backend (with built-in duplicate prevention)
         await this.saveFCMTokenToBackend(fcmToken);
       } catch (error) {
-        console.error('❌ Error handling FCM token refresh:', error);
+        if (__DEV__) console.error('❌ Error handling FCM token refresh:', error);
       }
     });
   }
@@ -582,7 +582,7 @@ class FCMService {
       await this.registerToken();
       console.log('✅ FCM token refreshed successfully');
     } catch (error) {
-      console.error('❌ Error refreshing FCM token:', error);
+      if (__DEV__) console.error('❌ Error refreshing FCM token:', error);
     }
   }
   /**
