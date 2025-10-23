@@ -3,140 +3,86 @@ const { createClient } = require('@supabase/supabase-js');
 
 const globalForPrisma = globalThis;
 
-// Optimized Prisma configuration for Railway/Render
+// ✅ Get database URL with safety checks
 const getDatabaseUrl = () => {
   const baseUrl = process.env.DATABASE_URL;
   if (!baseUrl) {
     console.warn('⚠️ DATABASE_URL environment variable is not set');
-    return null; // Return null instead of throwing error
+    return null;
   }
-  
-  // Railway-optimized connection settings for production stability
+
   const separator = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${separator}connection_limit=25&pool_timeout=60&connect_timeout=30&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true&idle_in_transaction_session_timeout=30000&lock_timeout=30000`;
+  return `${baseUrl}${separator}statement_cache_size=0&prepared_statement_cache_queries=0&idle_in_transaction_session_timeout=30000&lock_timeout=30000`;
 };
 
-// Initialize Prisma client only if DATABASE_URL is available
+// ✅ Initialize Prisma client (optimized for Supabase/Railway)
 const databaseUrl = getDatabaseUrl();
-const prisma = databaseUrl ? (globalForPrisma.prisma || new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['error'] : ['error'],
-  datasources: {
-    db: {
-      url: databaseUrl,
-    },
-  },
-  errorFormat: 'minimal',
-  // Railway-optimized engine configuration
-  __internal: {
-    engine: {
-      connectTimeout: 90000,    // 90 seconds for Railway latency
-      queryTimeout: 60000,      // 60 seconds for complex queries
-      requestTimeout: 60000,    // 60 seconds for request timeout
-    },
-  },
-})) : null;
+const prisma = databaseUrl
+  ? (globalForPrisma.prisma ||
+      new PrismaClient({
+        log: process.env.NODE_ENV === 'development' ? ['query', 'error'] : ['error'],
+        datasources: {
+          db: { url: databaseUrl },
+        },
+        errorFormat: 'minimal',
+      }))
+  : null;
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-// Ensure clean shutdown on process termination
-process.on('beforeExit', async () => {
-  if (prisma) await prisma.$disconnect();
-});
-
-process.on('SIGINT', async () => {
-  if (prisma) await prisma.$disconnect();
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  if (prisma) await prisma.$disconnect();
-  process.exit(0);
-});
-
+// ✅ Connection helpers
 async function connectDatabase() {
   if (!prisma) {
     console.log('⚠️ Database not configured - skipping connection');
     return false;
   }
-  
+
   let retries = 3;
-  
   while (retries > 0) {
     try {
-      // Test connection with a simple query
       await prisma.$queryRaw`SELECT 1`;
       console.log('✅ Database connected successfully');
       return true;
     } catch (error) {
-      console.error(`❌ Database connection failed (${4 - retries}/3):`, error.message);
-      
-      // Handle specific connection pool errors
-      if (error.code === 'P2024' || error.message?.includes('connection pool')) {
-        console.log('🔄 Connection pool timeout, resetting connection...');
-        await prisma.$disconnect();
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-      }
-      
-      // If it's a prepared statement error, try to reset the connection
-      if (error.message?.includes('prepared statement') || error.code === 'P2010') {
-        console.log('🔄 Prepared statement error, resetting connection...');
-        await prisma.$disconnect();
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-      }
-      
+      console.error(`❌ Connection failed (${4 - retries}/3):`, error.message);
       retries--;
-      if (retries === 0) {
-        console.error('❌ All database connection attempts failed');
-        return false;
-      }
-      
-      console.log(`🔄 Retrying database connection... (${retries} attempts left)`);
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds before retry
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
-  
+  console.error('❌ All database connection attempts failed');
   return false;
 }
 
-// Function to handle prepared statement conflicts
 async function resetConnection() {
   try {
     console.log('🔄 Resetting Prisma connection...');
     await prisma.$disconnect();
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+    await new Promise((r) => setTimeout(r, 2000));
     await prisma.$connect();
-    console.log('✅ Connection reset completed');
-    return true;
+    console.log('✅ Connection reset successful');
   } catch (error) {
     console.error('❌ Connection reset failed:', error.message);
-    return false;
   }
 }
 
-// Graceful shutdown
 async function disconnectDatabase() {
   try {
     await prisma.$disconnect();
     console.log('👋 Database disconnected');
   } catch (error) {
     console.error('❌ Error disconnecting database:', error.message);
-    return false;
   }
 }
 
-// Initialize Supabase client
+// ✅ Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.warn('⚠️ Supabase configuration missing. Storage features will be disabled.');
+  console.warn('⚠️ Supabase configuration missing — storage features disabled.');
 }
 
-const supabase = supabaseUrl && supabaseKey 
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 module.exports = {
   prisma,
