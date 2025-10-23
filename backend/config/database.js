@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const globalForPrisma = globalThis;
 
-// Optimized Prisma configuration for Railway/Render
+// Optimized Prisma configuration for Railway/Render with multiple connection strategies
 const getDatabaseUrl = () => {
   const baseUrl = process.env.DATABASE_URL;
   if (!baseUrl) {
@@ -11,11 +11,24 @@ const getDatabaseUrl = () => {
     return null; // Return null instead of throwing error
   }
   
+  console.log('🔍 Original DATABASE_URL host:', baseUrl.split('@')[1]?.split('/')[0]);
+  
   // Railway-optimized connection settings with direct connection (no pooler)
   const separator = baseUrl.includes('?') ? '&' : '?';
   // Use direct connection to avoid pooler timeout issues
   const directUrl = baseUrl.replace('.pooler.supabase.com', '.supabase.co');
-  return `${directUrl}${separator}connection_limit=10&pool_timeout=30&connect_timeout=15&statement_cache_size=0&prepared_statement_cache_queries=0&idle_in_transaction_session_timeout=15000&lock_timeout=15000`;
+  return `${directUrl}${separator}connection_limit=5&pool_timeout=20&connect_timeout=10&statement_cache_size=0&prepared_statement_cache_queries=0&idle_in_transaction_session_timeout=10000&lock_timeout=10000`;
+};
+
+// Alternative connection URL with pooler for fallback
+const getPoolerDatabaseUrl = () => {
+  const baseUrl = process.env.DATABASE_URL;
+  if (!baseUrl) return null;
+  
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  // Use pooler connection as fallback
+  const poolerUrl = baseUrl.replace('.supabase.co', '.pooler.supabase.com');
+  return `${poolerUrl}${separator}connection_limit=3&pool_timeout=15&connect_timeout=8&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true`;
 };
 
 // Initialize Prisma client only if DATABASE_URL is available
@@ -63,42 +76,61 @@ async function connectDatabase() {
     return false;
   }
   
-  let retries = 3;
+  // Try direct connection first
+  console.log('🔄 Attempting direct connection to Supabase...');
+  let retries = 2;
   
   while (retries > 0) {
     try {
       // Test connection with a simple query
       await prisma.$queryRaw`SELECT 1`;
-      console.log('✅ Database connected successfully');
+      console.log('✅ Database connected successfully (direct connection)');
       return true;
     } catch (error) {
-      console.error(`❌ Database connection failed (${4 - retries}/3):`, error.message);
-      
-      // Handle specific connection pool errors
-      if (error.code === 'P2024' || error.message?.includes('connection pool')) {
-        console.log('🔄 Connection pool timeout, resetting connection...');
-        await prisma.$disconnect();
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-      }
-      
-      // If it's a prepared statement error, try to reset the connection
-      if (error.message?.includes('prepared statement') || error.code === 'P2010') {
-        console.log('🔄 Prepared statement error, resetting connection...');
-        await prisma.$disconnect();
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-      }
+      console.error(`❌ Direct connection failed (${3 - retries}/2):`, error.message);
       
       retries--;
-      if (retries === 0) {
-        console.error('❌ All database connection attempts failed');
-        return false;
-      }
       
-      console.log(`🔄 Retrying database connection... (${retries} attempts left)`);
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds before retry
+      if (retries > 0) {
+        console.log(`🔄 Retrying direct connection... (${retries} attempts left)`);
+        await prisma.$disconnect();
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+      }
     }
   }
   
+  // If direct connection fails, try pooler connection
+  console.log('🔄 Direct connection failed, trying pooler connection...');
+  const poolerUrl = getPoolerDatabaseUrl();
+  
+  if (poolerUrl) {
+    try {
+      // Create new Prisma client with pooler URL
+      const poolerPrisma = new PrismaClient({
+        log: ['error'],
+        datasources: {
+          db: {
+            url: poolerUrl,
+          },
+        },
+        errorFormat: 'minimal',
+      });
+      
+      await poolerPrisma.$queryRaw`SELECT 1`;
+      console.log('✅ Database connected successfully (pooler connection)');
+      
+      // Replace the global prisma instance
+      await prisma.$disconnect();
+      globalForPrisma.prisma = poolerPrisma;
+      
+      return true;
+    } catch (poolerError) {
+      console.error('❌ Pooler connection also failed:', poolerError.message);
+    }
+  }
+  
+  console.log('❌ All database connection attempts failed');
+  console.log('⚠️ Database connection delayed, but server is running');
   return false;
 }
 
