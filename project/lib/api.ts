@@ -186,21 +186,28 @@ class ApiService {
         try {
             return await this.post<AuthResponse>(API_ENDPOINTS.GOOGLE_LOGIN, { idToken }); 
         } catch (error: any) {
+            console.error('Google Login Backend Error:', error);
+            
             // Handle specific backend connection errors
             if (error.code === 'NETWORK_ERROR' || !error.response) {
                 throw new Error('Unable to connect to server. Please check your internet connection and try again.');
             }
             
             if (error.response?.status === 503) {
-                throw new Error('Server is temporarily unavailable. Please try again in a few moments.');
+                throw new Error('Server is temporarily unavailable. Database connection issue. Please try again in a few moments.');
             }
             
             if (error.response?.status === 500) {
-                throw new Error('Server is experiencing issues. Please try again later.');
+                throw new Error('Server database error. Please try again in a moment.');
             }
             
-            // Pass through other errors
-            throw error;
+            if (error.response?.status === 408) {
+                throw new Error('Request timeout. Please try again.');
+            }
+            
+            // Pass through other errors with more context
+            const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
+            throw new Error(`Login failed: ${errorMessage}`);
         }
     }
     async getPosts(page: number = 1, limit: number = 10): Promise<any[]> {

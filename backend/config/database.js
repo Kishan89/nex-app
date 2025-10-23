@@ -11,9 +11,11 @@ const getDatabaseUrl = () => {
     return null; // Return null instead of throwing error
   }
   
-  // Railway-optimized connection settings for production stability
+  // Railway-optimized connection settings with direct connection (no pooler)
   const separator = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${separator}connection_limit=25&pool_timeout=60&connect_timeout=30&statement_cache_size=0&prepared_statement_cache_queries=0&pgbouncer=true&idle_in_transaction_session_timeout=30000&lock_timeout=30000`;
+  // Use direct connection to avoid pooler timeout issues
+  const directUrl = baseUrl.replace('.pooler.supabase.com', '.supabase.co');
+  return `${directUrl}${separator}connection_limit=10&pool_timeout=30&connect_timeout=15&statement_cache_size=0&prepared_statement_cache_queries=0&idle_in_transaction_session_timeout=15000&lock_timeout=15000`;
 };
 
 // Initialize Prisma client only if DATABASE_URL is available

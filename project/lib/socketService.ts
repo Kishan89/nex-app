@@ -66,7 +66,7 @@ class SocketService {
         logger.error('❌ Failed to load user ID:', userError);
       }
       // Use the same base URL as API for consistency
-      const serverUrl = process.env.EXPO_PUBLIC_API_URL || 'https://nexeed-t2wb.onrender.com';
+      const serverUrl = process.env.EXPO_PUBLIC_API_URL || 'https://nex-app-production.up.railway.app';
       this.socket = io(serverUrl, {
         auth: {
           token
@@ -91,7 +91,7 @@ class SocketService {
     if (!this.socket) return;
     // Remove all existing listeners to prevent duplicates
     this.socket.removeAllListeners();
-    const serverUrl = process.env.EXPO_PUBLIC_API_URL || 'https://nexeed-t2wb.onrender.com';
+    const serverUrl = process.env.EXPO_PUBLIC_API_URL || 'https://nex-app-production.up.railway.app';
     this.socket.on('connect', () => {
       this.isConnected = true;
       this.reconnectAttempts = 0;

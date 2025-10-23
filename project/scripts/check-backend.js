@@ -3,7 +3,7 @@
 // Backend Health Check Script for Nexeed App
 const https = require('https');
 
-const BACKEND_URL = 'https://nexeed-t2wb.onrender.com';
+const BACKEND_URL = 'https://nex-app-production.up.railway.app';
 
 async function checkEndpoint(path, description) {
     return new Promise((resolve) => {

@@ -1,6 +1,6 @@
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: process.env.EXPO_PUBLIC_API_URL || 'https://nexeed-t2wb.onrender.com',
+  BASE_URL: process.env.EXPO_PUBLIC_API_URL || 'https://nex-app-production.up.railway.app',
   TIMEOUT: 10000,
   RETRY_ATTEMPTS: 3,
 };

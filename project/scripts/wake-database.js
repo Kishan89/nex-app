@@ -3,7 +3,7 @@
 // Database Wake-up Script for Supabase Free Tier
 const https = require('https');
 
-const BACKEND_URL = 'https://nexeed-t2wb.onrender.com';
+const BACKEND_URL = 'https://nex-app-production.up.railway.app';
 
 async function wakeDatabase() {
     return new Promise((resolve) => {

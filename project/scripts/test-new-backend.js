@@ -1,6 +1,6 @@
 // Test script for new backend connection
 const testBackendConnection = async () => {
-  const newBackendUrl = 'https://nexeed-t2wb.onrender.com';
+  const newBackendUrl = 'https://nex-app-production.up.railway.app';
   
   console.log('🔍 Testing new backend connection...');
   console.log('Backend URL:', newBackendUrl);
