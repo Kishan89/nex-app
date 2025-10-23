@@ -40,7 +40,6 @@ build/
 # Backend specific
 backend/.env
 backend/prisma/generated/
-backend/config/firebase-service-account-key.json
 
 # Frontend specific
 project/.expo/
