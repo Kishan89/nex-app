@@ -13,9 +13,8 @@ const API_CONFIG = {
   expo_tunnel: 'http://localhost:3000/api', 
 };
 const getApiBaseUrl = () => {
-  // Use deployed backend URL
-  // Use Render deployed backend for all platforms
-  const deployedUrl = 'https://nexeed-t2wb.onrender.com/api';
+  // Use Railway deployed backend for all platforms
+  const deployedUrl = 'https://nex-app-production.up.railway.app/api';
   return deployedUrl;
 };
 // Re-enable network detection for real API calls

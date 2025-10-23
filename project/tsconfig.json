@@ -11,7 +11,10 @@
     "noEmit": true,
     "noImplicitAny": false,
     "skipDefaultLibCheck": true,
-    "types": ["react-native", "expo"],
+    "types": [
+      "react-native",
+      "expo"
+    ],
     "baseUrl": ".",
     "paths": {
       "@/*": [
@@ -27,5 +30,6 @@
   ],
   "exclude": [
     "node_modules"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }

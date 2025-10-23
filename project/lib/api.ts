@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import 'react-native-url-polyfill/auto';
 const API_CONFIG = {
-    BASE_URL: `https://nexeed-t2wb.onrender.com/api`,
+    BASE_URL: `https://nex-app-production.up.railway.app/api`,
     TIMEOUT: 60000,
 };
 const API_ENDPOINTS = {
