@@ -8,9 +8,19 @@ if (!admin.apps.length) {
     // Try to load service account key from environment or file
     let serviceAccount;
     
+    console.log('🔥 Firebase Admin SDK Initialization Started');
+    console.log('🔍 Environment Check:');
+    console.log('  - FIREBASE_SERVICE_ACCOUNT_KEY exists:', !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+    console.log('  - FIREBASE_PRIVATE_KEY exists:', !!process.env.FIREBASE_PRIVATE_KEY);
+    console.log('  - FIREBASE_CLIENT_EMAIL exists:', !!process.env.FIREBASE_CLIENT_EMAIL);
+    console.log('  - FIREBASE_PROJECT_ID exists:', !!process.env.FIREBASE_PROJECT_ID);
+    
     if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
       // Load from environment variable (recommended for production)
+      console.log('🔧 Using FIREBASE_SERVICE_ACCOUNT_KEY (JSON format)');
       serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      console.log('🔧 Parsed Project ID:', serviceAccount.project_id);
+      console.log('🔧 Parsed Client Email:', serviceAccount.client_email);
     } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PROJECT_ID) {
       // Load from individual environment variables
       console.log('🔧 Using individual Firebase environment variables');
@@ -25,9 +35,13 @@ if (!admin.apps.length) {
       };
     } else {
       // Load from file (for development)
+      console.log('🔧 Using local Firebase service account file');
       const serviceAccountPath = path.join(__dirname, '..', 'config', 'firebase-service-account-key.json');
+      console.log('🔧 File path:', serviceAccountPath);
       try {
         serviceAccount = require(serviceAccountPath);
+        console.log('🔧 File Project ID:', serviceAccount.project_id);
+        console.log('🔧 File Client Email:', serviceAccount.client_email);
       } catch (error) {
         console.warn('⚠️ Firebase service account key not found. FCM notifications will not work.');
         console.warn('Please add firebase-service-account-key.json to backend/config/ or set FIREBASE_SERVICE_ACCOUNT_KEY environment variable.');
