@@ -140,6 +140,11 @@ export default function SearchUsersScreen() {
         // ⚡ INSTANT UI UPDATE: Update local state immediately
         updateUserFollowStatus(targetUser.id, result.isFollowing);
         console.log(`⚡ Instant follow toggle in search: ${targetUser.id} -> ${result.isFollowing}`);
+      } else {
+        // Handle failure case - don't show alert for operation in progress
+        if (result.error !== 'Operation already in progress') {
+          Alert.alert('Info', result.error || 'Please try again');
+        }
       }
     } catch (error) {
       console.error('❌ Follow toggle failed in search:', error);

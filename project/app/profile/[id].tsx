@@ -143,7 +143,11 @@ export default function ProfileScreen() {
       } else {
         // Handle failure case
         console.warn(`⚠️ Follow toggle failed:`, result.error);
-        Alert.alert('Info', result.error || 'Operation already in progress');
+        
+        // Don't show alert for "operation in progress" - it's just protection
+        if (result.error !== 'Operation already in progress') {
+          Alert.alert('Info', result.error || 'Please try again');
+        }
       }
 
     } catch (error: any) {
