@@ -39,6 +39,8 @@ export default function SearchUsersScreen() {
   const [recentSearches, setRecentSearches] = useState<SearchUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+  const [followLoading, setFollowLoading] = useState<string | null>(null);
+  const [chatLoadingId, setChatLoadingId] = useState<string | null>(null);
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
   // Helper function to filter out test users
@@ -131,7 +133,13 @@ export default function SearchUsersScreen() {
     }
   };
   const handleFollowToggle = async (targetUser: SearchUser) => {
+    if (followLoading === targetUser.id) {
+      return; // Prevent multiple clicks while loading
+    }
+    
     try {
+      setFollowLoading(targetUser.id); // Set loading for this specific user
+      
       // 🚀 INSTANT FOLLOW: Update UI immediately, sync in background
       const { followOptimizations } = await import('../../lib/followOptimizations');
       const result = await followOptimizations.optimisticFollowToggle(targetUser.id, targetUser.isFollowing);
@@ -140,6 +148,10 @@ export default function SearchUsersScreen() {
         // ⚡ INSTANT UI UPDATE: Update local state immediately
         updateUserFollowStatus(targetUser.id, result.isFollowing);
         console.log(`⚡ Instant follow toggle in search: ${targetUser.id} -> ${result.isFollowing}`);
+        
+        // Show success alert for follow/unfollow
+        const message = result.isFollowing ? 'Following!' : 'Unfollowed!';
+        Alert.alert('Success', message);
       } else {
         // Handle failure case - don't show alert for operation in progress
         if (result.error !== 'Operation already in progress') {
@@ -149,6 +161,8 @@ export default function SearchUsersScreen() {
     } catch (error) {
       console.error('❌ Follow toggle failed in search:', error);
       Alert.alert('Error', 'Failed to update follow status. Please try again.');
+    } finally {
+      setFollowLoading(null); // Clear loading state
     }
   };
   const updateUserFollowStatus = (userId: string, isFollowing: boolean) => {
@@ -159,18 +173,23 @@ export default function SearchUsersScreen() {
     setRecentSearches(prev => prev.map(updateUser));
   };
   const handleMessageUser = async (targetUser: SearchUser) => {
+    if (chatLoadingId) return;
     // Save to recent searches
     saveRecentSearch(targetUser);
-    proceedWithChatCreation(targetUser);
-  };
-  const proceedWithChatCreation = async (targetUser: SearchUser) => {
     try {
+      setChatLoadingId(targetUser.id);
+      // Create chat then navigate once with real ID
       const chat = await apiService.createChatWithUser(targetUser.id);
       const chatId = (chat as any)?.id || (chat as any)?.data?.id;
-      // Navigate to chat
-      router.push(`/chat/${chatId}`);
+      if (chatId) {
+        router.push(`/chat/${chatId}`);
+      } else {
+        Alert.alert('Error', 'Failed to start chat. Please try again.');
+      }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to start chat. Please try again.');
+    } finally {
+      setChatLoadingId(null);
     }
   };
   // Handle user profile navigation
@@ -209,14 +228,18 @@ export default function SearchUsersScreen() {
         <TouchableOpacity
           style={[
             styles.followButton,
-            item.isFollowing ? styles.followingButton : styles.followButton
+            item.isFollowing ? styles.followingButton : styles.followButton,
+            followLoading === item.id && styles.loadingButton
           ]}
           onPress={(e) => {
             e.stopPropagation();
             handleFollowToggle(item);
           }}
+          disabled={followLoading === item.id}
         >
-          {item.isFollowing ? (
+          {followLoading === item.id ? (
+            <ActivityIndicator size="small" color={item.isFollowing ? colors.text : "#ffffff"} />
+          ) : item.isFollowing ? (
             <UserMinus size={16} color={colors.text} />
           ) : (
             <UserPlus size={16} color="#ffffff" />
@@ -228,8 +251,13 @@ export default function SearchUsersScreen() {
             e.stopPropagation();
             handleMessageUser(item);
           }}
+          disabled={chatLoadingId === item.id}
         >
-          <MessageCircle size={16} color={colors.primary} />
+          {chatLoadingId === item.id ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <MessageCircle size={16} color={colors.primary} />
+          )}
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -438,6 +466,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.backgroundTertiary,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  loadingButton: {
+    opacity: 0.7,
   },
   chatButton: {
     backgroundColor: colors.backgroundTertiary,

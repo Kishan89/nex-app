@@ -290,7 +290,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingBottom: 100, // Extend background beyond safe area
   },
   header: {
     flexDirection: 'row',

@@ -133,12 +133,12 @@ export default function ProfileScreen() {
         // ⚡ INSTANT UI UPDATE: Update local state immediately
         setIsFollowing(result.isFollowing);
 
-        // 🎉 SUCCESS FEEDBACK: Show instant success
+        // 🎉 SUCCESS FEEDBACK: Show success alert
         const message = result.isFollowing ? 'Following!' : 'Unfollowed!';
         console.log(`✅ ${message} User: ${userId}`);
         
-        // Optional: Show success alert (can be removed for cleaner UX)
-        // Alert.alert('Success', message);
+        // Show success alert for follow/unfollow
+        Alert.alert('Success', message);
 
       } else {
         // Handle failure case
@@ -159,21 +159,25 @@ export default function ProfileScreen() {
     }
   }, [userId, isFollowing, followLoading]);
 
-  // Handle start chat
+  // Handle start chat - INSTANT NAVIGATION
+  const [chatLoading, setChatLoading] = useState(false);
   const handleStartChat = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || chatLoading) return;
     try {
+      setChatLoading(true);
       const chat = await apiService.createChatWithUser(String(userId));
       const chatId = (chat as any)?.id || (chat as any)?.data?.id;
       if (chatId) {
         router.push(`/chat/${chatId}`);
       } else {
-        Alert.alert('Error', 'Failed to create chat. Please try again.');
+        Alert.alert('Error', 'Failed to start chat. Please try again.');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to start chat. Please try again.');
+    } finally {
+      setChatLoading(false);
     }
-  }, [userId]);
+  }, [userId, chatLoading]);
   // Optimized post filtering with early returns
   const userPosts = useMemo(() => {
     if (!profile?.username) return [];
@@ -418,8 +422,12 @@ export default function ProfileScreen() {
                       </>
                     )}
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.backgroundTertiary, borderColor: colors.primary }]} onPress={handleStartChat}>
-                    <MessageCircle size={20} color={colors.primary} />
+                  <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.backgroundTertiary, borderColor: colors.primary }]} onPress={handleStartChat} disabled={chatLoading}>
+                    {chatLoading ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <MessageCircle size={20} color={colors.primary} />
+                    )}
                   </TouchableOpacity>
                 </View>
               )}

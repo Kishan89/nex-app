@@ -361,10 +361,12 @@ export default function HomeScreen() {
                   tintColor={colors.primary}
                   title="Pull to refresh"
                   titleColor={colors.textSecondary}
+                  progressViewOffset={120} // Position refresh control below header
+                  progressBackgroundColor={colors.background}
                 />
               }
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 80, paddingTop: 140 }} // Increased top padding for more space after tabs
+              contentContainerStyle={{ paddingBottom: 80, paddingTop: 140 }} // Original padding to maintain content position
               onEndReached={handleLoadMore}
               onEndReachedThreshold={0.1}
               ListFooterComponent={renderFooter}
@@ -427,7 +429,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 1000,
+    zIndex: 100,
     backgroundColor: colors.background,
   },
   topBar: {

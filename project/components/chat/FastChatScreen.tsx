@@ -79,14 +79,15 @@ const FastChatScreen = React.memo(function FastChatScreen({
   // 🚀 IMPROVED: Auto-scroll whenever messages change with better timing
   useEffect(() => {
     if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      // 🚀 MULTIPLE AUTO-SCROLL ATTEMPTS for reliability
-      // Immediate scroll
-      setTimeout(() => scrollToBottom(true), 0);
-      // Backup scroll after short delay
-      setTimeout(() => scrollToBottom(true), 100);
+      // 🚀 INSTANT SCROLL: Multiple attempts for reliability
+      // Immediate scroll (no animation for instant effect)
+      setTimeout(() => scrollToBottom(false), 0);
+      // Backup scroll with animation
+      setTimeout(() => scrollToBottom(true), 50);
       // Final scroll after layout
-      setTimeout(() => scrollToBottom(true), 200);
+      setTimeout(() => scrollToBottom(true), 150);
+      // Extra scroll for reliability
+      setTimeout(() => scrollToBottom(true), 300);
     }
   }, [messages, scrollToBottom]);
   // ⚡ ULTRA-FAST MESSAGE LOADING - INSTANT DISPLAY
@@ -454,10 +455,16 @@ const FastChatScreen = React.memo(function FastChatScreen({
       // 🚀 INSTANT: Load profile and messages (0ms delay)
       loadProfile();
       loadMessages(false); // Instant from ultra-fast cache
-      // 🚀 INSTANT: Auto scroll (immediate)
+      // 🚀 INSTANT: Auto scroll (immediate) - Multiple attempts for reliability
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: false });
       }, 0);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 200);
       // 📡 BACKGROUND: Initialize socket connection (non-blocking)
       setTimeout(async () => {
         const socketInitialized = await socketService.initialize();
@@ -741,7 +748,9 @@ const FastChatScreen = React.memo(function FastChatScreen({
         getItemLayout={undefined}
         extraData={messages}
         onLayout={() => {
-          // Auto scroll to last message when chat opens
+          // Auto scroll to last message when chat opens - Multiple attempts
+          setTimeout(() => scrollToBottom(false), 0);
+          setTimeout(() => scrollToBottom(false), 50);
           setTimeout(() => scrollToBottom(false), 100);
         }}
       />

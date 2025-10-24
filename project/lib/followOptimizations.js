@@ -31,11 +31,12 @@ class FollowOptimizations {
         .find(op => op.userId === userId);
       
       if (existingOperation) {
-        console.log(`⚠️ Follow operation already pending for user ${userId}, skipping`);
+        console.log(`⚠️ Follow operation already pending for user ${userId}, showing loading state`);
         return {
           success: false,
           error: 'Operation already in progress',
-          isFollowing: currentFollowState
+          isFollowing: currentFollowState,
+          showLoading: true // Indicate that loading should be shown
         };
       }
       
