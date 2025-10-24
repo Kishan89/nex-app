@@ -74,13 +74,18 @@ export default function NotificationsScreen() {
     try {
       setError(null);
       if (notifications.length === 0) setLoading(true);
+      console.log('🔄 Loading notifications for user:', user.id);
       const notificationsData = await apiService.getUserNotifications(user.id);
+      console.log('📊 Raw notifications data:', notificationsData);
       if (Array.isArray(notificationsData)) {
         // Filter to show only like, comment, follow notifications (exclude chat/message)
         const filteredNotifications = notificationsData.filter((notification: SimpleNotification) => {
           const type = notification.type?.toLowerCase() || '';
-          return ['like', 'comment', 'follow'].includes(type);
+          const isAllowed = ['like', 'comment', 'follow'].includes(type);
+          console.log(`🔍 Notification: ${type} - ${isAllowed ? 'allowed' : 'excluded'}`);
+          return isAllowed;
         });
+        console.log('📝 Filtered notifications:', filteredNotifications);
         setNotifications(filteredNotifications);
         // Cache the notifications for instant loading next time
         notificationCache.cacheNotifications(filteredNotifications);
@@ -117,17 +122,11 @@ export default function NotificationsScreen() {
               const response = await apiService.markNotificationsAsRead(user.id);
               console.log('✅ Notifications marked as read on server:', response);
               
-              // If server marking was successful, refresh the count
-              if (response && response.count > 0) {
-                console.log(`📊 Server marked ${response.count} notifications as read`);
-                console.log(`📊 Remaining unread: ${response.remainingUnread}`);
-                // Force refresh the notification count to ensure sync
-                setTimeout(() => {
-                  refreshNotificationCount();
-                }, 1000);
-              } else {
-                console.log('📊 No notifications were marked as read on server');
-              }
+              // Always refresh count after server marking, regardless of count
+              // Force refresh the notification count to ensure sync
+              setTimeout(() => {
+                refreshNotificationCount();
+              }, 500);
             } catch (error) {
               console.error('❌ Error marking notifications as read on server:', error);
               // If server marking fails, still keep the optimistic update

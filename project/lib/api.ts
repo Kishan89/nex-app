@@ -330,13 +330,18 @@ class ApiService {
     getChatMessages(chatId: string) { return this.get<Message[]>(API_ENDPOINTS.CHAT_MESSAGES(chatId)); }
     sendMessage(chatId: string, messageData: MessageData) { return this.post<Message>(API_ENDPOINTS.SEND_MESSAGE(chatId), messageData); }
     deleteChat(chatId: string) { return this.delete(`/chats/${chatId}`); }
-    getUserNotifications(userId: string) {
+    getUserNotifications(userId: string, forceRefresh = false) {
         const endpoint = API_ENDPOINTS.USER_NOTIFICATIONS(userId);
-        return this._request<Notification[]>("GET", endpoint)
+        // Add cache busting parameter if force refresh is requested
+        const url = forceRefresh ? `${endpoint}?t=${Date.now()}` : endpoint;
+        console.log('🌐 API: Fetching notifications from:', url);
+        return this._request<Notification[]>("GET", url)
             .then(notifications => {
+                console.log('📡 API Response: Raw notifications:', notifications);
                 return Array.isArray(notifications) ? notifications : [];
             })
             .catch(error => {
+                console.error('❌ API Error fetching notifications:', error);
                 return [];
             });
     }

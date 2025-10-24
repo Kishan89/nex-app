@@ -14,6 +14,21 @@ const getNotificationsByUserId = async (req, res) => {
         
         console.log(`📋 Fetching notifications for user: ${userId}`);
         
+        // First check all notifications for this user
+        const allNotifications = await prisma.notification.findMany({
+            where: {
+                userId: userId
+            },
+            select: {
+                id: true,
+                type: true,
+                read: true,
+                message: true,
+                createdAt: true
+            }
+        });
+        console.log(`🔍 All notifications for user ${userId}:`, allNotifications);
+        
         try {
             // 🚀 OPTIMIZED QUERY: Get only like, comment, follow notifications
             const notifications = await prisma.notification.findMany({
@@ -80,27 +95,8 @@ const getNotificationsByUserId = async (req, res) => {
             });
             res.status(200).json(transformedNotifications);
 
-            // 🔄 BACKGROUND PROCESSING: Mark as read in background (only like, comment, follow)
-            setImmediate(async () => {
-                try {
-                    await prisma.notification.updateMany({
-                        where: { 
-                            userId: userId,
-                            read: false,
-                            // Only mark like, comment, follow notifications as read
-                            type: {
-                                in: ['LIKE', 'COMMENT', 'FOLLOW']
-                            }
-                        },
-                        data: { 
-                            read: true 
-                        }
-                    });
-                    console.log(`✅ Background: Marked like/comment/follow notifications as read for user ${userId}`);
-                } catch (markError) {
-                    console.error('⚠️ Background error marking notifications as read:', markError);
-                }
-            });
+            // ❌ REMOVED: Don't automatically mark notifications as read when fetching
+            // Notifications should only be marked as read when user explicitly views them
 
         } catch (dbError) {
             console.error(`❌ Database error fetching notifications for user ${userId}:`, dbError);
