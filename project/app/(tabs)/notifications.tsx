@@ -108,12 +108,23 @@ export default function NotificationsScreen() {
       // This provides instant UI feedback and server sync
       (async () => {
         try {
+          // First mark locally for instant UI feedback
           await markNotificationsAsRead();
+          
+          // Then mark on server in background
+          if (user?.id) {
+            try {
+              await apiService.markNotificationsAsRead(user.id);
+              console.log('✅ Notifications marked as read on server');
+            } catch (error) {
+              console.error('Error marking notifications as read on server:', error);
+            }
+          }
         } catch (error) {
           console.error('Error marking notifications as read:', error);
         }
       })();
-    }, [loadNotifications, markNotificationsAsRead])
+    }, [loadNotifications, markNotificationsAsRead, user?.id])
   );
   const onRefresh = useCallback(() => {
     setRefreshing(true);

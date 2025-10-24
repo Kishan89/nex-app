@@ -6,6 +6,8 @@ interface NotificationCountContextType {
   unreadNotificationCount: number;
   refreshNotificationCount: () => Promise<void>;
   markNotificationsAsRead: () => void;
+  incrementNotificationCount: () => void;
+  decrementNotificationCount: () => void;
 }
 const NotificationCountContext = createContext<NotificationCountContextType | undefined>(undefined);
 export const useNotificationCount = () => {
@@ -48,13 +50,10 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
     // Optimistic update - immediately set to 0 for instant UI feedback
     setUnreadNotificationCount(0);
     
-    // Then refresh from server to ensure accuracy
-    try {
-      await refreshNotificationCount();
-    } catch (error) {
-      console.error('Error refreshing notification count after marking as read:', error);
-    }
-  }, [refreshNotificationCount]);
+    // Don't refresh from server immediately to maintain optimistic update
+    // Server will be updated by the notifications screen
+    console.log('✅ Notifications marked as read (optimistic update)');
+  }, []);
   // Load initial notification count
   useEffect(() => {
     if (user?.id) {
@@ -63,21 +62,30 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
       setUnreadNotificationCount(0);
     }
   }, [user?.id, refreshNotificationCount]);
-  // Refresh notification count periodically (only when count > 0)
+  // Refresh notification count periodically
   useEffect(() => {
     if (!user?.id) return;
     const interval = setInterval(() => {
-      // Only refresh if there are unread notifications to avoid unnecessary API calls
-      if (unreadNotificationCount > 0) {
-        refreshNotificationCount();
-      }
-    }, 30000); // Refresh every 30 seconds when there are unread notifications
+      refreshNotificationCount();
+    }, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
-  }, [user?.id, refreshNotificationCount, unreadNotificationCount]);
+  }, [user?.id, refreshNotificationCount]);
+
+  // Add method to increment count when new notification arrives
+  const incrementNotificationCount = useCallback(() => {
+    setUnreadNotificationCount(prev => prev + 1);
+  }, []);
+
+  // Add method to decrement count when notification is read
+  const decrementNotificationCount = useCallback(() => {
+    setUnreadNotificationCount(prev => Math.max(0, prev - 1));
+  }, []);
   const value: NotificationCountContextType = {
     unreadNotificationCount,
     refreshNotificationCount,
     markNotificationsAsRead,
+    incrementNotificationCount,
+    decrementNotificationCount,
   };
   return (
     <NotificationCountContext.Provider value={value}>

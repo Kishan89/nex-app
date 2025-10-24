@@ -21,7 +21,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { Message } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useChatContext } from '@/context/ChatContext';
-import { useMemorySafeTimeout, useMemorySafeInterval } from '@/lib/memoryManager';
+// Memory management will be handled by regular setTimeout for now
 import { apiService } from '@/lib/api';
 import { chatMessageCache } from '@/store/chatMessageCache';
 import { formatMessageTime, getCurrentTimestamp, fixServerTimestamp, compareTimestamps } from '@/lib/timestampUtils';
@@ -70,6 +70,17 @@ const FastChatScreen = React.memo(function FastChatScreen({
   const [isSending, setIsSending] = useState(false);
   // Refs
   const flatListRef = useRef<FlatList>(null);
+  const timeoutRefs = useRef<Set<NodeJS.Timeout>>(new Set());
+  
+  // Helper function for memory-safe timeouts
+  const safeSetTimeout = useCallback((callback: () => void, delay: number) => {
+    const timeout = setTimeout(() => {
+      timeoutRefs.current.delete(timeout);
+      callback();
+    }, delay);
+    timeoutRefs.current.add(timeout);
+    return timeout;
+  }, []);
   // 🚀 UTILITY: Reliable scroll to bottom function
   const scrollToBottom = useCallback((animated: boolean = true) => {
     try {
@@ -80,17 +91,32 @@ const FastChatScreen = React.memo(function FastChatScreen({
   // 🚀 IMPROVED: Auto-scroll whenever messages change with better timing
   useEffect(() => {
     if (messages.length > 0) {
+      // Clear existing timeouts
+      timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+      timeoutRefs.current.clear();
+      
       // 🚀 INSTANT SCROLL: Multiple attempts for reliability
       // Immediate scroll (no animation for instant effect)
-      useMemorySafeTimeout(() => scrollToBottom(false), 0);
+      safeSetTimeout(() => scrollToBottom(false), 0);
+      
       // Backup scroll with animation
-      useMemorySafeTimeout(() => scrollToBottom(true), 50);
+      safeSetTimeout(() => scrollToBottom(true), 50);
+      
       // Final scroll after layout
-      useMemorySafeTimeout(() => scrollToBottom(true), 150);
+      safeSetTimeout(() => scrollToBottom(true), 150);
+      
       // Extra scroll for reliability
-      useMemorySafeTimeout(() => scrollToBottom(true), 300);
+      safeSetTimeout(() => scrollToBottom(true), 300);
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, scrollToBottom, safeSetTimeout]);
+
+  // Cleanup timeouts on component unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+      timeoutRefs.current.clear();
+    };
+  }, []);
   // ⚡ ULTRA-FAST MESSAGE LOADING - INSTANT DISPLAY
   const loadMessages = useCallback(async (forceRefresh = false) => {
     if (!user || !chatData?.id) return;
@@ -102,9 +128,9 @@ const FastChatScreen = React.memo(function FastChatScreen({
         setMessages(instantMessages);
         setLoading(false);
         // Auto scroll immediately
-        setTimeout(() => scrollToBottom(false), 0);
+        safeSetTimeout(() => scrollToBottom(false), 0);
         // Background sync after 100ms (non-blocking)
-        setTimeout(() => {
+        safeSetTimeout(() => {
           if (!isSending) {
             loadMessages(true);
           }

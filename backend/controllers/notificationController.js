@@ -112,6 +112,46 @@ const getNotificationsByUserId = async (req, res) => {
     }
 };
 
+// Mark notifications as read for a user
+const markNotificationsAsRead = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        if (!userId) {
+            return res.status(400).json({ message: 'User ID is required' });
+        }
+
+        console.log(`📝 Marking notifications as read for user: ${userId}`);
+
+        // Mark only like, comment, follow notifications as read (exclude chat/message)
+        const result = await prisma.notification.updateMany({
+            where: {
+                userId: userId,
+                read: false,
+                // Only mark like, comment, follow notifications as read
+                type: {
+                    in: ['LIKE', 'COMMENT', 'FOLLOW']
+                }
+            },
+            data: {
+                read: true
+            }
+        });
+
+        console.log(`✅ Marked ${result.count} notifications as read for user ${userId}`);
+
+        return res.status(200).json({ 
+            message: 'Notifications marked as read successfully',
+            count: result.count 
+        });
+
+    } catch (error) {
+        console.error('❌ Error marking notifications as read:', error);
+        return res.status(500).json({ message: 'Failed to mark notifications as read' });
+    }
+};
+
 module.exports = {
-    getNotificationsByUserId
+    getNotificationsByUserId,
+    markNotificationsAsRead
 };

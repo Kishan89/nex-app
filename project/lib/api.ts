@@ -28,6 +28,7 @@ const API_ENDPOINTS = {
     USER_PROFILE: (userId: string) => `/users/${userId}/profile`,
     AUTHENTICATED_USER_PROFILE: "/users/me/profile",
     USER_NOTIFICATIONS: (userId: string) => `/notifications/${userId}`,
+    MARK_NOTIFICATIONS_READ: (userId: string) => `/notifications/${userId}/mark-read`,
     USER_CHATS: (userId: string) => `/chats/${userId}`,
     CHAT_MESSAGES: (chatId: string) => `/chats/${chatId}/messages`,
     SEND_MESSAGE: (chatId: string) => `/chats/${chatId}/messages`,
@@ -338,6 +339,11 @@ class ApiService {
             .catch(error => {
                 return [];
             });
+    }
+
+    async markNotificationsAsRead(userId: string): Promise<void> {
+        const endpoint = API_ENDPOINTS.MARK_NOTIFICATIONS_READ(userId);
+        return this._request<void>("PUT", endpoint);
     }
     async uploadImageFile(uri: string, fieldName = "file", folder = "uploads") {
         if (!uri) throw new Error("No file URI provided for upload");
