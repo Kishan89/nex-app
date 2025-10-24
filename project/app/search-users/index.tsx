@@ -132,17 +132,17 @@ export default function SearchUsersScreen() {
   };
   const handleFollowToggle = async (targetUser: SearchUser) => {
     try {
-      const newFollowState = !targetUser.isFollowing;
-      if (targetUser.isFollowing) {
-        await apiService.unfollowUser(targetUser.id);
-      } else {
-        await apiService.followUser(targetUser.id);
+      // 🚀 INSTANT FOLLOW: Update UI immediately, sync in background
+      const { followOptimizations } = await import('../../lib/followOptimizations');
+      const result = await followOptimizations.optimisticFollowToggle(targetUser.id, targetUser.isFollowing);
+      
+      if (result.success) {
+        // ⚡ INSTANT UI UPDATE: Update local state immediately
+        updateUserFollowStatus(targetUser.id, result.isFollowing);
+        console.log(`⚡ Instant follow toggle in search: ${targetUser.id} -> ${result.isFollowing}`);
       }
-      // Update local state
-      updateUserFollowStatus(targetUser.id, newFollowState);
-      // Sync follow state across all screens
-      await followSync.updateFollowState(targetUser.id, newFollowState);
     } catch (error) {
+      console.error('❌ Follow toggle failed in search:', error);
       Alert.alert('Error', 'Failed to update follow status. Please try again.');
     }
   };

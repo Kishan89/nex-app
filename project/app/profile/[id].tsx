@@ -104,68 +104,45 @@ export default function ProfileScreen() {
     }
     return unsubscribe;
   }, [userId, isMyProfile]);
+
   const onCombinedRefresh = useCallback(() => {
     onRefresh();
     fetchProfileData(true); // Force refresh on manual pull
   }, [onRefresh, fetchProfileData]);
+
   // Remove frequent auto-refresh to improve performance
   // Only refresh on manual pull-to-refresh or when returning from background
-  // Handle follow/unfollow with sync
+  // Handle follow/unfollow with INSTANT UI updates
   const handleFollowToggle = useCallback(async () => {
     if (!userId || followLoading) return;
+
     try {
       setFollowLoading(true);
-      const newFollowState = !isFollowing;
-      if (isFollowing) {
-        await apiService.unfollowUser(String(userId));
-        Alert.alert('Success', 'User unfollowed successfully');
-      } else {
-        await apiService.followUser(String(userId));
-        Alert.alert('Success', 'User followed successfully');
+
+      // 🚀 INSTANT FOLLOW: UI updates immediately, API syncs in background
+      const { followOptimizations } = await import('../../lib/followOptimizations');
+      const result = await followOptimizations.optimisticFollowToggle(String(userId), isFollowing);
+
+      if (result.success) {
+        // ⚡ INSTANT UI UPDATE: Update local state immediately
+        setIsFollowing(result.isFollowing);
+
+        // 🎉 SUCCESS FEEDBACK: Show instant success
+        const message = result.isFollowing ? 'Following!' : 'Unfollowed!';
+        Alert.alert('Success', message);
+
+        console.log(`⚡ Instant follow toggle completed: ${userId} -> ${result.isFollowing}`);
       }
-      // Update local state immediately
-      setIsFollowing(newFollowState);
-      // Update profile store cache
-      await profileStore.updateFollowStatus(userId, newFollowState);
-      // Sync follow state across all screens
-      await followSync.updateFollowState(String(userId), newFollowState);
-      // Get updated follow counts from backend and update profile
-      try {
-        const updatedCounts = await apiService.getFollowCounts(String(userId));
-        // Type-safe access to the response data
-        const countsData = (updatedCounts as any)?.data;
-        if (profile && countsData && typeof countsData.followers === 'number' && typeof countsData.following === 'number') {
-          // Update local state
-          setProfile(prev => prev ? {
-            ...prev,
-            followers_count: countsData.followers,
-            following_count: countsData.following
-          } : prev);
-          // Update profile store cache with new counts
-          await profileStore.updateFollowCounts(userId, countsData.followers, countsData.following);
-          // Also update current user's following count if this is a follow action
-          if (user?.id && newFollowState) {
-            try {
-              const currentUserCounts = await apiService.getFollowCounts(user.id);
-              const currentUserCountsData = (currentUserCounts as any)?.data;
-              if (currentUserCountsData) {
-                await profileStore.updateFollowCounts(user.id, currentUserCountsData.followers, currentUserCountsData.following);
-                }
-            } catch (currentUserError) {
-              }
-          }
-          } else {
-          }
-      } catch (countError) {
-        // Fallback to full profile refresh if count update fails
-        fetchProfileData(true);
-      }
+
     } catch (error: any) {
+      console.error('❌ Follow toggle failed:', error);
       Alert.alert('Error', error.message || 'Failed to update follow status. Please try again.');
     } finally {
+      // ⚡ INSTANT LOADING STATE: Remove loading immediately
       setFollowLoading(false);
     }
-  }, [userId, isFollowing, followLoading, profile, fetchProfileData]);
+  }, [userId, isFollowing, followLoading]);
+
   // Handle start chat
   const handleStartChat = useCallback(async () => {
     if (!userId) return;
