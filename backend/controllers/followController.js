@@ -1,6 +1,5 @@
 const followService = require('../services/followService');
-const notificationService = require('../services/notificationService');
-const { sendFollowNotification } = require('../services/fcmService');
+const { addFollowNotificationJob, addFollowCountUpdateJob } = require('../services/queueService');
 const { successResponse, errorResponse } = require('../utils/helpers');
 
 class FollowController {
@@ -24,27 +23,25 @@ class FollowController {
 
       const follow = await followService.followUser(followerId, userId);
 
-      // Create notification for the followed user
+      // 🚀 INSTANT RESPONSE - Send success immediately
+      console.log(`Follow successful: ${followerId} -> ${userId}`);
+      res.status(201).json(successResponse(follow, 'User followed successfully'));
+
+      // 🔄 BACKGROUND PROCESSING - Queue notification and count updates
       try {
         const followerUsername = follow.follower?.username || 'Someone';
         
-        // Create in-app notification
-        await notificationService.createNotification({
-          userId: userId,
-          fromUserId: followerId,
-          type: 'FOLLOW',
-          message: `${followerUsername} started following you`
-        });
-
-        // Send FCM push notification
-        await sendFollowNotification(userId, followerId, followerUsername);
-      } catch (notificationError) {
-        console.error('Failed to create follow notification:', notificationError);
-        // Don't fail the follow operation if notification fails
+        // Add notification job to queue (processed in background)
+        await addFollowNotificationJob(userId, followerId, followerUsername);
+        
+        // Add follow count update job to queue
+        await addFollowCountUpdateJob(followerId, userId);
+        
+        console.log(`📋 Background jobs queued for follow: ${followerId} -> ${userId}`);
+      } catch (queueError) {
+        console.error('Failed to queue background jobs:', queueError);
+        // Don't affect the response since it's already sent
       }
-
-      console.log(`Follow successful: ${followerId} -> ${userId}`);
-      res.status(201).json(successResponse(follow, 'User followed successfully'));
     } catch (error) {
       console.error('Error in followUser:', error);
       if (error.message === 'Already following this user') {

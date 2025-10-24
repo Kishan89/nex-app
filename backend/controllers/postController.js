@@ -1,5 +1,5 @@
 const postService = require('../services/postService');
-const xpService = require('../services/xpService');
+const { addXpJob } = require('../services/queueService');
 const { successResponse, errorResponse } = require('../utils/helpers');
 
 class PostController {
@@ -65,15 +65,17 @@ class PostController {
       
       const post = await postService.createPost({ content, imageUrl, userId, pollData });
       
-      // Award XP for creating a post
-      try {
-        await xpService.awardPostCreationXP(userId);
-      } catch (xpError) {
-        console.error('❌ Error awarding XP for post creation:', xpError);
-        // Don't fail the post creation if XP fails
-      }
-      
+      // 🚀 INSTANT RESPONSE - Send success immediately
       res.status(201).json(successResponse(post, 'Post created successfully'));
+      
+      // 🔄 BACKGROUND PROCESSING - Queue XP award
+      try {
+        await addXpJob(userId);
+        console.log(`📋 XP job queued for user: ${userId}`);
+      } catch (queueError) {
+        console.error('❌ Error queuing XP job:', queueError);
+        // Don't affect the response since it's already sent
+      }
     } catch (error) {
       next(error);
     }

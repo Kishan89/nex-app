@@ -10,6 +10,7 @@ const { dbMonitor } = require('./utils/dbMonitor');
 const apiRoutes = require('./routes');
 const pushTokenRoutes = require('./routes/pushTokenRoutes');
 const socketService = require('./services/socketService');
+const queueService = require('./services/queueService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;

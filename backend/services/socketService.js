@@ -373,6 +373,11 @@ class SocketService {
     return false;
   }
 
+  // Emit to user (alias for sendToUser for consistency)
+  emitToUser(userId, event, data) {
+    return this.sendToUser(userId, event, data);
+  }
+
   // Send message to chat room
   sendToChat(chatId, event, data) {
     this.io.to(`chat:${chatId}`).emit(event, data);

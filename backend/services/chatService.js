@@ -1,10 +1,11 @@
 const { prisma } = require('../config/database');
 const { formatTimeAgo } = require('../utils/helpers');
 const followService = require('./followService');
+const userCacheService = require('./userCacheService');
 
 class ChatService {
   /**
-   * Get user's chats
+   * Get user's chats (OPTIMIZED for instant loading)
    * @param {string} userId - User ID
    * @returns {Promise<Array>} - Array of chats
    */
@@ -18,7 +19,7 @@ class ChatService {
         return [];
       }
       
-      // Direct prisma query with error handling
+      // 🚀 OPTIMIZED QUERY: Single query with all data
       const chats = await prisma.chat.findMany({
           where: {
             participants: {
@@ -27,9 +28,12 @@ class ChatService {
               },
             },
           },
-          include: {
+          select: {
+            id: true,
+            updatedAt: true,
             participants: {
-              include: {
+              select: {
+                userId: true,
                 user: {
                   select: {
                     id: true,
@@ -41,81 +45,80 @@ class ChatService {
                 }
               },
               where: {
-                userId: { not: userId } // Get other participants
+                userId: { not: userId } // Get other participants only
               }
             },
             messages: {
-              orderBy: { createdAt: 'desc' },
-              take: 1, // Get latest message
-              include: {
+              select: {
+                id: true,
+                content: true,
+                createdAt: true,
+                senderId: true,
+                status: true,
                 sender: {
                   select: {
                     username: true
                   }
                 }
-              }
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1, // Get latest message only
             },
-            // Temporarily disable _count to avoid Prisma errors
-            // We'll implement proper unread logic differently
+            // Get unread count in single query
+            _count: {
+              select: {
+                messages: {
+                  where: {
+                    senderId: { not: userId },
+                    status: { not: 'READ' }
+                  }
+                }
+              }
+            }
           },
           orderBy: {
-            // You can order by the latest message's creation date to show recent chats first
             updatedAt: 'desc'
           }
         });
 
-      // Format the data to return a clean chat list for the frontend
-      const formattedChats = await Promise.all(chats.map(async (chat) => {
+      // 🚀 FAST FORMATTING: Process all chats in single pass
+      const formattedChats = chats.map((chat) => {
         const otherParticipant = chat.participants[0]?.user;
         const lastMessage = chat.messages[0];
+        const unreadCount = chat._count?.messages || 0;
         
-        // Real unread count - count unread messages from others in THIS specific chat
-        let unreadCount = 0;
-        try {
-          // Count only unread messages from others in THIS chat
-          const unreadMessages = await prisma.message.count({
-            where: {
-              chatId: chat.id, // CRITICAL: Filter by this specific chat
-              senderId: { not: userId }, // Messages from others
-              status: { not: 'READ' } // Only unread messages
-            }
-          });
-          unreadCount = unreadMessages;
-        } catch (error) {
-            unreadCount = 0;
-        }
-        
-        // Format last seen properly
-        let lastSeenText = '';
+        // Fast last seen formatting
+        let lastSeenText = 'Last seen recently';
         if (otherParticipant?.isOnline) {
           lastSeenText = 'Online';
         } else if (otherParticipant?.lastSeen) {
           const timeAgo = formatTimeAgo(otherParticipant.lastSeen);
           lastSeenText = timeAgo === 'now' ? 'Last seen just now' : `Last seen ${timeAgo} ago`;
-        } else {
-          lastSeenText = 'Last seen recently';
         }
         
         return {
           id: chat.id,
           name: otherParticipant?.username || 'Unknown',
-          username: otherParticipant?.username || 'Unknown', // Add username field for consistency
-          userId: otherParticipant?.id || 'unknown', // Add the actual user ID
+          username: otherParticipant?.username || 'Unknown',
+          userId: otherParticipant?.id || 'unknown',
           lastMessage: lastMessage?.content || 'No messages yet',
           time: lastMessage ? formatTimeAgo(lastMessage.createdAt) : '',
           avatar: otherParticipant?.avatar || null,
           isOnline: otherParticipant?.isOnline || false,
           lastSeen: otherParticipant?.lastSeen,
           lastSeenText: lastSeenText,
-          unread: unreadCount, // Actual calculated unread count
+          unread: unreadCount,
+          // Add caching metadata
+          lastUpdated: chat.updatedAt,
+          lastMessageId: lastMessage?.id,
         };
-      }));
+      });
       
       return formattedChats;
       
     } catch (error) {
       console.error('❌ ChatService: Error getting user chats:', error);
-      return []; // Return empty array instead of throwing
+      return [];
     }
   }
 
