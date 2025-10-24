@@ -114,10 +114,24 @@ export default function NotificationsScreen() {
           // Then mark on server in background
           if (user?.id) {
             try {
-              await apiService.markNotificationsAsRead(user.id);
-              console.log('✅ Notifications marked as read on server');
+              const response = await apiService.markNotificationsAsRead(user.id);
+              console.log('✅ Notifications marked as read on server:', response);
+              
+              // If server marking was successful, refresh the count
+              if (response && response.count > 0) {
+                console.log(`📊 Server marked ${response.count} notifications as read`);
+                console.log(`📊 Remaining unread: ${response.remainingUnread}`);
+                // Force refresh the notification count to ensure sync
+                setTimeout(() => {
+                  refreshNotificationCount();
+                }, 1000);
+              } else {
+                console.log('📊 No notifications were marked as read on server');
+              }
             } catch (error) {
-              console.error('Error marking notifications as read on server:', error);
+              console.error('❌ Error marking notifications as read on server:', error);
+              // If server marking fails, still keep the optimistic update
+              console.log('⚠️ Keeping optimistic update despite server error');
             }
           }
         } catch (error) {

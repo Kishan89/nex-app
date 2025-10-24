@@ -123,6 +123,25 @@ const markNotificationsAsRead = async (req, res) => {
 
         console.log(`📝 Marking notifications as read for user: ${userId}`);
 
+        // First, let's check what notifications exist for this user
+        const existingNotifications = await prisma.notification.findMany({
+            where: {
+                userId: userId,
+                read: false,
+                type: {
+                    in: ['LIKE', 'COMMENT', 'FOLLOW']
+                }
+            },
+            select: {
+                id: true,
+                type: true,
+                read: true,
+                createdAt: true
+            }
+        });
+
+        console.log(`🔍 Found ${existingNotifications.length} unread notifications for user ${userId}:`, existingNotifications);
+
         // Mark only like, comment, follow notifications as read (exclude chat/message)
         const result = await prisma.notification.updateMany({
             where: {
@@ -140,9 +159,23 @@ const markNotificationsAsRead = async (req, res) => {
 
         console.log(`✅ Marked ${result.count} notifications as read for user ${userId}`);
 
+        // Verify the update worked
+        const remainingUnread = await prisma.notification.count({
+            where: {
+                userId: userId,
+                read: false,
+                type: {
+                    in: ['LIKE', 'COMMENT', 'FOLLOW']
+                }
+            }
+        });
+
+        console.log(`🔍 Remaining unread notifications for user ${userId}: ${remainingUnread}`);
+
         return res.status(200).json({ 
             message: 'Notifications marked as read successfully',
-            count: result.count 
+            count: result.count,
+            remainingUnread: remainingUnread
         });
 
     } catch (error) {

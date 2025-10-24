@@ -341,9 +341,9 @@ class ApiService {
             });
     }
 
-    async markNotificationsAsRead(userId: string): Promise<void> {
+    async markNotificationsAsRead(userId: string): Promise<{message: string, count: number, remainingUnread: number}> {
         const endpoint = API_ENDPOINTS.MARK_NOTIFICATIONS_READ(userId);
-        return this._request<void>("PUT", endpoint);
+        return this._request<{message: string, count: number, remainingUnread: number}>("PUT", endpoint);
     }
     async uploadImageFile(uri: string, fieldName = "file", folder = "uploads") {
         if (!uri) throw new Error("No file URI provided for upload");

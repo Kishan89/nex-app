@@ -29,11 +29,12 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
     try {
       const notificationsData = await apiService.getUserNotifications(user.id);
       if (Array.isArray(notificationsData)) {
-        // Count only like, comment, follow notifications that are unread (exclude chat/message)
+        // Count only like, comment, follow notifications that are unread (exclude message)
         const unreadCount = notificationsData.filter((notification: any) => {
           const type = notification.type?.toLowerCase() || '';
           const isAllowedNotification = ['like', 'comment', 'follow'].includes(type);
           const isUnread = !notification.read;
+          console.log(`🔍 Notification: ${type} - ${isUnread ? 'unread' : 'read'} - ${isAllowedNotification ? 'allowed' : 'excluded'}`);
           return isAllowedNotification && isUnread;
         }).length;
         setUnreadNotificationCount(unreadCount);
@@ -53,7 +54,12 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
     // Don't refresh from server immediately to maintain optimistic update
     // Server will be updated by the notifications screen
     console.log('✅ Notifications marked as read (optimistic update)');
-  }, []);
+    
+    // Schedule a delayed refresh to ensure server sync
+    setTimeout(() => {
+      refreshNotificationCount();
+    }, 2000); // Refresh after 2 seconds to allow server processing
+  }, [refreshNotificationCount]);
   // Load initial notification count
   useEffect(() => {
     if (user?.id) {
