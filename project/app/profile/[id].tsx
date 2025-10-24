@@ -114,14 +114,20 @@ export default function ProfileScreen() {
   // Only refresh on manual pull-to-refresh or when returning from background
   // Handle follow/unfollow with INSTANT UI updates
   const handleFollowToggle = useCallback(async () => {
-    if (!userId || followLoading) return;
+    if (!userId || followLoading) {
+      console.log(`⚠️ Follow toggle blocked: userId=${userId}, followLoading=${followLoading}`);
+      return;
+    }
 
     try {
       setFollowLoading(true);
+      console.log(`🚀 Starting follow toggle: userId=${userId}, currentState=${isFollowing}`);
 
       // 🚀 INSTANT FOLLOW: UI updates immediately, API syncs in background
       const { followOptimizations } = await import('../../lib/followOptimizations');
       const result = await followOptimizations.optimisticFollowToggle(String(userId), isFollowing);
+
+      console.log(`📋 Follow toggle result:`, result);
 
       if (result.success) {
         // ⚡ INSTANT UI UPDATE: Update local state immediately
@@ -129,9 +135,15 @@ export default function ProfileScreen() {
 
         // 🎉 SUCCESS FEEDBACK: Show instant success
         const message = result.isFollowing ? 'Following!' : 'Unfollowed!';
-        Alert.alert('Success', message);
+        console.log(`✅ ${message} User: ${userId}`);
+        
+        // Optional: Show success alert (can be removed for cleaner UX)
+        // Alert.alert('Success', message);
 
-        console.log(`⚡ Instant follow toggle completed: ${userId} -> ${result.isFollowing}`);
+      } else {
+        // Handle failure case
+        console.warn(`⚠️ Follow toggle failed:`, result.error);
+        Alert.alert('Info', result.error || 'Operation already in progress');
       }
 
     } catch (error: any) {

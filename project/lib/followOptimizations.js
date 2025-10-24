@@ -14,12 +14,30 @@ class FollowOptimizations {
 
   // 🚀 INSTANT FOLLOW: Update UI immediately, sync in background
   async instantFollow(userId, currentFollowState = false) {
+    // Validate inputs
+    if (!userId) {
+      throw new Error('User ID is required for follow operation');
+    }
+
     const operationId = `follow-${userId}-${Date.now()}`;
     const newFollowState = !currentFollowState;
 
     try {
       // 1. 🚀 INSTANT UI UPDATE - Update immediately
-      console.log(`⚡ Instant follow UI update: ${userId} -> ${newFollowState}`);
+      console.log(`⚡ Instant follow UI update: ${userId} -> ${newFollowState} (was: ${currentFollowState})`);
+      
+      // Check if operation is already pending
+      const existingOperation = Array.from(this.pendingOperations.values())
+        .find(op => op.userId === userId);
+      
+      if (existingOperation) {
+        console.log(`⚠️ Follow operation already pending for user ${userId}, skipping`);
+        return {
+          success: false,
+          error: 'Operation already in progress',
+          isFollowing: currentFollowState
+        };
+      }
       
       // Update follow sync (notifies all components instantly)
       await followSync.updateFollowState(userId, newFollowState);
@@ -36,7 +54,9 @@ class FollowOptimizations {
       });
 
       // Start background sync (don't await)
-      this.syncFollowOperation(operationId, userId, newFollowState, currentFollowState);
+      setTimeout(() => {
+        this.syncFollowOperation(operationId, userId, newFollowState, currentFollowState);
+      }, 100); // Small delay to ensure UI updates first
 
       // 3. ✅ RETURN SUCCESS IMMEDIATELY
       return {
@@ -49,8 +69,12 @@ class FollowOptimizations {
       console.error('❌ Instant follow failed:', error);
       
       // Revert UI changes if instant update failed
-      await followSync.updateFollowState(userId, currentFollowState);
-      await profileStore.updateFollowStatus(userId, currentFollowState);
+      try {
+        await followSync.updateFollowState(userId, currentFollowState);
+        await profileStore.updateFollowStatus(userId, currentFollowState);
+      } catch (revertError) {
+        console.error('❌ Failed to revert UI changes:', revertError);
+      }
       
       throw error;
     }
@@ -59,20 +83,35 @@ class FollowOptimizations {
   // 🔄 BACKGROUND SYNC: Handle API call in background
   async syncFollowOperation(operationId, userId, newFollowState, originalState) {
     const operation = this.pendingOperations.get(operationId);
-    if (!operation) return;
+    if (!operation) {
+      console.log(`⚠️ Operation ${operationId} not found in pending operations`);
+      return;
+    }
 
     try {
-      console.log(`🔄 Background sync: ${operation.action} ${userId}`);
+      console.log(`🔄 Background sync: ${operation.action} ${userId} (attempt ${operation.retryCount + 1})`);
 
-      // Make API call
-      if (newFollowState) {
-        await apiService.followUser(userId);
-      } else {
-        await apiService.unfollowUser(userId);
+      // Validate API service
+      if (!apiService) {
+        throw new Error('API service not available');
       }
 
+      // Make API call with timeout
+      const apiCall = newFollowState 
+        ? apiService.followUser(userId)
+        : apiService.unfollowUser(userId);
+      
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('API call timeout')), 10000); // 10 second timeout
+      });
+
+      await Promise.race([apiCall, timeoutPromise]);
+
       // ✅ SUCCESS: Update counts in background
-      this.updateFollowCountsBackground(userId, newFollowState);
+      setTimeout(() => {
+        this.updateFollowCountsBackground(userId, newFollowState);
+      }, 500);
       
       // Remove from pending operations
       this.pendingOperations.delete(operationId);
@@ -218,7 +257,54 @@ class FollowOptimizations {
   // 🚀 OPTIMISTIC FOLLOW TOGGLE: One-click instant toggle
   async optimisticFollowToggle(userId, currentState) {
     // This is the main method components should use
+    console.log(`🚀 Optimistic follow toggle called: userId=${userId}, currentState=${currentState}`);
+    
+    // Validate inputs
+    if (!userId) {
+      console.error('❌ optimisticFollowToggle: userId is required');
+      throw new Error('User ID is required');
+    }
+    
+    if (typeof currentState !== 'boolean') {
+      console.warn(`⚠️ optimisticFollowToggle: currentState should be boolean, got ${typeof currentState}: ${currentState}`);
+      currentState = Boolean(currentState);
+    }
+    
     return this.instantFollow(userId, currentState);
+  }
+
+  // 🔍 DEBUG: Get current operation status for debugging
+  debugStatus(userId = null) {
+    const status = {
+      timestamp: new Date().toISOString(),
+      pendingOperations: Array.from(this.pendingOperations.entries()).map(([id, op]) => ({
+        operationId: id,
+        userId: op.userId,
+        action: op.action,
+        retryCount: op.retryCount,
+        age: Date.now() - op.timestamp
+      })),
+      failedOperations: Array.from(this.retryQueue.entries()).map(([userId, op]) => ({
+        userId,
+        action: op.action,
+        error: op.error
+      })),
+      memoryUsage: {
+        pendingCount: this.pendingOperations.size,
+        failedCount: this.retryQueue.size
+      }
+    };
+    
+    if (userId) {
+      status.userSpecific = {
+        userId,
+        isPending: this.isSyncing(userId),
+        followState: followSync.getFollowState(userId)
+      };
+    }
+    
+    console.log('🔍 Follow Optimizations Debug Status:', status);
+    return status;
   }
 
   // 📱 SYNC STATUS: Check if operations are syncing
