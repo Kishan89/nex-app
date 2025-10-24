@@ -5,6 +5,8 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-na
 import { NormalizedPost } from '@/types';
 import PollComponent from './PollComponent';
 import YouTubePreview from './YouTubePreview';
+import TruncatedText from './TruncatedText';
+import LinkDetector from './LinkDetector';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { ShareService } from '@/lib/shareService';
@@ -28,6 +30,8 @@ type Props = {
   onImagePress?: (imageUri: string) => void;
   currentUserId?: string;
   allowImageClick?: boolean; // New prop to control image click functionality
+  onTextToggle?: () => void; // Callback for text expand/collapse
+  refreshKey?: number; // Key to reset TruncatedText state on refresh
 };
 export default function PostCard({
   post,
@@ -47,6 +51,8 @@ export default function PostCard({
   onImagePress,
   allowImageClick = false,
   currentUserId,
+  onTextToggle,
+  refreshKey,
 }: Props) {
   const { colors } = useTheme();
   // Use post.liked as the source of truth, with isLiked as fallback
@@ -165,7 +171,16 @@ export default function PostCard({
           </View>
           {/* Content under username with more space */}
           <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-            {post.content && <Text style={[styles.postContent, { color: colors.text }]}>{post.content}</Text>}
+            {post.content && (
+              <TruncatedText 
+                text={post.content}
+                maxLines={6}
+                style={styles.postContent}
+                onPress={onPress}
+                onToggle={onTextToggle}
+                refreshKey={refreshKey}
+              />
+            )}
             {post.image && (
               allowImageClick ? (
                 <TouchableOpacity onPress={() => onImagePress?.(post.image)} activeOpacity={0.9}>

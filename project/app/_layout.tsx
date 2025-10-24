@@ -271,9 +271,9 @@ function SafeAreaProviderWithTheme() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SplashProvider>
         <AuthProvider>
-          <NotificationCountProvider>
-            <PollVoteProvider>
-              <ChatProvider>
+          <PollVoteProvider>
+            <ChatProvider>
+              <NotificationCountProvider>
                 <NotificationProvider>
                   <NotificationPermissionProvider>
                     <SocketProvider>
@@ -283,9 +283,9 @@ function SafeAreaProviderWithTheme() {
                     </SocketProvider>
                   </NotificationPermissionProvider>
                 </NotificationProvider>
-              </ChatProvider>
-            </PollVoteProvider>
-          </NotificationCountProvider>
+              </NotificationCountProvider>
+            </ChatProvider>
+          </PollVoteProvider>
         </AuthProvider>
       </SplashProvider>
     </View>

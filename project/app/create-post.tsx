@@ -17,6 +17,7 @@ import {
   TouchableWithoutFeedback,
   Modal,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Image as ImageIcon, XCircle, BarChart2 } from 'lucide-react-native';
@@ -37,6 +38,11 @@ export default function CreatePostScreen() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [compressionResult, setCompressionResult] = useState<CompressionResult | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
+  
+  // Word count validation
+  const MAX_WORDS = 500;
+  const wordCount = content.trim().split(/\s+/).filter(word => word.length > 0).length;
+  const isOverLimit = wordCount > MAX_WORDS;
   // Poll State
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
@@ -92,6 +98,7 @@ export default function CreatePostScreen() {
   const handlePost = async () => {
     if (!user?.id) return Alert.alert('Not logged in', 'Please log in to create a post.');
     if (!content.trim() && !imageUri && !isCreatingPoll) return Alert.alert('Empty post', 'Write something, choose an image, or create a poll.');
+    if (isOverLimit) return Alert.alert('Post too long', `Your post has ${wordCount} words. Please keep it under ${MAX_WORDS} words.`);
     let pollData;
     if (isCreatingPoll) {
       if (!pollQuestion.trim()) return Alert.alert('Invalid Poll', 'Please enter a poll question.');
@@ -124,7 +131,7 @@ export default function CreatePostScreen() {
       setIsPosting(false);
     }
   };
-  const isPostButtonDisabled = isPosting || isCompressing || (!content.trim() && !imageUri && !isCreatingPoll);
+  const isPostButtonDisabled = isPosting || isCompressing || isOverLimit || (!content.trim() && !imageUri && !isCreatingPoll);
   // Create dynamic styles inside component to access colors
   const styles = createStyles(colors);
   return (
@@ -153,7 +160,7 @@ export default function CreatePostScreen() {
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
             <Animated.View style={styles.card} entering={FadeIn} exiting={FadeOut}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, isOverLimit && styles.inputError]}
                 placeholder="What's on your mind?"
                 placeholderTextColor={colors.textPlaceholder}
                 multiline
@@ -164,6 +171,19 @@ export default function CreatePostScreen() {
                 scrollEnabled={true}
                 blurOnSubmit={false}
               />
+              {/* Word count display */}
+              {content.trim() && (
+                <View style={styles.wordCountContainer}>
+                  <Text style={[styles.wordCountText, isOverLimit && styles.wordCountError]}>
+                    {wordCount}/{MAX_WORDS} words
+                  </Text>
+                  {isOverLimit && (
+                    <Text style={styles.wordCountWarning}>
+                      Please reduce by {wordCount - MAX_WORDS} words
+                    </Text>
+                  )}
+                </View>
+              )}
               {/* Action Icons */}
               <View style={styles.actionSection}>
                 <View style={styles.iconRow}>
@@ -374,6 +394,31 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: Spacing.sm,
     fontWeight: FontWeights.regular,
     textAlignVertical: 'top',
+  },
+  inputError: {
+    borderColor: colors.error,
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+  },
+  wordCountContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  wordCountText: {
+    fontSize: FontSizes.xs,
+    color: colors.textMuted,
+    fontWeight: FontWeights.medium,
+  },
+  wordCountError: {
+    color: colors.error,
+  },
+  wordCountWarning: {
+    fontSize: FontSizes.xs,
+    color: colors.error,
+    fontWeight: FontWeights.medium,
   },
   actionSection: {
     marginTop: Spacing.md,

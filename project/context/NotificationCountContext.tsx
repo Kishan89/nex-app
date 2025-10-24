@@ -27,7 +27,8 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
     const authContext = useAuth();
     user = authContext?.user;
   } catch (error) {
-    console.warn('⚠️ Auth context not available in NotificationCountProvider:', error);
+    // Auth context not available yet, this is normal during initialization
+    user = null;
   }
 
   // Update userId when user changes
@@ -55,7 +56,7 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
         setUnreadNotificationCount(0);
       }
     } catch (error) {
-      console.error('❌ Error refreshing notification count:', error);
+      console.error('Error refreshing notification count:', error);
       setUnreadNotificationCount(0);
     }
   }, [userId]);
@@ -63,8 +64,6 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
   const markNotificationsAsRead = useCallback(async () => {
     // Optimistic update - immediately set to 0 for instant UI feedback
     setUnreadNotificationCount(0);
-    
-    console.log('✅ Notifications marked as read (optimistic update)');
     
     // Don't refresh from server immediately to maintain optimistic update
     // The notifications screen will handle server sync
@@ -77,8 +76,17 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
       setUnreadNotificationCount(0);
     }
   }, [userId, refreshNotificationCount]);
-  // Remove periodic refresh to prevent infinite loops
-  // Notifications will be refreshed when user opens notification screen
+
+  // Periodic refresh every 30 seconds to get new notifications
+  useEffect(() => {
+    if (!userId) return;
+    
+    const interval = setInterval(() => {
+      refreshNotificationCount();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [userId, refreshNotificationCount]);
 
   // Add method to increment count when new notification arrives
   const incrementNotificationCount = useCallback(() => {

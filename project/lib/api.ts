@@ -334,14 +334,12 @@ class ApiService {
         const endpoint = API_ENDPOINTS.USER_NOTIFICATIONS(userId);
         // Add cache busting parameter if force refresh is requested
         const url = forceRefresh ? `${endpoint}?t=${Date.now()}` : endpoint;
-        console.log('🌐 API: Fetching notifications from:', url);
         return this._request<Notification[]>("GET", url)
             .then(notifications => {
-                console.log('📡 API Response: Raw notifications:', notifications);
                 return Array.isArray(notifications) ? notifications : [];
             })
             .catch(error => {
-                console.error('❌ API Error fetching notifications:', error);
+                console.error('API Error fetching notifications:', error);
                 return [];
             });
     }

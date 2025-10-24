@@ -95,8 +95,27 @@ const getNotificationsByUserId = async (req, res) => {
             });
             res.status(200).json(transformedNotifications);
 
-            // ❌ REMOVED: Don't automatically mark notifications as read when fetching
-            // Notifications should only be marked as read when user explicitly views them
+            // 🔄 BACKGROUND PROCESSING: Mark as read in background (only like, comment, follow)
+            setImmediate(async () => {
+                try {
+                    await prisma.notification.updateMany({
+                        where: { 
+                            userId: userId,
+                            read: false,
+                            // Only mark like, comment, follow notifications as read
+                            type: {
+                                in: ['LIKE', 'COMMENT', 'FOLLOW']
+                            }
+                        },
+                        data: { 
+                            read: true 
+                        }
+                    });
+                    console.log(`✅ Background: Marked like/comment/follow notifications as read for user ${userId}`);
+                } catch (markError) {
+                    console.error('⚠️ Background error marking notifications as read:', markError);
+                }
+            });
 
         } catch (dbError) {
             console.error(`❌ Database error fetching notifications for user ${userId}:`, dbError);

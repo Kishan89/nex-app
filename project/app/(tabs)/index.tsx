@@ -61,6 +61,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState('Latest');
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<NormalizedPost | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   // Animation values for scroll-to-hide
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerTranslateY = useRef(new Animated.Value(0)).current;
@@ -199,6 +200,11 @@ export default function HomeScreen() {
     markNotificationsAsRead();
     router.push('/(tabs)/notifications');
   };
+  const handleRefresh = useCallback(async () => {
+    setRefreshKey(prev => prev + 1); // Increment refresh key to reset TruncatedText states
+    await onRefresh();
+  }, [onRefresh]);
+
   const handleTabChange = useCallback((tab: string) => {
     setActiveTab(tab);
     // Track tab change event
@@ -259,6 +265,7 @@ export default function HomeScreen() {
         onReport={() => handleReportPostFromFeed(post.id)}
         onDelete={() => handleDeletePost(post.id)}
         currentUserId={user?.id}
+        refreshKey={refreshKey}
       />
     );
   };
@@ -362,7 +369,7 @@ export default function HomeScreen() {
                   refreshControl={
                     <RefreshControl 
                       refreshing={refreshing} 
-                      onRefresh={onRefresh}
+                      onRefresh={handleRefresh}
                       colors={[colors.primary]}
                       tintColor={colors.primary}
                       title="Pull to refresh"

@@ -73,19 +73,15 @@ export default function NotificationsScreen() {
     }
     try {
       setError(null);
-      if (notifications.length === 0) setLoading(true);
-      console.log('🔄 Loading notifications for user:', user.id);
-      const notificationsData = await apiService.getUserNotifications(user.id);
-      console.log('📊 Raw notifications data:', notificationsData);
+      setLoading(true);
+      const notificationsData = await apiService.getUserNotifications(user.id, forceRefresh);
       if (Array.isArray(notificationsData)) {
         // Filter to show only like, comment, follow notifications (exclude chat/message)
         const filteredNotifications = notificationsData.filter((notification: SimpleNotification) => {
           const type = notification.type?.toLowerCase() || '';
           const isAllowed = ['like', 'comment', 'follow'].includes(type);
-          console.log(`🔍 Notification: ${type} - ${isAllowed ? 'allowed' : 'excluded'}`);
           return isAllowed;
         });
-        console.log('📝 Filtered notifications:', filteredNotifications);
         setNotifications(filteredNotifications);
         // Cache the notifications for instant loading next time
         notificationCache.cacheNotifications(filteredNotifications);
@@ -99,7 +95,7 @@ export default function NotificationsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.id, notifications.length]);
+  }, [user?.id]);
   // Real-time notifications removed - notifications still work via API refresh
   useEffect(() => {
     if (user?.id) {
@@ -108,7 +104,8 @@ export default function NotificationsScreen() {
   }, [user?.id]);
   useFocusEffect(
     useCallback(() => {
-      loadNotifications();
+      // Always load fresh notifications when screen is focused
+      loadNotifications(true);
       // Mark notifications as read when user visits this screen
       // This provides instant UI feedback and server sync
       (async () => {
@@ -120,7 +117,6 @@ export default function NotificationsScreen() {
           if (user?.id) {
             try {
               const response = await apiService.markNotificationsAsRead(user.id);
-              console.log('✅ Notifications marked as read on server:', response);
               
               // Always refresh count after server marking, regardless of count
               // Force refresh the notification count to ensure sync
@@ -128,16 +124,14 @@ export default function NotificationsScreen() {
                 refreshNotificationCount();
               }, 500);
             } catch (error) {
-              console.error('❌ Error marking notifications as read on server:', error);
-              // If server marking fails, still keep the optimistic update
-              console.log('⚠️ Keeping optimistic update despite server error');
+              console.error('Error marking notifications as read on server:', error);
             }
           }
         } catch (error) {
           console.error('Error marking notifications as read:', error);
         }
       })();
-    }, [loadNotifications, markNotificationsAsRead, user?.id])
+    }, [loadNotifications, markNotificationsAsRead, user?.id, refreshNotificationCount])
   );
   const onRefresh = useCallback(() => {
     setRefreshing(true);
