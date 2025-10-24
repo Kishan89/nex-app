@@ -71,8 +71,19 @@ class FollowController {
         return res.status(404).json(errorResponse('Follow relationship not found'));
       }
 
+      // 🚀 INSTANT RESPONSE - Send success immediately
       console.log(`Unfollow successful: ${followerId} -> ${userId}`);
       res.status(200).json(successResponse(null, 'User unfollowed successfully'));
+
+      // 🔄 BACKGROUND PROCESSING - Queue count updates
+      try {
+        // Add follow count update job to queue
+        await addFollowCountUpdateJob(followerId, userId);
+        console.log(`📋 Background count update queued for unfollow: ${followerId} -> ${userId}`);
+      } catch (queueError) {
+        console.error('Failed to queue background jobs for unfollow:', queueError);
+        // Don't affect the response since it's already sent
+      }
     } catch (error) {
       console.error('Error in unfollowUser:', error);
       next(error);

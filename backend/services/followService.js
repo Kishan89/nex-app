@@ -47,9 +47,8 @@ class FollowService {
         }
       });
 
-      // Update follower/following counts (optional - can be calculated dynamically)
-      await this.updateFollowCounts(followerId, followingId);
-
+      // 🚀 INSTANT RETURN: Skip count updates for speed
+      // Count updates will be handled by background queue
       return follow;
     } catch (error) {
       console.error('Error in followUser:', error);
@@ -74,9 +73,8 @@ class FollowService {
         }
       });
 
-      // Update follower/following counts
-      await this.updateFollowCounts(followerId, followingId);
-
+      // 🚀 INSTANT RETURN: Skip count updates for speed
+      // Count updates will be handled by background queue
       return !!deletedFollow;
     } catch (error) {
       console.error('Error in unfollowUser:', error);

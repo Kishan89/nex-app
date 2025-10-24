@@ -78,7 +78,7 @@ async function createNotification(data) {
 }
 
 /**
- * Get notifications for a user
+ * Get notifications for a user (OPTIMIZED for instant loading)
  * @param {string} userId - User ID
  * @param {number} limit - Number of notifications to return
  * @param {number} offset - Offset for pagination
@@ -88,30 +88,33 @@ async function getNotificationsForUser(userId, limit = 20, offset = 0) {
   try {
     console.log(`📋 Fetching notifications for user ${userId}, limit: ${limit}, offset: ${offset}`);
     
+    // 🚀 OPTIMIZED QUERY: Minimal data selection for speed
     const notifications = await prisma.notification.findMany({
       where: {
         userId,
       },
-      include: {
+      select: {
+        id: true,
+        type: true,
+        message: true,
+        read: true,
+        createdAt: true,
+        postId: true,
+        fromUserId: true,
+        // Only essential user data
         fromUser: {
           select: {
             id: true,
             username: true,
-            name: true,
             avatar: true,
           },
         },
+        // Minimal post data
         post: {
           select: {
             id: true,
             content: true,
-            image: true,
-          },
-        },
-        comment: {
-          select: {
-            id: true,
-            content: true,
+            imageUrl: true,
           },
         },
       },

@@ -5,6 +5,7 @@ const getNotificationsByUserId = async (req, res) => {
     try {
         // Get userId from authenticated user or params
         const userId = req.user?.userId || req.params.userId;
+        const { limit = 20, offset = 0 } = req.query;
         
         if (!userId) {
             console.error('❌ Missing userId in notification request');
@@ -14,11 +15,19 @@ const getNotificationsByUserId = async (req, res) => {
         console.log(`📋 Fetching notifications for user: ${userId}`);
         
         try {
+            // 🚀 OPTIMIZED QUERY: Use the optimized service method
             const notifications = await prisma.notification.findMany({
                 where: { 
                     userId: userId 
                 },
-                include: {
+                select: {
+                    id: true,
+                    type: true,
+                    message: true,
+                    read: true,
+                    createdAt: true,
+                    postId: true,
+                    fromUserId: true,
                     fromUser: {
                         select: {
                             id: true,
@@ -36,62 +45,55 @@ const getNotificationsByUserId = async (req, res) => {
                 },
                 orderBy: {
                     createdAt: 'desc'
-                }
+                },
+                take: parseInt(limit),
+                skip: parseInt(offset)
             });
             
             console.log(`✅ Found ${notifications.length} notifications for user ${userId}`);
             
-            // Safely transform notifications with null checks
-            const transformedNotifications = notifications.map(notification => {
+            // 🚀 FAST TRANSFORMATION: Optimized processing
+            const transformedNotifications = notifications.map(notification => ({
+                id: notification.id,
+                type: notification.type?.toLowerCase() || 'unknown',
+                user: notification.fromUser?.username || 'System',
+                userId: notification.fromUser?.id,
+                userAvatar: notification.fromUser?.avatar,
+                action: getNotificationAction(notification.type),
+                message: notification.message || '',
+                postId: notification.postId,
+                postContent: notification.post?.content,
+                postImage: notification.post?.imageUrl,
+                read: notification.read || false,
+                time: formatTimeAgo(notification.createdAt),
+                createdAt: notification.createdAt
+            }));
+
+            // 🚀 INSTANT RESPONSE: Send notifications immediately
+            res.set({
+                'Cache-Control': 'private, max-age=60', // Cache for 1 minute
+                'ETag': `"notifications-${userId}-${notifications.length}"`,
+            });
+            res.status(200).json(transformedNotifications);
+
+            // 🔄 BACKGROUND PROCESSING: Mark as read in background
+            setImmediate(async () => {
                 try {
-                    return {
-                        id: notification.id,
-                        type: notification.type?.toLowerCase() || 'unknown',
-                        user: notification.fromUser?.username || 'System',
-                        userId: notification.fromUser?.id,
-                        userAvatar: notification.fromUser?.avatar,
-                        action: getNotificationAction(notification.type),
-                        message: notification.message || '',
-                        postId: notification.postId,
-                        postContent: notification.post?.content,
-                        postImage: notification.post?.imageUrl,
-                        read: notification.read || false,
-                        time: formatTimeAgo(notification.createdAt),
-                        createdAt: notification.createdAt
-                    };
-                } catch (transformError) {
-                    console.error('❌ Error transforming notification:', transformError, notification);
-                    // Return a minimal valid notification object if transformation fails
-                    return {
-                        id: notification.id || 'unknown',
-                        type: 'unknown',
-                        user: 'System',
-                        message: 'Notification details unavailable',
-                        read: false,
-                        time: 'recently',
-                        createdAt: new Date()
-                    };
+                    await prisma.notification.updateMany({
+                        where: { 
+                            userId: userId,
+                            read: false
+                        },
+                        data: { 
+                            read: true 
+                        }
+                    });
+                    console.log(`✅ Background: Marked notifications as read for user ${userId}`);
+                } catch (markError) {
+                    console.error('⚠️ Background error marking notifications as read:', markError);
                 }
             });
 
-            // Mark notifications as read
-            try {
-                await prisma.notification.updateMany({
-                    where: { 
-                        userId: userId,
-                        read: false
-                    },
-                    data: { 
-                        read: true 
-                    }
-                });
-                console.log(`✅ Marked notifications as read for user ${userId}`);
-            } catch (markError) {
-                console.error('⚠️ Error marking notifications as read:', markError);
-                // Continue despite error marking as read
-            }
-
-            return res.status(200).json(transformedNotifications);
         } catch (dbError) {
             console.error(`❌ Database error fetching notifications for user ${userId}:`, dbError);
             return res.status(500).json({ message: 'Database error while fetching notifications' });
