@@ -21,6 +21,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { Message } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useChatContext } from '@/context/ChatContext';
+import { useMemorySafeTimeout, useMemorySafeInterval } from '@/lib/memoryManager';
 import { apiService } from '@/lib/api';
 import { chatMessageCache } from '@/store/chatMessageCache';
 import { formatMessageTime, getCurrentTimestamp, fixServerTimestamp, compareTimestamps } from '@/lib/timestampUtils';
@@ -81,13 +82,13 @@ const FastChatScreen = React.memo(function FastChatScreen({
     if (messages.length > 0) {
       // 🚀 INSTANT SCROLL: Multiple attempts for reliability
       // Immediate scroll (no animation for instant effect)
-      setTimeout(() => scrollToBottom(false), 0);
+      useMemorySafeTimeout(() => scrollToBottom(false), 0);
       // Backup scroll with animation
-      setTimeout(() => scrollToBottom(true), 50);
+      useMemorySafeTimeout(() => scrollToBottom(true), 50);
       // Final scroll after layout
-      setTimeout(() => scrollToBottom(true), 150);
+      useMemorySafeTimeout(() => scrollToBottom(true), 150);
       // Extra scroll for reliability
-      setTimeout(() => scrollToBottom(true), 300);
+      useMemorySafeTimeout(() => scrollToBottom(true), 300);
     }
   }, [messages, scrollToBottom]);
   // ⚡ ULTRA-FAST MESSAGE LOADING - INSTANT DISPLAY

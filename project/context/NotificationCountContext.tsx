@@ -27,14 +27,15 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
     try {
       const notificationsData = await apiService.getUserNotifications(user.id);
       if (Array.isArray(notificationsData)) {
-        // Count only non-chat notifications (like, comment, follow) that are unread
+        // Count only like, comment, follow notifications that are unread (exclude chat/message)
         const unreadCount = notificationsData.filter((notification: any) => {
           const type = notification.type?.toLowerCase() || '';
-          const isNonChatNotification = type !== 'message' && type !== 'chat';
+          const isAllowedNotification = ['like', 'comment', 'follow'].includes(type);
           const isUnread = !notification.read;
-          return isNonChatNotification && isUnread;
+          return isAllowedNotification && isUnread;
         }).length;
         setUnreadNotificationCount(unreadCount);
+        console.log(`📊 Notification count updated: ${unreadCount} unread notifications`);
       } else {
         setUnreadNotificationCount(0);
       }
@@ -42,10 +43,18 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
       setUnreadNotificationCount(0);
     }
   }, [user?.id]);
-  // Mark notifications as read (optimistic update)
-  const markNotificationsAsRead = useCallback(() => {
+  // Mark notifications as read (optimistic update + server sync)
+  const markNotificationsAsRead = useCallback(async () => {
+    // Optimistic update - immediately set to 0 for instant UI feedback
     setUnreadNotificationCount(0);
-  }, []);
+    
+    // Then refresh from server to ensure accuracy
+    try {
+      await refreshNotificationCount();
+    } catch (error) {
+      console.error('Error refreshing notification count after marking as read:', error);
+    }
+  }, [refreshNotificationCount]);
   // Load initial notification count
   useEffect(() => {
     if (user?.id) {
@@ -54,14 +63,17 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
       setUnreadNotificationCount(0);
     }
   }, [user?.id, refreshNotificationCount]);
-  // Refresh notification count periodically
+  // Refresh notification count periodically (only when count > 0)
   useEffect(() => {
     if (!user?.id) return;
     const interval = setInterval(() => {
-      refreshNotificationCount();
-    }, 60000); // Refresh every 60 seconds
+      // Only refresh if there are unread notifications to avoid unnecessary API calls
+      if (unreadNotificationCount > 0) {
+        refreshNotificationCount();
+      }
+    }, 30000); // Refresh every 30 seconds when there are unread notifications
     return () => clearInterval(interval);
-  }, [user?.id, refreshNotificationCount]);
+  }, [user?.id, refreshNotificationCount, unreadNotificationCount]);
   const value: NotificationCountContextType = {
     unreadNotificationCount,
     refreshNotificationCount,

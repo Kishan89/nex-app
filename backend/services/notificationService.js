@@ -169,9 +169,9 @@ async function markNotificationsAsRead(userId, notificationIds = []) {
 }
 
 /**
- * Get unread notification count for a user
+ * Get unread notification count for a user (excluding chat notifications)
  * @param {string} userId - User ID
- * @returns {Promise<number>} Number of unread notifications
+ * @returns {Promise<number>} Number of unread notifications (like, comment, follow only)
  */
 async function getUnreadNotificationCount(userId) {
   try {
@@ -179,6 +179,12 @@ async function getUnreadNotificationCount(userId) {
       where: {
         userId,
         read: false,
+        // Exclude chat/message notifications from count
+        NOT: {
+          type: {
+            in: ['MESSAGE', 'CHAT']
+          }
+        }
       },
     });
 

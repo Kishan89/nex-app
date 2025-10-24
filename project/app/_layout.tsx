@@ -26,6 +26,7 @@ import { myAppDeepLinkingService } from '@/lib/myappDeepLinking';
 import { notificationNavigationService } from '@/lib/notificationNavigationService';
 import { fcmService } from '@/lib/fcmService';
 import { ultraFastChatCache } from '@/lib/ChatCache';
+import OptimizationManager from '@/lib/optimizationManager';
 // Removed imports - initialization moved to SplashContext
 // Component to manage the status bar appearance
 const AppStatusBar = () => {
@@ -244,6 +245,11 @@ function AppWithNotifications() {
 }
 // Root export function for the application
 export default function RootLayout() {
+  // Initialize optimization manager
+  React.useEffect(() => {
+    OptimizationManager.initialize();
+  }, []);
+
   // Initialization is now handled in SplashContext for better performance
   // This prevents duplicate loading and ensures smooth transitions
   // Use neutral dark grey that looks good in both modes

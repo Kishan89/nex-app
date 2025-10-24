@@ -44,6 +44,8 @@ export interface Comment {
   replies?: Comment[];
   parentId?: string;
   replyTo?: string; // Username being replied to
+  isOptimistic?: boolean; // Flag for optimistic updates
+  createdAt?: string; // ISO date string for sorting
 }
 // Corrected: Moved RawComment to its proper section
 export type RawComment = Record<string, any>;

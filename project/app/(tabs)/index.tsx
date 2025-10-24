@@ -281,20 +281,18 @@ export default function HomeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} translucent={false} />
-      {loading && posts.length === 0 ? (
-        <HomeSkeleton />
-      ) : (
-        <>
-          {/* Animated Header Container */}
-          <Animated.View 
-            style={[
-              styles.headerContainer,
-              {
-                backgroundColor: colors.background,
-                transform: [{ translateY: headerTranslateY }]
-              }
-            ]}
-          >
+      
+      {/* Always show header and UI elements */}
+      {/* Animated Header Container */}
+      <Animated.View 
+        style={[
+          styles.headerContainer,
+          {
+            backgroundColor: colors.background,
+            transform: [{ translateY: headerTranslateY }]
+          }
+        ]}
+      >
             {/* Top Bar */}
             <View style={[styles.topBar, { backgroundColor: colors.background }]}>
               <TouchableOpacity
@@ -345,40 +343,49 @@ export default function HomeScreen() {
               </View>
             </View>
           </Animated.View>
-          {/* Feed */}
-          {error ? (
-            <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+          
+          {/* Content Area - Show loading skeleton only in content area */}
+          {loading && posts.length === 0 ? (
+            <View style={styles.contentContainer}>
+              <HomeSkeleton />
+            </View>
           ) : (
-            <FlatList
-              data={displayedPosts}
-              renderItem={renderItem}
-              keyExtractor={item => item.id}
-              refreshControl={
-                <RefreshControl 
-                  refreshing={refreshing} 
-                  onRefresh={onRefresh}
-                  colors={[colors.primary]}
-                  tintColor={colors.primary}
-                  title="Pull to refresh"
-                  titleColor={colors.textSecondary}
-                  progressViewOffset={120} // Position refresh control below header
-                  progressBackgroundColor={colors.background}
+            <>
+              {/* Feed */}
+              {error ? (
+                <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+              ) : (
+                <FlatList
+                  data={displayedPosts}
+                  renderItem={renderItem}
+                  keyExtractor={item => item.id}
+                  refreshControl={
+                    <RefreshControl 
+                      refreshing={refreshing} 
+                      onRefresh={onRefresh}
+                      colors={[colors.primary]}
+                      tintColor={colors.primary}
+                      title="Pull to refresh"
+                      titleColor={colors.textSecondary}
+                      progressViewOffset={120} // Position refresh control below header
+                      progressBackgroundColor={colors.background}
+                    />
+                  }
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 80, paddingTop: 140 }} // Original padding to maintain content position
+                  onEndReached={handleLoadMore}
+                  onEndReachedThreshold={0.1}
+                  ListFooterComponent={renderFooter}
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}
+                  bounces={true}
+                  alwaysBounceVertical={true}
                 />
-              }
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 80, paddingTop: 140 }} // Original padding to maintain content position
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.1}
-              ListFooterComponent={renderFooter}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-              bounces={true}
-              alwaysBounceVertical={true}
-            />
+              )}
+            </>
           )}
-        </>
-      )}
-      {/* Animated Floating Action Button */}
+          
+      {/* Animated Floating Action Button - Always show */}
       <Animated.View
         style={[
           styles.fab, 
@@ -424,6 +431,11 @@ export default function HomeScreen() {
 // Create dynamic styles function
 const createStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  contentContainer: {
+    flex: 1,
+    paddingTop: 140, // Account for header height
+    backgroundColor: colors.background,
+  },
   headerContainer: {
     position: 'absolute',
     top: 0,

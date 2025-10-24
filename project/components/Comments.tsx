@@ -27,6 +27,7 @@ import { useListen } from '@/context/ListenContext';
 import { useCommentReply } from '@/context/CommentReplyContext';
 import PostCard from './PostCard';
 import { CommentsSkeleton } from './skeletons';
+import { commentCache } from '@/store/commentCache';
 interface CommentsModalProps {
   visible: boolean;
   onClose: () => void;
@@ -89,12 +90,28 @@ export default function CommentsModal({
   const currentInteractions = currentPost ? postInteractions[currentPost.id] : null;
   useEffect(() => {
     if (post) {
+      // Try to load cached comments first for instant display
+      loadCachedComments();
       setLocalComments(comments);
       setCommentsLoading(false);
       // Clear old refs when comments change
       setCommentRefs({});
     }
   }, [post, comments]);
+
+  // Load cached comments for instant display
+  const loadCachedComments = async () => {
+    if (!post?.id) return;
+    try {
+      const cachedComments = await commentCache.getCachedComments(post.id);
+      if (cachedComments.length > 0) {
+        setLocalComments(cachedComments);
+        console.log(`📦 Loaded ${cachedComments.length} cached comments for instant display`);
+      }
+    } catch (error) {
+      console.error('Error loading cached comments:', error);
+    }
+  };
   // Set navigation bar theme-aware when modal opens
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -170,11 +187,45 @@ export default function CommentsModal({
       supabase.removeChannel(channel);
     };
   }, [post?.id, visible, onLoadComments]);
-  const handleSendComment = () => {
+  const handleSendComment = async () => {
     const text = newComment.trim();
     if (text) {
-      onAddComment(text);
+      // Create optimistic comment for instant UI feedback
+      const optimisticComment: Comment = {
+        id: `temp-${Date.now()}`, // Temporary ID
+        text: text,
+        userId: currentUserId || '',
+        username: 'You', // Will be replaced with actual username
+        avatar: '', // Will be replaced with actual avatar
+        time: 'now', // Time display
+        createdAt: new Date().toISOString(),
+        parentId: undefined,
+        replies: [],
+        isOptimistic: true, // Flag to identify optimistic comments
+      };
+
+      // Add optimistic comment immediately to UI
+      setLocalComments(prev => [optimisticComment, ...prev]);
       setNewComment('');
+
+      // Call the actual API
+      try {
+        await onAddComment(text);
+        // Remove optimistic comment and let real comment load
+        setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
+        
+        // Cache the new comment for future instant loading
+        if (post?.id) {
+          // The real comment will be loaded by the parent component and cached
+          console.log('✅ Comment added successfully, cache will be updated by parent');
+        }
+      } catch (error) {
+        // Remove optimistic comment on error
+        setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
+        // Restore the comment text
+        setNewComment(text);
+        console.error('Error adding comment:', error);
+      }
     }
   };
   const handleDeleteComment = async (commentId: string) => {
@@ -346,6 +397,12 @@ export default function CommentsModal({
             <View style={styles.commentHeader}>
               <Text style={styles.commentUsername}>{comment.username}</Text>
               <Text style={styles.commentTime}>{comment.time}</Text>
+              {/* Optimistic comment indicator */}
+              {comment.isOptimistic && (
+                <View style={styles.optimisticIndicator}>
+                  <Text style={styles.optimisticText}>Sending...</Text>
+                </View>
+              )}
               {/* Delete button inline with header - show for comment author OR post owner */}
               {(() => {
                 // Enhanced logic: Check if user can delete comment
@@ -856,5 +913,19 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontSize: FontSizes.xs,
     color: colors.primary,
     fontWeight: FontWeights.semibold,
+  },
+  // Optimistic comment styles
+  optimisticIndicator: {
+    backgroundColor: colors.primary + '20',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    marginLeft: Spacing.sm,
+  },
+  optimisticText: {
+    fontSize: FontSizes.xs,
+    color: colors.primary,
+    fontWeight: FontWeights.medium,
+    fontStyle: 'italic',
   },
 });

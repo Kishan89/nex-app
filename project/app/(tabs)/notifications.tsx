@@ -76,10 +76,10 @@ export default function NotificationsScreen() {
       if (notifications.length === 0) setLoading(true);
       const notificationsData = await apiService.getUserNotifications(user.id);
       if (Array.isArray(notificationsData)) {
-        // Filter out only chat/message notifications, keep everything else
+        // Filter to show only like, comment, follow notifications (exclude chat/message)
         const filteredNotifications = notificationsData.filter((notification: SimpleNotification) => {
           const type = notification.type?.toLowerCase() || '';
-          return type !== 'message' && type !== 'chat';
+          return ['like', 'comment', 'follow'].includes(type);
         });
         setNotifications(filteredNotifications);
         // Cache the notifications for instant loading next time
@@ -105,13 +105,15 @@ export default function NotificationsScreen() {
     useCallback(() => {
       loadNotifications();
       // Mark notifications as read when user visits this screen
-      // This provides instant UI feedback
-      markNotificationsAsRead();
-      // Also refresh the count from server after a short delay
-      setTimeout(() => {
-        refreshNotificationCount();
-      }, 1000);
-    }, [loadNotifications, markNotificationsAsRead, refreshNotificationCount])
+      // This provides instant UI feedback and server sync
+      (async () => {
+        try {
+          await markNotificationsAsRead();
+        } catch (error) {
+          console.error('Error marking notifications as read:', error);
+        }
+      })();
+    }, [loadNotifications, markNotificationsAsRead])
   );
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -232,4 +234,95 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     flex: 1,
   },
   username: {
-    fontSize: FontSizes.md,    color: colors.text,    fontWeight: FontWeights.semibold,  },  action: {    color: colors.textSecondary,    fontSize: FontSizes.sm,    marginTop: Spacing.xs,  },  time: {    fontSize: FontSizes.xs,    color: colors.textMuted,    marginTop: Spacing.xs,  },  fullWidthSeparator: {    height: 1,    backgroundColor: colors.border,    position: 'absolute',    left: 0,    right: 0,    bottom: 0,  },  loadingContainer: {    flex: 1,    justifyContent: 'center',    alignItems: 'center',    paddingVertical: 100,  },  loadingText: {    fontSize: FontSizes.md,    color: colors.textMuted,    marginTop: Spacing.md,    fontWeight: FontWeights.medium,  },  errorContainer: {    flex: 1,    justifyContent: 'center',    alignItems: 'center',    paddingVertical: 100,    paddingHorizontal: Spacing.xl,  },  errorText: {    fontSize: FontSizes.md,    color: colors.error,    textAlign: 'center',    marginBottom: Spacing.lg,    fontWeight: FontWeights.medium,  },  retryButton: {    backgroundColor: colors.primary,    paddingHorizontal: Spacing.lg,    paddingVertical: Spacing.sm,    borderRadius: BorderRadius.md,    ...Shadows.small,  },  retryButtonText: {    color: colors.background,    fontSize: FontSizes.md,    fontWeight: FontWeights.semibold,  },  emptyContainer: {    flex: 1,    justifyContent: 'center',    alignItems: 'center',    paddingVertical: 100,    paddingHorizontal: Spacing.xl,  },  emptyListContainer: {    flexGrow: 1,  },  listContainer: {    paddingBottom: 100, // Add bottom padding for tab bar  },  flatList: {    flex: 1,  },  emptyTitle: {    fontSize: FontSizes.xl,    color: colors.text,    fontWeight: FontWeights.semibold,    marginTop: Spacing.md,    marginBottom: Spacing.sm,    textAlign: 'center',  },  emptyText: {    fontSize: FontSizes.sm,    color: colors.textMuted,    fontWeight: FontWeights.regular,    textAlign: 'center',    lineHeight: 20,  },});
+    fontSize: FontSizes.md,
+    color: colors.text,
+    fontWeight: FontWeights.semibold,
+  },
+  action: {
+    color: colors.textSecondary,
+    fontSize: FontSizes.sm,
+    marginTop: Spacing.xs,
+  },
+  time: {
+    fontSize: FontSizes.xs,
+    color: colors.textMuted,
+    marginTop: Spacing.xs,
+  },
+  fullWidthSeparator: {
+    height: 1,
+    backgroundColor: colors.border,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+  loadingText: {
+    fontSize: FontSizes.md,
+    color: colors.textMuted,
+    marginTop: Spacing.md,
+    fontWeight: FontWeights.medium,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+    paddingHorizontal: Spacing.xl,
+  },
+  errorText: {
+    fontSize: FontSizes.md,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: Spacing.lg,
+    fontWeight: FontWeights.medium,
+  },
+  retryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    ...Shadows.small,
+  },
+  retryButtonText: {
+    color: colors.background,
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyListContainer: {
+    flexGrow: 1,
+  },
+  listContainer: {
+    paddingBottom: 100, // Add bottom padding for tab bar
+  },
+  flatList: {
+    flex: 1,
+  },
+  emptyTitle: {
+    fontSize: FontSizes.xl,
+    color: colors.text,
+    fontWeight: FontWeights.semibold,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: FontSizes.sm,
+    color: colors.textMuted,
+    fontWeight: FontWeights.regular,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+});

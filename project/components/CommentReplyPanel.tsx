@@ -180,17 +180,41 @@ export default function CommentReplyPanel({
     setNewReply('');
     setSending(true);
     setIsOperating(true);
+
+    // Create optimistic reply for instant UI feedback
+    const optimisticReply: Comment = {
+      id: `temp-reply-${Date.now()}`,
+      text: replyText,
+      username: 'You',
+      avatar: currentUserAvatar || '',
+      time: 'now',
+      userId: currentUserId || '',
+      isOptimistic: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Add optimistic reply immediately
+    setReplies(prev => [...prev, optimisticReply]);
+    
+    // Scroll to show the new reply
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+
     try {
       const response = await apiService.addComment(postId, replyText, parentComment.id);
-      // Reload replies to show the new one
+      // Remove optimistic reply and reload to get real data
+      setReplies(prev => prev.filter(reply => reply.id !== optimisticReply.id));
       await loadReplies();
       // Scroll to bottom to show new reply
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
-      // Restore the reply text if sending failed
+      // Remove optimistic reply on error and restore text
+      setReplies(prev => prev.filter(reply => reply.id !== optimisticReply.id));
       setNewReply(replyText);
+      console.error('Error sending reply:', error);
     } finally {
       setSending(false);
       setIsOperating(false);
@@ -250,6 +274,12 @@ export default function CommentReplyPanel({
         <View style={styles.replyHeader}>
           <Text style={styles.replyUsername}>{reply.username}</Text>
           <Text style={styles.replyTime}>{reply.time}</Text>
+          {/* Optimistic reply indicator */}
+          {reply.isOptimistic && (
+            <View style={styles.optimisticIndicator}>
+              <Text style={styles.optimisticText}>Sending...</Text>
+            </View>
+          )}
           {/* Delete button inline with header - for reply author OR post owner */}
           {(currentUserId === reply.user?.id) && (
             <TouchableOpacity 
@@ -583,5 +613,19 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     textAlignVertical: 'top',
     borderWidth: isDark ? 0 : 1,
     borderColor: isDark ? 'transparent' : colors.border,
+  },
+  // Optimistic reply styles
+  optimisticIndicator: {
+    backgroundColor: colors.primary + '20',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    marginLeft: Spacing.sm,
+  },
+  optimisticText: {
+    fontSize: FontSizes.xs,
+    color: colors.primary,
+    fontWeight: FontWeights.medium,
+    fontStyle: 'italic',
   },
 });

@@ -15,6 +15,7 @@ import {
 import { ArrowLeft } from 'lucide-react-native';
 import { useListen } from '@/context/ListenContext';
 import { apiService } from '@/lib/api';
+import { commentCache } from '@/store/commentCache';
 import { NormalizedPost } from '@/types';
 import CommentsModal from '@/components/Comments';
 import ImageViewer from '@/components/ImageViewer';
