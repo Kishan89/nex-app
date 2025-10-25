@@ -1,1 +1,140 @@
-import React from 'react';import { View, StyleSheet, SafeAreaView, ScrollView, Platform } from 'react-native';import { SkeletonAvatar, SkeletonText, SkeletonBase } from './SkeletonBase';import { Spacing, BorderRadius, ComponentStyles, Shadows, FontSizes, FontWeights } from '../../constants/theme';import { useTheme } from '../../context/ThemeContext';interface ChatItemSkeletonProps {  style?: any;  isOnline?: boolean;  hasUnread?: boolean;}export const ChatItemSkeleton: React.FC<ChatItemSkeletonProps> = ({  style,  isOnline = false,  hasUnread = false}) => {  const { colors } = useTheme();  return (    <View style={[styles.chatItem, { backgroundColor: colors.backgroundSecondary }, style]}>      <View style={styles.avatarContainer}>        <SkeletonAvatar size={ComponentStyles.avatar.large} />        {isOnline && (          <SkeletonBase            width={16}            height={16}            borderRadius={8}            style={styles.onlineIndicator}          />        )}      </View>      <View style={styles.chatContent}>        <View style={styles.chatHeader}>          <SkeletonText            width={120}            height={18}          />          <SkeletonText            width={50}            height={12}            style={styles.timeStamp}          />        </View>        <View style={styles.messageRow}>          <SkeletonText            width="70%"            height={15}            style={styles.lastMessage}          />          {hasUnread && (            <SkeletonBase              width={24}              height={24}              borderRadius={12}              style={styles.unreadBadge}            />          )}        </View>      </View>    </View>  );};// Message Bubble Skeleton for Chat Screenexport const MessageBubbleSkeleton: React.FC<{ isUser?: boolean }> = ({ isUser = false }) => {  return (    <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.otherBubble]}>      <SkeletonText        width="60%"        height={16}      />      <SkeletonText        width={40}        height={12}        style={styles.messageTime}      />    </View>  );};export const ChatSkeleton: React.FC = () => {  const { colors } = useTheme();  return (    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>      {/* Header matching the actual chats screen */}      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>        <View style={styles.headerLeft} />        <SkeletonText          width={80}          height={32}          style={styles.headerTitle}        />        <View style={styles.headerActions}>          <SkeletonBase width={36} height={36} borderRadius={18} />        </View>      </View>      {/* Chat List with limited items - only show top 3 items */}      <View style={styles.chatsList}>        {[1, 2, 3].map((index) => (          <ChatItemSkeleton            key={`chat-skeleton-${index}`}            style={styles.chatItemSpacing}            isOnline={index % 3 === 0}            hasUnread={index % 4 === 1}          />        ))}        {/* Loading indicator for remaining content */}        <View style={styles.loadingIndicator}>          <View style={styles.loadingDots}>            <View style={[styles.dot, styles.dot1]} />            <View style={[styles.dot, styles.dot2]} />            <View style={[styles.dot, styles.dot3]} />          </View>        </View>      </View>    </SafeAreaView>  );};const styles = StyleSheet.create({  container: {    flex: 1,  },  header: {    flexDirection: 'row',    alignItems: 'center',    justifyContent: 'space-between',    paddingTop: Platform.OS === 'ios' ? 45 : 15,    paddingBottom: 6,    paddingHorizontal: Spacing.md,    borderBottomWidth: 1,  },  headerLeft: {    width: ComponentStyles.avatar.medium,  },  headerTitle: {    fontSize: 32,    fontWeight: '800',    letterSpacing: 0.5,  },  headerActions: {    flexDirection: 'row',    alignItems: 'center',  },  chatsList: {    paddingTop: Spacing.sm,  },  chatItem: {    flexDirection: 'row',    alignItems: 'center',    paddingVertical: Spacing.md,    paddingHorizontal: Spacing.md,    marginHorizontal: Spacing.sm,    marginVertical: Spacing.xs,    borderRadius: BorderRadius.md,  },  chatItemSpacing: {    marginHorizontal: Spacing.sm,    marginVertical: Spacing.xs,  },  avatarContainer: {    position: 'relative',  },  onlineIndicator: {    position: 'absolute',    bottom: 2,    right: 2,  },  chatContent: {    flex: 1,    marginLeft: Spacing.md,    marginRight: Spacing.sm,  },  chatHeader: {    flexDirection: 'row',    justifyContent: 'space-between',    alignItems: 'center',    marginBottom: Spacing.xs,  },  timeStamp: {    opacity: 0.7,  },  messageRow: {    flexDirection: 'row',    justifyContent: 'space-between',    alignItems: 'center',  },  lastMessage: {    flex: 1,    marginRight: Spacing.xs,  },  unreadBadge: {    borderRadius: 10,    minWidth: 20,    height: 20,    justifyContent: 'center',    alignItems: 'center',    paddingHorizontal: Spacing.xs,    marginLeft: Spacing.sm,  },  messageBubble: {    padding: Spacing.sm,    marginVertical: Spacing.xs,    borderRadius: BorderRadius.lg,    maxWidth: '80%',  },  userBubble: {    alignSelf: 'flex-end',    marginRight: Spacing.md,  },  otherBubble: {    alignSelf: 'flex-start',    marginLeft: Spacing.md,  },  messageTime: {    marginTop: Spacing.xs,    opacity: 0.6,  },  loadingIndicator: {    paddingVertical: Spacing.lg,    alignItems: 'center',    justifyContent: 'center',  },  loadingDots: {    flexDirection: 'row',    alignItems: 'center',    gap: Spacing.xs,  },  dot: {    width: 8,    height: 8,    borderRadius: 4,    opacity: 0.3,  },  dot1: {    opacity: 0.8,  },  dot2: {    opacity: 0.5,  },  dot3: {    opacity: 0.3,  },});
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
+import { SkeletonAvatar, SkeletonText, SkeletonBase } from './SkeletonBase';
+import { Spacing, ComponentStyles } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
+
+interface ChatItemSkeletonProps {
+  style?: any;
+  hasUnread?: boolean;
+}
+
+export const ChatItemSkeleton: React.FC<ChatItemSkeletonProps> = ({
+  style,
+  hasUnread = false
+}) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+  
+  return (
+    <View style={[styles.chatItem, style]}>
+      {/* Avatar */}
+      <View style={styles.avatarContainer}>
+        <SkeletonAvatar size={50} />
+      </View>
+      
+      {/* Chat Content */}
+      <View style={styles.chatContent}>
+        {/* Chat Header - Name and Time */}
+        <View style={styles.chatHeader}>
+          <SkeletonText width={120} height={16} style={styles.chatName} />
+          <SkeletonText width={50} height={12} style={styles.chatTime} />
+        </View>
+        
+        {/* Last Message */}
+        <SkeletonText width="75%" height={14} style={styles.lastMessage} />
+      </View>
+      
+      {/* Unread Indicator - Green Dot */}
+      {hasUnread && (
+        <SkeletonBase width={8} height={8} borderRadius={4} style={styles.unreadDot} />
+      )}
+    </View>
+  );
+};
+
+// Message Bubble Skeleton for Chat Detail Screen
+export const MessageBubbleSkeleton: React.FC<{ isUser?: boolean }> = ({ isUser = false }) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+  
+  return (
+    <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.otherBubble]}>
+      <SkeletonText width="60%" height={14} />
+      <SkeletonText width={40} height={11} style={styles.messageTime} />
+    </View>
+  );
+};
+
+export const ChatSkeleton: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+  
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Chat List - Show 5-6 chats */}
+      <View style={styles.chatsList}>
+        {[1, 2, 3, 4, 5, 6].map((index) => (
+          <ChatItemSkeleton
+            key={`chat-skeleton-${index}`}
+            hasUnread={index % 3 === 1} // Some chats have unread indicator
+          />
+        ))}
+      </View>
+    </View>
+  );
+};
+
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  chatsList: {
+    flex: 1,
+  },
+  chatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: colors.backgroundSecondary,
+    marginHorizontal: Spacing.sm,
+    marginVertical: Spacing.xs,
+    borderRadius: 12,
+  },
+  avatarContainer: {
+    marginRight: Spacing.md,
+  },
+  chatContent: {
+    flex: 1,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  chatName: {
+    flex: 1,
+  },
+  chatTime: {
+    marginLeft: Spacing.sm,
+    opacity: 0.6,
+  },
+  lastMessage: {
+    opacity: 0.7,
+  },
+  unreadDot: {
+    marginLeft: Spacing.sm,
+    backgroundColor: colors.success || '#4ade80',
+  },
+  // Message bubble styles for chat detail screen
+  messageBubble: {
+    padding: Spacing.sm,
+    marginVertical: Spacing.xs,
+    borderRadius: 16,
+    maxWidth: '80%',
+  },
+  userBubble: {
+    alignSelf: 'flex-end',
+    marginRight: Spacing.md,
+  },
+  otherBubble: {
+    alignSelf: 'flex-start',
+    marginLeft: Spacing.md,
+  },
+  messageTime: {
+    marginTop: 4,
+    opacity: 0.6,
+  },
+});

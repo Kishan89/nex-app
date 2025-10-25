@@ -353,21 +353,18 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onCombinedRefresh} tintColor={colors.primary} />}
       >
-        <View style={styles.headerBar}>
-          <TouchableOpacity style={styles.backButton} onPress={() => {
+        <View style={styles.bannerSection}>
+          <Image source={{ uri: bannerUri }} style={styles.banner} />
+          {/* Floating Back Button */}
+          <TouchableOpacity style={styles.floatingBackButton} onPress={() => {
             if (router.canGoBack()) {
               router.back();
             } else {
               router.push('/(tabs)/chats');
             }
           }}>
-            <ArrowLeft size={24} color={colors.text} />
+            <ArrowLeft size={24} color="#ffffff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{profile.username}</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        <View style={styles.bannerSection}>
-          <Image source={{ uri: bannerUri }} style={styles.banner} />
         </View>
         {/* Profile Image Section - Separate from banner */}
         <View style={styles.profileImageSection}>
@@ -519,43 +516,34 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background
   },
-  headerBar: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: Spacing.md, 
-    paddingVertical: Spacing.sm, 
-    backgroundColor: colors.background,
-    ...Shadows.small,
-  },
-  backButton: { 
-    width: ComponentStyles.avatar.medium, 
-    height: ComponentStyles.avatar.medium, 
-    borderRadius: ComponentStyles.avatar.medium / 2, 
-    backgroundColor: colors.backgroundTertiary, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
-  },
-  headerTitle: { 
-    fontSize: FontSizes.xl, 
-    fontWeight: FontWeights.bold, 
-    color: colors.text 
-  },
   bannerSection: {
     position: 'relative',
     backgroundColor: colors.background,
     overflow: 'visible', // Ensure profile image and action buttons are not clipped
     zIndex: 1, // Lower z-index than action buttons
+    marginTop: -Spacing.md, // Slight negative margin to extend banner upward
   },
   banner: { 
     width: '100%', 
-    height: 160, // Increased from 120 to ensure profile image fits
+    height: 200, // Taller banner for full-bleed effect
     backgroundColor: colors.backgroundTertiary,
+  },
+  floatingBackButton: {
+    position: 'absolute',
+    top: Spacing.lg, // Moved down from top
+    left: Spacing.md,
+    width: ComponentStyles.avatar.medium,
+    height: ComponentStyles.avatar.medium,
+    borderRadius: ComponentStyles.avatar.medium / 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   profileImageSection: {
     alignItems: 'flex-start',
     paddingHorizontal: Spacing.md,
-    marginTop: -50, // Increased negative margin to move component up
+    marginTop: -50, // Negative margin to overlap banner
     marginBottom: Spacing.xs, // Reduced margin for tighter spacing
     zIndex: 2,
   },

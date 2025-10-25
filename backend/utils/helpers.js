@@ -12,21 +12,21 @@ function formatTimeAgo(date) {
     const diffInDays = Math.floor(diffInHours / 24);
 
     if (diffInMinutes < 1) return 'now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m`;
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
 
-    if (diffInHours < 24) return `${diffInHours}h`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
 
-    if (diffInDays < 7) return `${diffInDays}d`;
+    if (diffInDays < 7) return `${diffInDays}d ago`;
 
     const diffInWeeks = Math.floor(diffInDays / 7);
-    if (diffInWeeks < 4) return `${diffInWeeks}w`;
+    if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
 
     // ⭐️ New: Add logic for months and years for very old dates
     const diffInMonths = Math.floor(diffInDays / 30);
-    if (diffInMonths < 12) return `${diffInMonths}mo`;
+    if (diffInMonths < 12) return `${diffInMonths}mo ago`;
 
     const diffInYears = Math.floor(diffInDays / 365);
-    return `${diffInYears}y`;
+    return `${diffInYears}y ago`;
 }
 
 /**

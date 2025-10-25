@@ -102,6 +102,22 @@ class CommentController {
       next(error);
     }
   }
+
+  /**
+   * Report a comment
+   */
+  async reportComment(req, res, next) {
+    try {
+      const { commentId } = req.params;
+      
+      const result = await commentService.reportComment(commentId);
+      
+      res.json(successResponse(result, 'Comment reported successfully'));
+    } catch (error) {
+      console.error('❌ Error in reportComment:', error);
+      next(error);
+    }
+  }
 }
 
 module.exports = new CommentController();

@@ -21,6 +21,7 @@ import { Spacing, FontSizes, FontWeights, BorderRadius } from '../../constants/t
 import { useTheme } from '../../context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { followSync } from '@/store/followSync';
+import { SearchUsersSkeleton } from '@/components/skeletons';
 interface SearchUser {
   id: string;
   username: string;
@@ -264,12 +265,7 @@ export default function SearchUsersScreen() {
   );
   const renderSection = (title: string, data: SearchUser[], showLoading = false) => {
     if (showLoading && loadingSuggestions) {
-      return (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{title}</Text>
-          <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
-        </View>
-      );
+      return null; // SearchUsersSkeleton will be shown in main render
     }
     if (data.length === 0) return null;
     return (
@@ -311,33 +307,34 @@ export default function SearchUsersScreen() {
         </View>
       </View>
       {/* Content */}
-      <ScrollView 
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {searchQuery.trim().length >= 2 ? (
-          // Search Results
-          <>
-            {loading && (
-              <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
-            )}
-            {searchResults.length > 0 ? (
-              renderSection('Search Results', searchResults)
-            ) : !loading && (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No users found</Text>
-              </View>
-            )}
-          </>
-        ) : (
-          // Default Content
-          <>
-            {renderSection('Top Suggested Users', suggestedUsers, true)}
-            {renderSection('Recent Searches', recentSearches)}
-          </>
-        )}
-      </ScrollView>
+      {(loading || loadingSuggestions) ? (
+        <SearchUsersSkeleton />
+      ) : (
+        <ScrollView 
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {searchQuery.trim().length >= 2 ? (
+            // Search Results
+            <>
+              {searchResults.length > 0 ? (
+                renderSection('Search Results', searchResults)
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>No users found</Text>
+                </View>
+              )}
+            </>
+          ) : (
+            // Default Content
+            <>
+              {renderSection('Top Suggested Users', suggestedUsers, true)}
+              {renderSection('Recent Searches', recentSearches)}
+            </>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

@@ -16,4 +16,7 @@ router.put('/:commentId', verifyAuthToken, commentController.updateComment);
 // Delete a comment (requires a logged-in user who owns the comment)
 router.delete('/:commentId', verifyAuthToken, commentController.deleteComment);
 
+// Report a comment (requires a logged-in user)
+router.post('/:commentId/report', verifyAuthToken, commentController.reportComment);
+
 module.exports = router;

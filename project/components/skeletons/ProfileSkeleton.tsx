@@ -10,104 +10,72 @@ export const ProfileSkeleton: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Enhanced Header with Back Button */}
-        <View style={styles.header}>
-          <SkeletonBase width={32} height={32} borderRadius={16} />
-          <SkeletonText width={140} height={24} />
-          <SkeletonBase width={32} height={32} borderRadius={16} />
-        </View>
-        {/* Cover Photo Section */}
-        <View style={styles.coverSection}>
-          <SkeletonBase width="100%" height={180} borderRadius={0} />
-          <View style={styles.profileImageContainer}>
-            <SkeletonAvatar size={120} style={styles.profileImage} />
-            <SkeletonBase width={36} height={36} borderRadius={18} style={styles.editButton} />
+        {/* Banner Section with Back Button */}
+        <View style={styles.bannerSection}>
+          <SkeletonBase width="100%" height={200} borderRadius={0} />
+          <View style={styles.floatingBackButton}>
+            <SkeletonBase width={32} height={32} borderRadius={16} />
           </View>
         </View>
-        {/* Enhanced Profile Info */}
+        {/* Profile Image Section - Overlapping Banner */}
+        <View style={styles.profileImageSection}>
+          <SkeletonAvatar size={100} style={styles.profileImage} />
+        </View>
+        {/* Profile Section */}
         <View style={styles.profileSection}>
-          {/* Name and Verification */}
-          <View style={styles.nameSection}>
-            <View style={styles.nameRow}>
-              <SkeletonText width={160} height={28} />
-              <SkeletonBase width={24} height={24} borderRadius={12} style={styles.verifiedBadge} />
+          {/* Profile Header with Username, XP, and Action Buttons */}
+          <View style={styles.profileHeader}>
+            <View style={styles.profileInfo}>
+              {/* Username and XP Row */}
+              <View style={styles.usernameXpRow}>
+                <SkeletonText width={140} height={28} />
+                <SkeletonBase width={80} height={28} borderRadius={14} style={styles.xpBadge} />
+              </View>
             </View>
-            <SkeletonText width={120} height={16} style={styles.handle} />
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsContainer}>
+              <SkeletonBase width={44} height={44} borderRadius={22} />
+            </View>
           </View>
-          {/* Enhanced Stats */}
+          {/* Bio Section */}
+          <View style={styles.bioSection}>
+            <SkeletonText width="90%" height={16} style={styles.bioLine} />
+            <SkeletonText width="75%" height={16} style={styles.bioLine} />
+          </View>
+          {/* Stats Section */}
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <SkeletonText width={50} height={24} />
-              <SkeletonText width={60} height={16} />
+              <SkeletonText width={40} height={20} />
+              <SkeletonText width={50} height={14} />
             </View>
-            <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <SkeletonText width={45} height={24} />
-              <SkeletonText width={70} height={16} />
+              <SkeletonText width={40} height={20} />
+              <SkeletonText width={60} height={14} />
             </View>
-            <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <SkeletonText width={40} height={24} />
-              <SkeletonText width={50} height={16} />
-            </View>
-          </View>
-          {/* Bio Section with Links */}
-          <View style={styles.bioSection}>
-            <SkeletonText width="95%" height={16} style={styles.bioLine} />
-            <SkeletonText width="80%" height={16} style={styles.bioLine} />
-            <View style={styles.linkRow}>
-              <SkeletonBase width={16} height={16} borderRadius={4} />
-              <SkeletonText width={140} height={16} style={styles.link} />
-            </View>
-            <View style={styles.linkRow}>
-              <SkeletonBase width={16} height={16} borderRadius={4} />
-              <SkeletonText width={100} height={16} style={styles.link} />
-            </View>
-          </View>
-          {/* Enhanced Action Buttons */}
-          <View style={styles.actionButtons}>
-            <SkeletonButton width="42%" height={40} />
-            <SkeletonButton width="42%" height={40} />
-            <SkeletonBase width={40} height={40} borderRadius={20} />
-          </View>
-          {/* Highlights Section */}
-          <View style={styles.highlightsSection}>
-            <SkeletonText width={80} height={18} style={styles.sectionTitle} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {[1, 2, 3, 4, 5].map((index) => (
-                <View key={index} style={styles.highlightItem}>
-                  <SkeletonBase width={64} height={64} borderRadius={32} />
-                  <SkeletonText width={50} height={12} style={styles.highlightName} />
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-          {/* Enhanced Tab Bar */}
-          <View style={styles.tabBar}>
-            <View style={styles.tabItem}>
-              <SkeletonBase width={24} height={24} borderRadius={4} />
-              <SkeletonText width={40} height={14} style={styles.tabLabel} />
-            </View>
-            <View style={styles.tabItem}>
-              <SkeletonBase width={24} height={24} borderRadius={4} />
-              <SkeletonText width={50} height={14} style={styles.tabLabel} />
-            </View>
-            <View style={styles.tabItem}>
-              <SkeletonBase width={24} height={24} borderRadius={4} />
-              <SkeletonText width={45} height={14} style={styles.tabLabel} />
+              <SkeletonText width={40} height={20} />
+              <SkeletonText width={60} height={14} />
             </View>
           </View>
         </View>
-        {/* Enhanced Posts Grid with Variety */}
-        <View style={styles.postsGrid}>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) => (
-            <SkeletonBase 
-              key={index}
-              width={(width - 60) / 3} 
-              height={(width - 60) / 3} 
-              borderRadius={12}
-              style={styles.gridItem}
-            />
+        {/* Posts Section Header */}
+        <View style={styles.postsHeaderContainer}>
+          <SkeletonText width={80} height={18} />
+        </View>
+        {/* Posts Content */}
+        <View style={styles.contentSection}>
+          {[1, 2, 3].map((index) => (
+            <View key={index} style={styles.postCard}>
+              <View style={styles.postHeader}>
+                <SkeletonAvatar size={40} />
+                <View style={styles.postHeaderText}>
+                  <SkeletonText width={100} height={14} />
+                  <SkeletonText width={60} height={12} style={styles.postTime} />
+                </View>
+              </View>
+              <SkeletonText width="100%" height={16} style={styles.postContent} />
+              <SkeletonText width="85%" height={16} style={styles.postContent} />
+            </View>
           ))}
         </View>
       </ScrollView>
@@ -119,70 +87,64 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: colors.backgroundSecondary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  coverSection: {
+  bannerSection: {
     position: 'relative',
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: colors.background,
+    overflow: 'visible',
   },
-  profileImageContainer: {
+  floatingBackButton: {
     position: 'absolute',
-    bottom: -60,
-    left: 20,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    top: 16,
+    left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  profileImageSection: {
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    marginTop: -50,
+    marginBottom: 8,
+    zIndex: 2,
   },
   profileImage: {
-    borderWidth: 4,
-    borderColor: colors.background,
-  },
-  editButton: {
-    marginLeft: 12,
-    backgroundColor: colors.border,
+    borderWidth: 3,
+    borderColor: colors.primary,
   },
   profileSection: {
     paddingHorizontal: 20,
-    paddingTop: 70,
-    paddingBottom: 20,
+    marginTop: 0,
+    backgroundColor: colors.background,
   },
-  nameSection: {
-    marginBottom: 20,
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    minHeight: 50,
   },
-  nameRow: {
+  profileInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  usernameXpRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    flexWrap: 'wrap',
+    marginBottom: 2,
   },
-  verifiedBadge: {
+  xpBadge: {
     marginLeft: 8,
-    backgroundColor: '#007AFF',
   },
-  handle: {
-    opacity: 0.7,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 16,
-    paddingVertical: 20,
-    marginBottom: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: 20,
+  actionButtonsContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    marginTop: -30,
+    zIndex: 3,
   },
   bioSection: {
     marginBottom: 20,
@@ -190,56 +152,45 @@ const createStyles = (colors: any) => StyleSheet.create({
   bioLine: {
     marginBottom: 6,
   },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  link: {
-    marginLeft: 8,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  highlightsSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    marginBottom: 16,
-  },
-  highlightItem: {
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  highlightName: {
-    marginTop: 8,
-  },
-  tabBar: {
+  statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: colors.backgroundTertiary,
     borderRadius: 16,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    marginBottom: 0,
   },
-  tabItem: {
+  statItem: {
     alignItems: 'center',
   },
-  tabLabel: {
-    marginTop: 6,
+  postsHeaderContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+    marginBottom: 16,
+    backgroundColor: colors.background,
   },
-  postsGrid: {
+  contentSection: {
+    paddingBottom: 80,
+    backgroundColor: colors.background,
+  },
+  postCard: {
+    padding: 16,
+    backgroundColor: colors.backgroundSecondary,
+    marginBottom: 1,
+  },
+  postHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  gridItem: {
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  postHeaderText: {
+    marginLeft: 12,
+  },
+  postTime: {
+    marginTop: 4,
+  },
+  postContent: {
+    marginBottom: 8,
   },
 });

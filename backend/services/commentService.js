@@ -451,6 +451,22 @@ class CommentService {
       where: { postId },
     });
   }
+
+  /**
+   * Report a comment
+   */
+  async reportComment(commentId) {
+    const comment = await prisma.comment.update({
+      where: { id: commentId },
+      data: {
+        reportsCount: {
+          increment: 1
+        }
+      }
+    });
+    
+    return { success: true, reportsCount: comment.reportsCount };
+  }
 }
 
 module.exports = new CommentService();

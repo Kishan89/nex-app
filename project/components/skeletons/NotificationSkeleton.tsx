@@ -8,43 +8,51 @@ interface NotificationItemSkeletonProps {
 export const NotificationItemSkeleton: React.FC<NotificationItemSkeletonProps> = ({ style }) => {
   const { colors } = useTheme();
   const styles = createStyles(colors);
+  
   return (
     <View style={[styles.notificationItem, style]}>
-      <SkeletonAvatar size={40} />
-      <View style={styles.notificationContent}>
-        <SkeletonText width="85%" height={16} style={styles.notificationText} />
-        <SkeletonText width="60%" height={14} style={styles.notificationText} />
-        <SkeletonText width={80} height={12} />
+      {/* Left - Avatar with icon badge */}
+      <View style={styles.leftSection}>
+        <View style={styles.avatarContainer}>
+          <SkeletonAvatar size={40} />
+          {/* Icon badge overlay */}
+          <SkeletonBase width={16} height={16} borderRadius={8} style={styles.iconBadge} />
+        </View>
       </View>
-      <SkeletonBase width={8} height={8} borderRadius={4} />
+      
+      {/* Center - Content */}
+      <View style={styles.notificationContent}>
+        <SkeletonText width="90%" height={14} style={styles.messageLine} />
+        <SkeletonText width="70%" height={14} style={styles.messageLine} />
+        {/* Post preview (optional, 50% chance) */}
+        {Math.random() > 0.5 && (
+          <SkeletonText width="75%" height={12} style={styles.postPreview} />
+        )}
+        <SkeletonText width={60} height={11} style={styles.timestamp} />
+      </View>
+      
+      {/* Right - Post image or unread dot */}
+      {Math.random() > 0.6 ? (
+        <SkeletonBase width={38} height={38} borderRadius={6} style={styles.postImage} />
+      ) : (
+        <SkeletonBase width={8} height={8} borderRadius={4} style={styles.unreadDot} />
+      )}
     </View>
   );
 };
 export const NotificationSkeleton: React.FC = () => {
   const { colors } = useTheme();
   const styles = createStyles(colors);
+  
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <SkeletonText width={120} height={24} />
-        <SkeletonBase width={40} height={40} borderRadius={20} />
-      </View>
-      {/* Notification Items - Limited to top 3 */}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Notification Items - Show 5-6 notifications */}
       <View style={styles.notificationsList}>
-        {[1, 2, 3].map((index) => (
+        {[1, 2, 3, 4, 5, 6].map((index) => (
           <NotificationItemSkeleton key={index} />
         ))}
-        {/* Loading indicator for remaining content */}
-        <View style={styles.loadingIndicator}>
-          <View style={styles.loadingDots}>
-            <View style={[styles.dot, styles.dot1]} />
-            <View style={[styles.dot, styles.dot2]} />
-            <View style={[styles.dot, styles.dot3]} />
-          </View>
-        </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 // Create dynamic styles function
@@ -53,58 +61,46 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
   notificationsList: {
     flex: 1,
   },
   notificationItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  notificationContent: {
-    flex: 1,
-    marginLeft: 12,
+  leftSection: {
     marginRight: 12,
   },
-  notificationText: {
+  avatarContainer: {
+    position: 'relative',
+  },
+  iconBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+  },
+  notificationContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  messageLine: {
     marginBottom: 4,
   },
-  loadingIndicator: {
-    paddingVertical: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  postPreview: {
+    marginBottom: 4,
+    opacity: 0.7,
   },
-  loadingDots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  timestamp: {
+    opacity: 0.6,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.textMuted,
-    opacity: 0.3,
+  postImage: {
+    alignSelf: 'center',
   },
-  dot1: {
-    opacity: 0.8,
-  },
-  dot2: {
-    opacity: 0.5,
-  },
-  dot3: {
-    opacity: 0.3,
+  unreadDot: {
+    alignSelf: 'center',
   },
 });

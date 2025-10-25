@@ -1,7 +1,7 @@
 // app/(tabs)/_layout.tsx
 import React, { useEffect, useState } from 'react';
 import { Tabs, Redirect } from 'expo-router';
-import { Home, Bell, MessageCircle, Settings } from 'lucide-react-native';
+import { Home, Bell, MessageCircle, Settings, Search } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, StatusBar, StyleSheet, Platform, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -88,18 +88,24 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="notifications"
+          name="search"
           options={{
-            title: 'Notifications',
+            title: 'Search',
             tabBarIcon: ({ size, color, focused }) => (
               <TabBarIcon focused={focused} colors={colors}>
-                <Bell
+                <Search
                   size={size}
                   color={color}
                   strokeWidth={focused ? 2.5 : 2}
                 />
               </TabBarIcon>
             ),
+          }}
+        />
+        <Tabs.Screen
+          name="notifications"
+          options={{
+            href: null, // Hide from tab bar
           }}
         />
         <Tabs.Screen

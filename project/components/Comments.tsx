@@ -73,7 +73,7 @@ export default function CommentsModal({
   isBookmarked,
   hasVotedOnPoll,
   userPollVote,
-}: CommentsModalProps) {
+}: CommentsModalProps): React.ReactElement | null {
   const { user: currentUser } = useAuth(); // Move useAuth hook to top level
   const { colors, isDark } = useTheme();
   const [newComment, setNewComment] = useState('');
@@ -81,6 +81,7 @@ export default function CommentsModal({
   const [expandedReplies, setExpandedReplies] = useState<{[key: string]: boolean}>({});
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentRefs, setCommentRefs] = useState<{[key: string]: React.RefObject<View>}>({});
+  const [showMenuForComment, setShowMenuForComment] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const { openCommentReplies } = useCommentReply();
   // Get real-time post data and interactions from ListenContext
@@ -229,13 +230,17 @@ export default function CommentsModal({
     }
   };
   const handleDeleteComment = async (commentId: string) => {
+    setShowMenuForComment(null);
     // Find the comment to show appropriate confirmation message
     const comment = localComments.find(c => c.id === commentId);
     const commentUserId = comment?.user?.id || comment?.userId;
     const isOwnComment = commentUserId && currentUser?.id && String(commentUserId) === String(currentUser.id);
+
     // Debug logging for delete attempt
+
     // Check if this is a parent comment with replies
     const hasReplies = comment?.replies && comment.replies.length > 0;
+
     let confirmationMessage = '';
     if (isOwnComment) {
       confirmationMessage = hasReplies 
@@ -245,6 +250,7 @@ export default function CommentsModal({
       Alert.alert('Error', 'You can only delete your own comments.');
       return;
     }
+
     Alert.alert(
       'Delete Comment',
       confirmationMessage,
@@ -314,6 +320,32 @@ export default function CommentsModal({
       ]
     );
   };
+
+  const handleReportComment = async (commentId: string) => {
+    setShowMenuForComment(null);
+    Alert.alert(
+      'Report Comment',
+      'Are you sure you want to report this comment?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (post?.id) {
+                await apiService.reportComment(post.id, commentId);
+                Alert.alert('Success', 'Comment reported successfully');
+              }
+            } catch (error: any) {
+              Alert.alert('Error', 'Failed to report comment. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const getOrCreateCommentRef = (commentId: string) => {
     if (!commentRefs[commentId]) {
       setCommentRefs(prev => ({
@@ -348,6 +380,10 @@ export default function CommentsModal({
       [commentId]: !prev[commentId]
     }));
   };
+
+  // Create dynamic styles inside component to access colors
+  const styles = createStyles(colors, isDark);
+
   // Helper function to render text with @mentions highlighted (logic preserved)
   const renderTextWithMentions = (text: string, username: string, isReply = false) => {
     const mentionRegex = /@(\w+)/g;
@@ -378,6 +414,9 @@ export default function CommentsModal({
     const hasReplies = comment.replies && comment.replies.length > 0;
     const repliesExpanded = expandedReplies[comment.id] || false;
     const commentRef = getOrCreateCommentRef(comment.id);
+    const commentUserId = comment.user?.id || comment.userId;
+    const isOwnComment = commentUserId && currentUser?.id && String(commentUserId) === String(currentUser.id);
+
     return (
       <View key={comment.id} style={styles.commentWrapper}>
         <View 
@@ -395,63 +434,60 @@ export default function CommentsModal({
           )}
           <View style={styles.commentContent}>
             <View style={styles.commentHeader}>
-              <Text style={styles.commentUsername}>{comment.username}</Text>
-              <Text style={styles.commentTime}>{comment.time}</Text>
+              <View style={styles.commentUserInfo}>
+                <Text style={styles.commentUsername}>{comment.username}</Text>
+                <Text style={styles.commentTime}>{comment.time}</Text>
+              </View>
               {/* Optimistic comment indicator */}
               {comment.isOptimistic && (
                 <View style={styles.optimisticIndicator}>
                   <Text style={styles.optimisticText}>Sending...</Text>
                 </View>
               )}
-              {/* Delete button inline with header - show for comment author OR post owner */}
-              {(() => {
-                // Enhanced logic: Check if user can delete comment
-                // Backend sends both comment.user.id and comment.userId as fallback
-                const commentUserId = comment.user?.id || comment.userId;
-                // User can delete ONLY their own comments (regardless of post ownership)
-                const isCommentAuthor = commentUserId && currentUser?.id && String(commentUserId) === String(currentUser.id);
-                const shouldShowDelete = isCommentAuthor;
-                return shouldShowDelete && (
-                  <TouchableOpacity
-                    style={styles.inlineDeleteButton}
-                    onPress={() => handleDeleteComment(comment.id)}
-                  >
-                    <Trash2 size={12} color={colors.error} />
-                  </TouchableOpacity>
-                );
-              })()}
-            </View>
-            <Text style={styles.commentText}>{comment.text}</Text>
-            {/* YouTube-style Comment Actions - Reply */}
-            <View style={styles.commentActions}>
-              <TouchableOpacity 
-                style={styles.replyButton}
-                onPress={() => handleReply(comment)}
+              {/* Three-dot menu button */}
+              <TouchableOpacity
+                style={styles.inlineMenuButton}
+                onPress={() => setShowMenuForComment(showMenuForComment === comment.id ? null : comment.id)}
               >
-                <Text style={styles.replyText}>
-                  Reply
-                </Text>
+                <MoreVertical size={16} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
+            <Text style={styles.commentText}>{comment.text}</Text>
+            {/* Dropdown menu */}
+            {showMenuForComment === comment.id && (
+              <View style={styles.menuDropdown}>
+                {isOwnComment && (
+                  <TouchableOpacity 
+                    style={styles.menuItem}
+                    onPress={() => handleDeleteComment(comment.id)}
+                  >
+                    <Trash2 size={16} color={colors.error} />
+                    <Text style={[styles.menuItemText, { color: colors.error }]}>Delete</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={() => handleReportComment(comment.id)}
+                >
+                  <Flag size={16} color={colors.textMuted} />
+                  <Text style={styles.menuItemText}>Report</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
-        {/* YouTube-style View Replies Button - Opens sliding panel */}
-        {hasReplies && !isReply && (
-          <TouchableOpacity 
-            style={styles.viewRepliesButton}
-            onPress={() => handleViewReplies(comment)}
-          >
-            <Text style={styles.viewRepliesIcon}>💬</Text>
-            <Text style={styles.viewRepliesText}>
-              View {comment.replies!.length} {comment.replies!.length === 1 ? 'reply' : 'replies'}
-            </Text>
-          </TouchableOpacity>
-        )}
+        {/* View Replies Button - Left aligned like PostCard */}
+        <TouchableOpacity 
+          style={styles.viewRepliesButton}
+          onPress={() => handleViewReplies(comment)}
+        >
+          <Text style={styles.viewRepliesText}>
+            {hasReplies ? `${comment.replies!.length} ${comment.replies!.length === 1 ? 'reply' : 'replies'}` : '0 replies'}
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   };
-  // Create dynamic styles inside component to access colors
-  const styles = createStyles(colors, isDark);
   if (!post) return null;
   return (
     <Modal
@@ -630,20 +666,23 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   commentHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: Spacing.xs,
+  },
+  commentUserInfo: {
+    flexDirection: 'column',
+    flex: 1,
   },
   commentUsername: {
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.bold,
     color: colors.text,
-    marginRight: Spacing.sm, // Add space between username and time
   },
   commentText: {
     fontSize: FontSizes.sm,
     color: colors.text,
     lineHeight: 18,
-    marginBottom: Spacing.xs,
+    marginTop: Spacing.xs,
   },
   mentionText: {
     fontSize: FontSizes.sm,
@@ -668,6 +707,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   commentTime: {
     fontSize: FontSizes.xs,
     color: colors.textMuted,
+    marginTop: 2,
   },
   replyButton: {
     paddingVertical: Spacing.xs,
@@ -685,10 +725,10 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontWeight: FontWeights.regular,
   },
   viewRepliesButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    paddingLeft:0,
     marginTop: Spacing.xs,
+    marginLeft: 0,
   },
   viewRepliesLine: {
     width: 24,
@@ -697,8 +737,8 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     marginRight: Spacing.sm,
   },
   viewRepliesText: {
-    fontSize: FontSizes.xs,
-    color: colors.textMuted,
+    fontSize: FontSizes.sm,
+    color: "#004aad",
     fontWeight: FontWeights.semibold,
   },
   repliesContainer: {
@@ -780,6 +820,39 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     padding: Spacing.xs,
     marginLeft: 'auto', // Push to right side
     opacity: 0.7,
+  },
+  inlineMenuButton: {
+    padding: Spacing.xs,
+    marginLeft: 'auto',
+    opacity: 0.7,
+  },
+  menuDropdown: {
+    position: 'absolute',
+    right: 0,
+    top: 30,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1000,
+    minWidth: 120,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.sm,
+  },
+  menuItemText: {
+    fontSize: FontSizes.sm,
+    color: colors.text,
+    fontWeight: FontWeights.medium,
   },
   // Input Container - positioned at bottom to cover grey area
   commentInputContainer: {

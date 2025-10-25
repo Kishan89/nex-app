@@ -13,10 +13,11 @@ import {
   ActivityIndicator,
   Share as RNShare,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Search, PenTool, Bell } from 'lucide-react-native';
+import { PenTool, Bell } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PostCard from '../../components/PostCard';
 import CommentsModal from '../../components/Comments';
@@ -30,6 +31,9 @@ import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles,
 import { useTheme } from '../../context/ThemeContext';
 import { useNotificationCount } from '../../context/NotificationCountContext';
 import { trackScreenView, trackEvent } from '../../lib/firebase';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -62,11 +66,22 @@ export default function HomeScreen() {
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<NormalizedPost | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Refs for horizontal and vertical FlatLists
+  const horizontalFlatListRef = useRef<FlatList>(null);
+  const verticalFlatListRefs = useRef<{ [key: string]: FlatList | null }>({});
+  
   // Animation values for scroll-to-hide
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const fabScale = useRef(new Animated.Value(1)).current;
   const lastScrollY = useRef(0);
+  
+  // Animation value for tab indicator
+  const tabIndicatorPosition = useRef(new Animated.Value(0)).current;
+  
+  // Current tab index
+  const currentTabIndex = useRef(0);
   // Track screen view when component mounts
   useEffect(() => {
     trackScreenView('home_screen');
@@ -205,13 +220,32 @@ export default function HomeScreen() {
     await onRefresh();
   }, [onRefresh]);
 
-  const handleTabChange = useCallback((tab: string) => {
+  const handleTabChange = useCallback((tab: string, tabIndex?: number) => {
+    const index = tabIndex !== undefined ? tabIndex : tabs.indexOf(tab);
+    
     setActiveTab(tab);
+    currentTabIndex.current = index;
+    
     // Track tab change event
     trackEvent('home_tab_change', {
       tab_name: tab.toLowerCase(),
       previous_tab: activeTab.toLowerCase()
     });
+    
+    // Scroll horizontal FlatList to the selected tab
+    horizontalFlatListRef.current?.scrollToIndex({
+      index,
+      animated: true,
+    });
+    
+    // Animate tab indicator
+    Animated.spring(tabIndicatorPosition, {
+      toValue: index,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 10,
+    }).start();
+    
     // Reset header and FAB visibility when changing tabs
     Animated.parallel([
       Animated.timing(headerTranslateY, {
@@ -225,17 +259,39 @@ export default function HomeScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+    
     // Reset scroll position tracking
     lastScrollY.current = 0;
+    
     if (tab === 'Following') {
-      // Load following posts when Following tab is selected
       loadFollowingPosts();
     } else if (tab === 'Trending') {
-      // Load trending posts when Trending tab is selected
       loadTrendingPosts();
     }
-  }, [loadFollowingPosts, loadTrendingPosts, activeTab, headerTranslateY, fabScale]);
-  const renderItem = ({ item }: { item: NormalizedPost }) => {
+  }, [loadFollowingPosts, loadTrendingPosts, activeTab, headerTranslateY, fabScale, tabIndicatorPosition, tabs]);
+  // Handle horizontal scroll for tab indicator
+  const handleHorizontalScroll = useCallback((event: any) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(offsetX / SCREEN_WIDTH);
+    
+    // Update tab indicator position continuously
+    tabIndicatorPosition.setValue(offsetX / SCREEN_WIDTH);
+    
+    // Update active tab when scroll settles
+    if (index !== currentTabIndex.current && index >= 0 && index < tabs.length) {
+      currentTabIndex.current = index;
+      setActiveTab(tabs[index]);
+      
+      // Load data for the new tab
+      if (tabs[index] === 'Following') {
+        loadFollowingPosts();
+      } else if (tabs[index] === 'Trending') {
+        loadTrendingPosts();
+      }
+    }
+  }, [tabIndicatorPosition, tabs, loadFollowingPosts, loadTrendingPosts]);
+  
+  const renderPostItem = ({ item }: { item: NormalizedPost }) => {
     const post = getPostById(item.id) || item;
     if (!post.id) return null;
     return (
@@ -267,6 +323,55 @@ export default function HomeScreen() {
         currentUserId={user?.id}
         refreshKey={refreshKey}
       />
+    );
+  };
+  
+  // Render vertical FlatList for each tab
+  const renderTabContent = ({ item, index }: { item: string; index: number }) => {
+    let tabPosts: NormalizedPost[] = [];
+    
+    if (item === 'Latest') {
+      tabPosts = posts;
+    } else if (item === 'Trending') {
+      tabPosts = trendingPosts;
+    } else if (item === 'Following') {
+      tabPosts = followingPosts;
+    }
+    
+    return (
+      <View style={[styles.tabContentContainer, { width: SCREEN_WIDTH }]}>
+        <FlatList
+          ref={(ref) => { verticalFlatListRefs.current[item] = ref; }}
+          data={tabPosts}
+          renderItem={renderPostItem}
+          keyExtractor={(post) => `${item}-${post.id}`}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+              title="Pull to refresh"
+              titleColor={colors.textSecondary}
+              progressViewOffset={120}
+              progressBackgroundColor={colors.background}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 80, paddingTop: 100 }}
+          onEndReached={() => {
+            if (item === 'Latest' && hasMorePosts && !loadingMore) {
+              loadMorePosts();
+            }
+          }}
+          onEndReachedThreshold={0.1}
+          ListFooterComponent={item === 'Latest' ? renderFooter : null}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          bounces={true}
+          alwaysBounceVertical={true}
+        />
+      </View>
     );
   };
   const handleLoadMore = useCallback(() => {
@@ -323,9 +428,6 @@ export default function HomeScreen() {
                     </View>
                   )}
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.searchButton, { backgroundColor: colors.backgroundTertiary }]} onPress={() => router.push('/search')}>
-                  <Search size={24} color={colors.text} />
-                </TouchableOpacity>
               </View>
             </View>
             {/* Tabs */}
@@ -334,13 +436,8 @@ export default function HomeScreen() {
                 {tabs.map((tab, index) => {
                   const isActive = activeTab === tab;
                   return (
-                    <TouchableOpacity key={tab} style={styles.tab} onPress={() => handleTabChange(tab)}>
-                      <Text style={[styles.tabText, { color: colors.textMuted }, isActive && { color: colors.text }]}>{tab}</Text>
-                      {isActive && (
-                        <View
-                          style={[styles.activeTabIndicator, { backgroundColor: colors.primary }]}
-                        />
-                      )}
+                    <TouchableOpacity key={tab} style={styles.tab} onPress={() => handleTabChange(tab, index)}>
+                      <Text style={[styles.tabText, { color: colors.textMuted }, isActive && { color: colors.primary }]}>{tab}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -353,40 +450,26 @@ export default function HomeScreen() {
             <View style={styles.contentContainer}>
               <HomeSkeleton />
             </View>
+          ) : error ? (
+            <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
           ) : (
-            <>
-              {/* Feed */}
-              {error ? (
-                <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
-              ) : (
-                <FlatList
-                  data={displayedPosts}
-                  renderItem={renderItem}
-                  keyExtractor={item => item.id}
-                  refreshControl={
-                    <RefreshControl 
-                      refreshing={refreshing} 
-                      onRefresh={handleRefresh}
-                      colors={[colors.primary]}
-                      tintColor={colors.primary}
-                      title="Pull to refresh"
-                      titleColor={colors.textSecondary}
-                      progressViewOffset={120} // Position refresh control below header
-                      progressBackgroundColor={colors.background}
-                    />
-                  }
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 80, paddingTop: 100 }} // Reduced top padding for tighter spacing
-                  onEndReached={handleLoadMore}
-                  onEndReachedThreshold={0.1}
-                  ListFooterComponent={renderFooter}
-                  onScroll={handleScroll}
-                  scrollEventThrottle={16}
-                  bounces={true}
-                  alwaysBounceVertical={true}
-                />
-              )}
-            </>
+            <FlatList
+              ref={horizontalFlatListRef}
+              data={tabs}
+              renderItem={renderTabContent}
+              keyExtractor={(item) => item}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={handleHorizontalScroll}
+              scrollEventThrottle={16}
+              bounces={false}
+              getItemLayout={(data, index) => ({
+                length: SCREEN_WIDTH,
+                offset: SCREEN_WIDTH * index,
+                index,
+              })}
+            />
           )}
           
       {/* Animated Floating Action Button - Always show */}
@@ -465,24 +548,39 @@ const createStyles = (colors: any) => StyleSheet.create({
   notificationButton: { padding: Spacing.sm, borderRadius: BorderRadius.round, backgroundColor: colors.backgroundTertiary, position: 'relative' },
   notificationBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: colors.error, borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.backgroundSecondary },
   notificationBadgeText: { fontSize: 10, fontWeight: FontWeights.bold, textAlign: 'center' },
-  searchButton: { padding: Spacing.sm, borderRadius: BorderRadius.round, backgroundColor: colors.backgroundTertiary },
-  tabContainer: { backgroundColor: colors.background, paddingHorizontal: Spacing.sm, paddingTop: 2, paddingBottom: 2, borderBottomWidth: 1, borderBottomColor: colors.border },
-  tabWrapper: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
+  tabContainer: { 
+    backgroundColor: colors.background, 
+    paddingHorizontal: Spacing.sm, 
+    paddingTop: 2, 
+    paddingBottom: 2, 
+    borderBottomWidth: 1, 
+    borderBottomColor: colors.border,
+  },
+  tabWrapper: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-around', 
+    alignItems: 'center',
+    position: 'relative',
+  },
   tab: { 
+    flex: 1,
     paddingVertical: Spacing.sm, 
     paddingHorizontal: Spacing.xs, 
-    position: 'relative',
     alignItems: 'center',
   },
-  tabText: { fontSize: FontSizes.md, fontWeight: FontWeights.semibold, color: colors.textMuted },
+  tabText: { fontSize: 17, fontWeight: FontWeights.semibold, color: colors.textMuted },
   activeTabText: { color: colors.text },
   activeTabIndicator: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
-    right: 0,
+    left: SCREEN_WIDTH / 3 * 0.2, // Offset to center the narrower indicator
+    width: SCREEN_WIDTH / 3 * 0.6, // 60% of tab width to match text
     height: 3,
     borderRadius: 2,
+  },
+  tabContentContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
   fab: { position: 'absolute', right: 16, bottom: 80, height: 52, width: 52, borderRadius: 26, overflow: 'hidden' },
   fabTouchable: { width: '100%', height: '100%' },
@@ -501,4 +599,3 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: FontWeights.medium,
   },
 });
-

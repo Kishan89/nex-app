@@ -35,6 +35,7 @@ const API_ENDPOINTS = {
     CREATE_CHAT: "/chats",
     POST_COMMENTS: (postId: string) => `/posts/${postId}/comments`,
     DELETE_COMMENT: (postId: string, commentId: string) => `/posts/${postId}/comments/${commentId}`,
+    REPORT_COMMENT: (postId: string, commentId: string) => `/posts/${postId}/comments/${commentId}/report`,
     POST_BY_ID: (postId: string) => `/posts/${postId}`,
     USER_BOOKMARKS: (userId: string) => `/users/${userId}/bookmarks`,
     SEARCH_USERS: "/search/users",
@@ -520,6 +521,9 @@ class ApiService {
             // Only log actual errors, not parsing issues
             throw error;
         }
+    }
+    async reportComment(postId: string, commentId: string) {
+        return this.post(API_ENDPOINTS.REPORT_COMMENT(postId, commentId), {});
     }
     // Chat management methods
     async markChatAsRead(chatId: string) {
