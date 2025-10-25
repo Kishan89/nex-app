@@ -274,22 +274,33 @@ export default function HomeScreen() {
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / SCREEN_WIDTH);
     
-    // Update tab indicator position continuously
+    // Update tab indicator position continuously for smooth animation
     tabIndicatorPosition.setValue(offsetX / SCREEN_WIDTH);
     
-    // Update active tab when scroll settles
+    // Update active tab in real-time during scroll for instant color change
     if (index !== currentTabIndex.current && index >= 0 && index < tabs.length) {
       currentTabIndex.current = index;
       setActiveTab(tabs[index]);
+    }
+  }, [tabIndicatorPosition, tabs]);
+  
+  // Handle scroll end to load tab data
+  const handleHorizontalScrollEnd = useCallback((event: any) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(offsetX / SCREEN_WIDTH);
+    
+    // Ensure tab is set and load data when scroll completes
+    if (index >= 0 && index < tabs.length) {
+      const tab = tabs[index];
       
       // Load data for the new tab
-      if (tabs[index] === 'Following') {
+      if (tab === 'Following') {
         loadFollowingPosts();
-      } else if (tabs[index] === 'Trending') {
+      } else if (tab === 'Trending') {
         loadTrendingPosts();
       }
     }
-  }, [tabIndicatorPosition, tabs, loadFollowingPosts, loadTrendingPosts]);
+  }, [tabs, loadFollowingPosts, loadTrendingPosts]);
   
   const renderPostItem = ({ item }: { item: NormalizedPost }) => {
     const post = getPostById(item.id) || item;
@@ -462,6 +473,7 @@ export default function HomeScreen() {
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               onScroll={handleHorizontalScroll}
+              onMomentumScrollEnd={handleHorizontalScrollEnd}
               scrollEventThrottle={16}
               bounces={false}
               getItemLayout={(data, index) => ({

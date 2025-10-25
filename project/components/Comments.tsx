@@ -436,7 +436,9 @@ export default function CommentsModal({
             <View style={styles.commentHeader}>
               <View style={styles.commentUserInfo}>
                 <Text style={styles.commentUsername}>{comment.username}</Text>
-                <Text style={styles.commentTime}>{comment.time}</Text>
+                <Text style={styles.commentTime}>
+                  {comment.time?.includes('ago') ? comment.time : `${comment.time} ago`}
+                </Text>
               </View>
               {/* Optimistic comment indicator */}
               {comment.isOptimistic && (

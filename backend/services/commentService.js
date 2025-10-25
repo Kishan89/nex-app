@@ -61,21 +61,43 @@ class CommentService {
   async createComment(commentData) {
     const { text, postId, userId, parentId = null } = commentData;
 
+    console.log('💬 [CommentService] Creating comment:', {
+      text: text?.substring(0, 50),
+      postId,
+      userId,
+      parentId,
+      hasParentId: !!parentId,
+      parentIdType: typeof parentId
+    });
+
     try {
-      const result = await prisma.$transaction(async (tx) => {
-        const commentData = {
-          text,
-          postId,
-          userId,
-        };
+      const commentDataToCreate = {
+        text,
+        postId,
+        userId,
+      };
+      
+      // Only add parentId if it's not null/undefined/empty
+      if (parentId && parentId.trim && parentId.trim() !== '') {
+        // Verify parent comment exists
+        const parentComment = await prisma.comment.findUnique({
+          where: { id: parentId }
+        });
         
-        // Only add parentId if it's not null/undefined
-        if (parentId) {
-          commentData.parentId = parentId;
+        if (!parentComment) {
+          console.error('❌ Parent comment not found:', parentId);
+          throw new Error('Parent comment not found');
         }
         
+        console.log('✅ Parent comment verified:', parentComment.id);
+        commentDataToCreate.parentId = parentId;
+      }
+      
+      console.log('📝 [CommentService] Comment data to create:', commentDataToCreate);
+      
+      const result = await prisma.$transaction(async (tx) => {
         const comment = await tx.comment.create({
-          data: commentData,
+          data: commentDataToCreate,
         });
 
         // Increment the post's comment count

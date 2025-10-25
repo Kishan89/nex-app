@@ -141,22 +141,38 @@ export default function CommentReplyPanel({
     }
     try {
       setLoading(true);
-      // Using existing API endpoint - may need backend adjustment if replies aren't nested
+      
+      // Check if replies are already in the parent comment (nested structure)
+      if (parentComment.replies && Array.isArray(parentComment.replies) && parentComment.replies.length > 0) {
+        console.log('✅ [ReplyPanel] Using nested replies from parent comment:', parentComment.replies.length);
+        setReplies(parentComment.replies);
+        setLoading(false);
+        return;
+      }
+      
+      // Fallback: Fetch all comments and filter for replies
       const comments = await apiService.getPostComments(postId);
+      
+      console.log('🔍 [ReplyPanel] Total comments fetched:', comments.length);
+      console.log('🔍 [ReplyPanel] Looking for replies to comment ID:', parentComment.id);
+      
       // Filter replies for this specific comment
       const commentReplies = comments.filter((comment: Comment) => {
         // Check multiple possible parentId fields since API might not include it
         const isReply = comment.parentId === parentComment.id || 
                        (comment as any).parent_id === parentComment.id ||
                        (comment as any).parentCommentId === parentComment.id;
+        
         if (isReply) {
-          } else {
-          // Debug: show what parentId fields exist
-          }
+          console.log('✅ [ReplyPanel] Found reply:', comment.id, comment.text?.substring(0, 30));
+        }
         return isReply;
       });
+      
+      console.log('🔍 [ReplyPanel] Filtered replies count:', commentReplies.length);
       setReplies(commentReplies);
     } catch (error) {
+      console.error('❌ [ReplyPanel] Error loading replies:', error);
       setReplies([]);
     } finally {
       setLoading(false);
@@ -209,10 +225,15 @@ export default function CommentReplyPanel({
     }, 100);
 
     try {
-      // If replying to a reply, use that reply's parent (which is the original parent comment)
-      // Otherwise, use the parent comment itself
-      const targetParentId = replyingToReply ? parentComment.id : parentComment.id;
-      const response = await apiService.addComment(postId, finalText, targetParentId);
+      // All replies to this panel should have parentComment.id as their parentId
+      // This ensures they're nested under the original comment
+      console.log('📤 [ReplyPanel] Sending reply:', {
+        postId,
+        parentCommentId: parentComment.id,
+        replyText: finalText.substring(0, 50)
+      });
+      
+      const response = await apiService.addComment(postId, finalText, parentComment.id);
       // Remove optimistic reply and reload to get real data
       setReplies(prev => prev.filter(reply => reply.id !== optimisticReply.id));
       await loadReplies();
@@ -316,12 +337,17 @@ export default function CommentReplyPanel({
     return (
       <View key={reply.id} style={styles.replyItem}>
         <View style={styles.replyItemRow}>
-          <Image source={{ uri: reply.avatar }} style={styles.replyAvatar} />
+          <Image 
+            source={reply.avatar && reply.avatar.trim() !== '' ? { uri: reply.avatar } : require('@/assets/images/default-avatar.png')} 
+            style={styles.replyAvatar} 
+          />
           <View style={styles.replyContent}>
           <View style={styles.replyHeader}>
             <View style={styles.replyUserInfo}>
               <Text style={styles.replyUsername}>{reply.username}</Text>
-              <Text style={styles.replyTime}>{reply.time}</Text>
+              <Text style={styles.replyTime}>
+                {reply.time?.includes('ago') ? reply.time : `${reply.time} ago`}
+              </Text>
             </View>
             {/* Optimistic reply indicator */}
             {reply.isOptimistic && (
@@ -398,8 +424,6 @@ export default function CommentReplyPanel({
               keyboardVerticalOffset={0}
               enabled={Platform.OS === 'ios'}
             >
-            {/* Main Content Area */}
-            <View style={{ flex: 1 }}>
               {/* Header */}
               <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
                 <TouchableOpacity onPress={closePanel} style={styles.backButton}>
@@ -413,12 +437,17 @@ export default function CommentReplyPanel({
               {/* Parent Comment */}
               <View style={styles.parentCommentContainer}>
                 <View style={styles.parentComment}>
-                  <Image source={{ uri: parentComment.avatar }} style={styles.parentAvatar} />
+                  <Image 
+                    source={parentComment.avatar && parentComment.avatar.trim() !== '' ? { uri: parentComment.avatar } : require('@/assets/images/default-avatar.png')} 
+                    style={styles.parentAvatar} 
+                  />
                   <View style={styles.parentContent}>
                     <View style={styles.parentHeader}>
-                      <View style={styles.parentUserInfo}>
+                    <View style={styles.parentUserInfo}>
                         <Text style={styles.parentUsername}>{parentComment.username}</Text>
-                        <Text style={styles.parentTime}>{parentComment.time}</Text>
+                        <Text style={styles.parentTime}>
+                          {parentComment.time?.includes('ago') ? parentComment.time : `${parentComment.time} ago`}
+                        </Text>
                       </View>
                     </View>
                     <Text style={styles.parentText}>{parentComment.text}</Text>
@@ -444,9 +473,8 @@ export default function CommentReplyPanel({
                   replies.map(renderReply)
                 )}
               </ScrollView>
-            </View>
-            {/* Reply Input - Same as Comments Modal */}
-            <View 
+              {/* Reply Input - Same as Comments Modal */}
+              <View
               style={[
                 styles.commentInputContainer, 
                 { paddingBottom: insets.bottom > 0 ? insets.bottom : 8 }
