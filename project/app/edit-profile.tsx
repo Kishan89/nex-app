@@ -162,7 +162,7 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
+      {/* StatusBar is handled globally in main app layout */}
       <View style={styles.container}>
         <KeyboardWrapper>
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -257,7 +257,8 @@ const createStyles = (colors: any) =>
       justifyContent: 'space-between',
       width: '100%',
       marginBottom: Spacing.lg,
-      paddingVertical: Spacing.sm,
+      paddingTop: 5, // Minimal top padding for consistent spacing
+      paddingBottom: 8, // Minimal bottom padding for consistent spacing
     },
     backButton: {
       padding: Spacing.sm,

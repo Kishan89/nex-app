@@ -186,7 +186,7 @@ export default function SearchScreen() {
   const styles = createStyles(colors);
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} translucent={false} />
+      {/* StatusBar is handled globally in main app layout */}
       <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.backgroundTertiary }]} onPress={handleGoBack}>
           <ArrowLeft size={24} color={colors.text} strokeWidth={2} />
@@ -295,8 +295,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
-    paddingBottom: 14,
+    paddingTop: 5, // Minimal top padding for consistent spacing
+    paddingBottom: 8, // Minimal bottom padding for consistent spacing
     backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,

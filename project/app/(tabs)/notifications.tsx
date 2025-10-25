@@ -172,7 +172,7 @@ export default function NotificationsScreen() {
   );
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} translucent={false} />
+      {/* StatusBar is handled globally in main app layout */}
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notifications</Text>
@@ -212,8 +212,8 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 45 : 15, // Same as other screens - thinner
-    paddingBottom: 6, // Minimal bottom padding like other screens
+    paddingTop: 5, // Minimal top padding for consistent spacing
+    paddingBottom: 8, // Minimal bottom padding for consistent spacing
     paddingHorizontal: Spacing.md,
     backgroundColor: colors.background,
     borderBottomWidth: 1,

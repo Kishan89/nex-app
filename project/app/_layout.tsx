@@ -31,22 +31,23 @@ import OptimizationManager from '@/lib/optimizationManager';
 // Component to manage the status bar appearance
 const AppStatusBar = () => {
   const { isDark, colors } = useTheme();
-  const themeStyles = getThemeStyles(isDark);
+  const insets = useSafeAreaInsets();
+
   // Set system navigation bar color for Android based on theme
   useEffect(() => {
-    const navBarColor = isDark ? '#000000' : '#ffffff';
-    const buttonStyle = isDark ? 'light' : 'dark';
-    SystemUI.setBackgroundColorAsync(navBarColor);
+    SystemUI.setBackgroundColorAsync(colors.background);
+
     // Also set navigation bar using NavigationBar API
     if (Platform.OS === 'android') {
-      NavigationBar.setBackgroundColorAsync(navBarColor);
-      NavigationBar.setButtonStyleAsync(buttonStyle);
+      NavigationBar.setBackgroundColorAsync(colors.background);
+      NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark');
     }
-  }, [isDark]);
+  }, [isDark, colors.background]);
+
   return (
     <StatusBar 
       style={isDark ? "light" : "dark"} 
-      backgroundColor={isDark ? "#000000" : "#ffffff"} 
+      backgroundColor={colors.background} 
       translucent={false}
     />
   );
@@ -154,6 +155,7 @@ function AppWithNotifications() {
     <View style={{ 
       flex: 1, 
       backgroundColor: colors.background,
+      paddingTop: Math.max(insets.top - 30, 2), // Ultra minimal gap - reduce by 30px but keep minimum 2px
     }}>
       <View style={{
         position: 'absolute',

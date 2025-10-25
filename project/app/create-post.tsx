@@ -136,7 +136,7 @@ export default function CreatePostScreen() {
   const styles = createStyles(colors);
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
+      {/* StatusBar is handled globally in main app layout */}
       <View style={{ flex: 1 }}>
         {/* HEADER */}
         <View style={styles.header}>
@@ -333,7 +333,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.background 
   },
   header: {
-    height: 60, // Slightly reduced for sleeker look
+    height: 50, // Minimal height for consistent spacing
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
@@ -341,7 +341,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     backgroundColor: colors.background,
-    paddingTop: Platform.OS === 'ios' ? 12 : 0,
+    paddingTop: Platform.OS === 'ios' ? 3 : 0, // Minimal padding for consistency
     ...Shadows.small,
   },
   headerLeft: { 

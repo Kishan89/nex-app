@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 5, // Minimal padding for consistent spacing
   },
   backButton: {
     padding: 8,
@@ -136,7 +136,7 @@ export default function PostScreen() {
   if (!post || fetchingPost) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} translucent={false} />
+        {/* StatusBar is handled globally in main app layout */}
         <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
           <ActivityIndicator color={colors.primary} size="large" />
         </View>
@@ -145,7 +145,7 @@ export default function PostScreen() {
   }
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} translucent={false} />
+      {/* StatusBar is handled globally in main app layout */}
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.background }]}>
         <TouchableOpacity 

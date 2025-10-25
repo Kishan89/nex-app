@@ -70,7 +70,7 @@ const FastChatScreen = React.memo(function FastChatScreen({
   const [isSending, setIsSending] = useState(false);
   // Refs
   const flatListRef = useRef<FlatList>(null);
-  const timeoutRefs = useRef<Set<NodeJS.Timeout>>(new Set());
+  const timeoutRefs = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   
   // Helper function for memory-safe timeouts
   const safeSetTimeout = useCallback((callback: () => void, delay: number) => {
@@ -753,7 +753,7 @@ const FastChatScreen = React.memo(function FastChatScreen({
   const styles = createStyles(colors);
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      {/* StatusBar is handled globally in main app layout */}
       {renderHeader()}
       <FlatList
         ref={flatListRef}
@@ -839,7 +839,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingTop: 5, // Minimal top padding for consistent spacing
+    paddingBottom: 8, // Minimal bottom padding for consistent spacing
     borderBottomWidth: 1,
   },
   backButton: {

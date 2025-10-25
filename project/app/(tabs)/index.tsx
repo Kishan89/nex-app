@@ -287,7 +287,7 @@ export default function HomeScreen() {
   const styles = createStyles(colors);
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} translucent={false} />
+      {/* StatusBar is handled globally in main app layout */}
       
       {/* Always show header and UI elements */}
       {/* Animated Header Container */}
@@ -337,11 +337,8 @@ export default function HomeScreen() {
                     <TouchableOpacity key={tab} style={styles.tab} onPress={() => handleTabChange(tab)}>
                       <Text style={[styles.tabText, { color: colors.textMuted }, isActive && { color: colors.text }]}>{tab}</Text>
                       {isActive && (
-                        <LinearGradient
-                          colors={[colors.secondary, colors.primary]}
-                          style={styles.activeTabIndicator}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
+                        <View
+                          style={[styles.activeTabIndicator, { backgroundColor: colors.primary }]}
                         />
                       )}
                     </TouchableOpacity>
@@ -379,7 +376,7 @@ export default function HomeScreen() {
                     />
                   }
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 80, paddingTop: 140 }} // Original padding to maintain content position
+                  contentContainerStyle={{ paddingBottom: 80, paddingTop: 100 }} // Reduced top padding for tighter spacing
                   onEndReached={handleLoadMore}
                   onEndReachedThreshold={0.1}
                   ListFooterComponent={renderFooter}
@@ -406,7 +403,7 @@ export default function HomeScreen() {
           style={styles.fabTouchable}
           onPress={() => router.push('/create-post')}
         >
-          <LinearGradient colors={[colors.secondary, colors.primary]} style={styles.fabGradient}>
+          <LinearGradient colors={['#004aad', '#004aad']} style={styles.fabGradient}>
             <PenTool size={24} color="#ffffff" />
           </LinearGradient>
         </TouchableOpacity>
@@ -440,7 +437,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   contentContainer: {
     flex: 1,
-    paddingTop: 140, // Account for header height
+    paddingTop: 20, // Minimal padding for tighter spacing
     backgroundColor: colors.background,
   },
   headerContainer: {
@@ -456,8 +453,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingTop: Platform.OS === 'ios' ? 45 : 15,
-    paddingBottom: 15,
+    paddingTop: 2, // Minimal top padding for consistent spacing
+    paddingBottom: 4, // Minimal bottom padding for consistent spacing
     backgroundColor: colors.background,
     ...Shadows.small,
   },
@@ -469,7 +466,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   notificationBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: colors.error, borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.backgroundSecondary },
   notificationBadgeText: { fontSize: 10, fontWeight: FontWeights.bold, textAlign: 'center' },
   searchButton: { padding: Spacing.sm, borderRadius: BorderRadius.round, backgroundColor: colors.backgroundTertiary },
-  tabContainer: { backgroundColor: colors.background, paddingHorizontal: Spacing.sm, paddingTop: 4, paddingBottom: Spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tabContainer: { backgroundColor: colors.background, paddingHorizontal: Spacing.sm, paddingTop: 2, paddingBottom: 2, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabWrapper: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
   tab: { 
     paddingVertical: Spacing.sm, 
@@ -504,3 +501,4 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: FontWeights.medium,
   },
 });
+

@@ -81,7 +81,7 @@ export default function TruncatedText({
       >
         <LinkDetector 
           text={text}
-          style={[styles.text, { color: colors.text }]}
+          style={[styles.text, { color: colors.text }, style]}
         />
       </Text>
       

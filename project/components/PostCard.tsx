@@ -147,12 +147,11 @@ export default function PostCard({
           />
         </TouchableOpacity>
         <View style={styles.contentSection}>
-          {/* Username and timestamp */}
+          {/* Username and more button */}
           <View style={styles.userInfoHeader}>
-            <TouchableOpacity onPress={onUserPress} activeOpacity={0.7}>
-              <Text style={[styles.username, { color: colors.text }]}>{post.username}</Text>
+            <TouchableOpacity onPress={onUserPress} activeOpacity={0.7} style={styles.usernameContainer}>
+              <Text style={[styles.username, { color: colors.text }]} numberOfLines={1}>{post.username}</Text>
             </TouchableOpacity>
-            <Text style={[styles.timeStamp, { color: colors.textMuted }]}>{post.createdAt}</Text>
             <TouchableOpacity 
               ref={moreButtonRef}
               style={styles.shareButton}
@@ -169,6 +168,8 @@ export default function PostCard({
               <MoreVertical size={20} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
+          {/* Timestamp below username */}
+          <Text style={[styles.timeStamp, { color: colors.textMuted }]}>{post.createdAt} ago</Text>
           {/* Content under username with more space */}
           <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
             {post.content && (
@@ -236,8 +237,8 @@ export default function PostCard({
       <View style={styles.postActions}>
         {/* Left side - Reply button */}
         <TouchableOpacity style={styles.replyButton} onPress={onComment}>
-          <Text style={[styles.replyText, { color: colors.textMuted }, localCommentsCount ? { color: colors.primary } : null]}>
-            Reply
+          <Text style={[styles.replyText, { color: '#004aad' }]}>
+            {localCommentsCount === 0 ? '0 replies' : localCommentsCount === 1 ? '1 reply' : `${localCommentsCount} replies`}
           </Text>
         </TouchableOpacity>
         {/* Right side - Like count and Bookmark */}
@@ -333,24 +334,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: Spacing.xs,
   },
+  usernameContainer: {
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
   username: { 
     fontSize: FontSizes.md, 
     fontWeight: FontWeights.semibold, 
-    color: Colors.text, 
-    marginRight: Spacing.sm,
+    color: Colors.text,
   },
   timeStamp: { 
     fontSize: FontSizes.xs, 
     color: Colors.textMuted,
-    flex: 1,
+    marginBottom: Spacing.xs,
   },
   postContent: { 
-    fontSize: FontSizes.sm,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 24,
     color: Colors.text, 
     marginBottom: Spacing.sm,
     fontWeight: FontWeights.regular,
-    marginTop: Spacing.md, // Increased space between username and content
+    marginTop: Spacing.sm, // Space between timestamp and content
   },
   postImage: { 
     width: '100%', 

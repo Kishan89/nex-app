@@ -52,22 +52,17 @@ export default function LinkDetector({ text, style, numberOfLines, onTextLayout 
       
       if (part && isUrl(part)) {
         components.push(
-          <TouchableOpacity
+          <Text
             key={i}
             onPress={() => handleLinkPress(part)}
-            activeOpacity={0.7}
+            style={[style, {
+              textDecorationLine: 'underline',
+              fontWeight: FontWeights.medium,
+              color: '#007AFF',
+            }]}
           >
-            <Text
-              style={{
-                color: colors.primary,
-                textDecorationLine: 'underline',
-                fontSize: FontSizes.sm,
-                fontWeight: FontWeights.medium,
-              }}
-            >
-              {part}
-            </Text>
-          </TouchableOpacity>
+            {part}
+          </Text>
         );
       } else if (part) {
         components.push(part);
