@@ -82,7 +82,7 @@ model Comment {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   parentId     String?
-  reportsCount Int       @default(0) @map("reports_count")
+  reportsCount Int       @default(0)
   parent       Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies      Comment[] @relation("CommentReplies")
   post         Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -115,6 +115,7 @@ model ChatParticipant {
   @@unique([chatId, userId])
   @@index([userId])
   @@index([chatId])
+  @@index([userId], map: "idx_chat_participants_user_id")
   @@map("chat_participants")
 }
 
@@ -133,6 +134,7 @@ model Message {
 
   @@index([chatId, createdAt])
   @@index([senderId])
+  @@index([senderId], map: "idx_messages_sender_id")
   @@map("messages")
 }
 

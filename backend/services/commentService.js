@@ -15,11 +15,10 @@ class CommentService {
     const { page = 1, limit = 50 } = options;
     const skip = (page - 1) * limit;
 
-    // Get ALL comments for this post (including replies) for the reply panel to work
-    const comments = await prisma.comment.findMany({
+    // Get ALL comments for this post (including replies)
+    const allComments = await prisma.comment.findMany({
       where: { 
         postId
-        // Removed parentId: null to get ALL comments including replies
       },
       include: {
         user: {
@@ -37,24 +36,43 @@ class CommentService {
       take: limit,
     });
     
-    if (!comments) {
+    if (!allComments) {
         return [];
     }
 
-    console.log('🔍 Backend: Raw comment from DB:', {
-      postId,
-      totalComments: comments.length,
-      sampleComment: comments[0] ? {
-        id: comments[0].id,
-        text: comments[0].text,
-        userId: comments[0].userId,
-        user: comments[0].user,
-        hasUserRelation: !!comments[0].user
-      } : null,
-      transformedSample: comments[0] ? transformComment(comments[0]) : null
+    // Build nested comment structure: parent comments with replies array
+    const parentComments = allComments.filter(c => !c.parentId);
+    const replyMap = {};
+    
+    // Group replies by parentId
+    allComments.filter(c => c.parentId).forEach(reply => {
+      if (!replyMap[reply.parentId]) {
+        replyMap[reply.parentId] = [];
+      }
+      replyMap[reply.parentId].push(reply);
+    });
+    
+    // Transform comments with nested replies
+    const transformedComments = parentComments.map(parent => {
+      const transformedParent = transformComment(parent);
+      const replies = replyMap[parent.id] || [];
+      transformedParent.replies = replies.map(transformComment);
+      return transformedParent;
     });
 
-    return comments.map(transformComment);
+    console.log('🔍 Backend: Nested comments structure:', {
+      postId,
+      totalComments: allComments.length,
+      parentComments: parentComments.length,
+      totalReplies: allComments.length - parentComments.length,
+      sampleComment: transformedComments[0] ? {
+        id: transformedComments[0].id,
+        username: transformedComments[0].username,
+        repliesCount: transformedComments[0].replies.length
+      } : null
+    });
+
+    return transformedComments;
   }
 
 
