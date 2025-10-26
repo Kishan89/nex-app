@@ -170,7 +170,7 @@ export default function PostCard({
           </View>
           {/* Timestamp below username */}
           <Text style={[styles.timeStamp, { color: colors.textMuted }]}>
-            {post.createdAt?.includes('ago') ? post.createdAt : `${post.createdAt} ago`}
+            {post.createdAt?.includes('ago') || post.createdAt === 'now' ? post.createdAt : `${post.createdAt} ago`}
           </Text>
           {/* Content under username with more space */}
           <TouchableOpacity onPress={onPress} activeOpacity={0.9}>

@@ -142,6 +142,14 @@ export default function CommentReplyPanel({
     try {
       setLoading(true);
       
+      console.log('🔍 [ReplyPanel] parentComment:', {
+        id: parentComment.id,
+        hasReplies: !!parentComment.replies,
+        repliesIsArray: Array.isArray(parentComment.replies),
+        repliesLength: parentComment.replies?.length || 0,
+        repliesData: parentComment.replies
+      });
+      
       // Check if replies are already in the parent comment (nested structure)
       if (parentComment.replies && Array.isArray(parentComment.replies) && parentComment.replies.length > 0) {
         console.log('✅ [ReplyPanel] Using nested replies from parent comment:', parentComment.replies.length);
@@ -150,27 +158,22 @@ export default function CommentReplyPanel({
         return;
       }
       
-      // Fallback: Fetch all comments and filter for replies
+      // Fallback: Fetch all comments and find the parent with nested replies
       const comments = await apiService.getPostComments(postId);
       
       console.log('🔍 [ReplyPanel] Total comments fetched:', comments.length);
       console.log('🔍 [ReplyPanel] Looking for replies to comment ID:', parentComment.id);
       
-      // Filter replies for this specific comment
-      const commentReplies = comments.filter((comment: Comment) => {
-        // Check multiple possible parentId fields since API might not include it
-        const isReply = comment.parentId === parentComment.id || 
-                       (comment as any).parent_id === parentComment.id ||
-                       (comment as any).parentCommentId === parentComment.id;
-        
-        if (isReply) {
-          console.log('✅ [ReplyPanel] Found reply:', comment.id, comment.text?.substring(0, 30));
-        }
-        return isReply;
-      });
+      // Find the parent comment in the fetched comments (it should have replies nested)
+      const parentWithReplies = comments.find((c: Comment) => c.id === parentComment.id);
       
-      console.log('🔍 [ReplyPanel] Filtered replies count:', commentReplies.length);
-      setReplies(commentReplies);
+      if (parentWithReplies && parentWithReplies.replies && parentWithReplies.replies.length > 0) {
+        console.log('✅ [ReplyPanel] Found parent comment with nested replies:', parentWithReplies.replies.length);
+        setReplies(parentWithReplies.replies);
+      } else {
+        console.log('⚠️ [ReplyPanel] No nested replies found for parent comment');
+        setReplies([]);
+      }
     } catch (error) {
       console.error('❌ [ReplyPanel] Error loading replies:', error);
       setReplies([]);
@@ -346,7 +349,7 @@ export default function CommentReplyPanel({
             <View style={styles.replyUserInfo}>
               <Text style={styles.replyUsername}>{reply.username}</Text>
               <Text style={styles.replyTime}>
-                {reply.time?.includes('ago') ? reply.time : `${reply.time} ago`}
+                {reply.time?.includes('ago') || reply.time === 'now' ? reply.time : `${reply.time} ago`}
               </Text>
             </View>
             {/* Optimistic reply indicator */}
@@ -446,7 +449,7 @@ export default function CommentReplyPanel({
                     <View style={styles.parentUserInfo}>
                         <Text style={styles.parentUsername}>{parentComment.username}</Text>
                         <Text style={styles.parentTime}>
-                          {parentComment.time?.includes('ago') ? parentComment.time : `${parentComment.time} ago`}
+                          {parentComment.time?.includes('ago') || parentComment.time === 'now' ? parentComment.time : `${parentComment.time} ago`}
                         </Text>
                       </View>
                     </View>

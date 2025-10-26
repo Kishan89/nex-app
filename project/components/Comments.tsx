@@ -93,6 +93,10 @@ export default function CommentsModal({
     if (post) {
       // Try to load cached comments first for instant display
       loadCachedComments();
+      console.log('📝 [Comments] Setting local comments:', comments.length, 'comments');
+      comments.forEach((c, i) => {
+        console.log(`  Comment ${i + 1}: id=${c.id.substring(0, 8)}, replies=${c.replies?.length || 0}`);
+      });
       setLocalComments(comments);
       setCommentsLoading(false);
       // Clear old refs when comments change
@@ -416,6 +420,9 @@ export default function CommentsModal({
     const commentRef = getOrCreateCommentRef(comment.id);
     const commentUserId = comment.user?.id || comment.userId;
     const isOwnComment = commentUserId && currentUser?.id && String(commentUserId) === String(currentUser.id);
+    
+    // Debug: Log reply count
+    console.log(`💬 [Comment ${comment.id.substring(0, 8)}] hasReplies:`, hasReplies, 'replies:', comment.replies?.length || 0, 'repliesArray:', comment.replies);
 
     return (
       <View key={comment.id} style={styles.commentWrapper}>
@@ -437,7 +444,7 @@ export default function CommentsModal({
               <View style={styles.commentUserInfo}>
                 <Text style={styles.commentUsername}>{comment.username}</Text>
                 <Text style={styles.commentTime}>
-                  {comment.time?.includes('ago') ? comment.time : `${comment.time} ago`}
+                  {comment.time?.includes('ago') || comment.time === 'now' ? comment.time : `${comment.time} ago`}
                 </Text>
               </View>
               {/* Optimistic comment indicator */}

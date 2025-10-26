@@ -95,6 +95,12 @@ const normalizeComment = (c: any): Comment => {
   // Extract user information from the comment data
   const userInfo = c.user || {};
   const userId = userInfo.id || c.userId;
+  
+  // Recursively normalize replies if they exist (preserve backend nested structure)
+  const replies = c.replies && Array.isArray(c.replies) 
+    ? c.replies.map(normalizeComment) 
+    : [];
+  
   return {
     id: String(c.id ?? c._id ?? Date.now()),
     username: c.username ?? userInfo.username ?? 'User',
@@ -105,7 +111,7 @@ const normalizeComment = (c: any): Comment => {
     replyTo: c.replyTo ?? undefined,
     user: userInfo.id ? userInfo : undefined, // Only include if we have a valid user object
     userId: userId, // Include userId for delete functionality
-    replies: [],
+    replies: replies, // Preserve nested replies from backend
   };
 };
 // Function to build nested comment structure from flat array
@@ -768,16 +774,22 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
         return comment;
       });
       const normalized = fixedCommentsArray.map(normalizeComment);
-      const nestedComments = buildNestedComments(normalized);
+      // Backend already returns nested structure, so no need to call buildNestedComments
+      // The normalizeComment function now preserves replies from backend
+      console.log(`✅ Normalized ${normalized.length} comments with nested replies preserved`);
+      normalized.forEach((c, i) => {
+        console.log(`  Comment ${i + 1}: id=${c.id.substring(0, 8)}, replies=${c.replies?.length || 0}`);
+      });
+      
       setComments(prev => {
-        const newState = { ...prev, [postId]: nestedComments };
+        const newState = { ...prev, [postId]: normalized };
         saveComments(newState);
         return newState;
       });
 
       // Cache the fresh comments for future instant loading
-      await commentCache.cacheComments(postId, nestedComments);
-      console.log(`💾 Cached ${nestedComments.length} fresh comments for post ${postId}`);
+      await commentCache.cacheComments(postId, normalized);
+      console.log(`💾 Cached ${normalized.length} fresh comments for post ${postId}`);
     } catch (err) {
     }
   }, [saveComments]);
