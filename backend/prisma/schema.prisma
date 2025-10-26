@@ -82,7 +82,7 @@ model Comment {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   parentId     String?
-  reportsCount Int       @default(0)
+  reportsCount Int       @default(0) @map("reports_count")
   parent       Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies      Comment[] @relation("CommentReplies")
   post         Post      @relation(fields: [postId], references: [id], onDelete: Cascade)

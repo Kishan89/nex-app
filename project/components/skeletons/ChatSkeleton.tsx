@@ -67,7 +67,7 @@ export const ChatSkeleton: React.FC = () => {
         {[1, 2, 3, 4, 5, 6].map((index) => (
           <ChatItemSkeleton
             key={`chat-skeleton-${index}`}
-            hasUnread={index % 3 === 1} // Some chats have unread indicator
+            hasUnread={index % 3 === 1}
           />
         ))}
       </View>
