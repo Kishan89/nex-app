@@ -66,10 +66,6 @@ export default function TruncatedText({
   // Use either the layout-based detection or the fallback methods
   const shouldShowReadMore = shouldTruncate || shouldShowReadMoreFallback || shouldShowReadMoreEstimate;
   
-  // Debug logging
-  if (text.length > 100) {
-    console.log(`TruncatedText Debug - Text length: ${text.length}, Estimated lines: ${estimatedLines}, Should truncate: ${shouldTruncate}, Should show read more: ${shouldShowReadMore}`);
-  }
   
   return (
     <View>
