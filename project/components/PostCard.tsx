@@ -55,6 +55,14 @@ export default function PostCard({
   refreshKey,
 }: Props) {
   const { colors } = useTheme();
+  
+  // Debug: Log isPinned value
+  React.useEffect(() => {
+    if (post.isPinned) {
+      console.log('📌 PINNED POST:', post.id, 'isPinned:', post.isPinned);
+    }
+  }, [post.isPinned, post.id]);
+  
   // Use post.liked as the source of truth, with isLiked as fallback
   const [localIsLiked, setLocalIsLiked] = useState(post.liked ?? isLiked ?? false);
   const [localLikesCount, setLocalLikesCount] = useState(post.likesCount || post.likes || 0);
@@ -154,9 +162,9 @@ export default function PostCard({
                 <Text style={[styles.username, { color: colors.text }]} numberOfLines={1}>{post.username}</Text>
               </TouchableOpacity>
               {post.isPinned && (
-                <View style={[styles.pinnedBadge, { backgroundColor: colors.primaryAlpha }]}>
-                  <Pin size={12} color={colors.primary} />
-                  <Text style={[styles.pinnedText, { color: colors.primary }]}>Pinned</Text>
+                <View style={[styles.pinnedBadge, { backgroundColor: colors.primaryAlpha || '#004aad20' }]}>
+                  <Pin size={14} color={colors.primary || '#004aad'} strokeWidth={2.5} />
+                  <Text style={[styles.pinnedText, { color: colors.primary || '#004aad' }]}>Pinned</Text>
                 </View>
               )}
             </View>
@@ -361,14 +369,17 @@ const styles = StyleSheet.create({
   pinnedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     gap: 4,
+    borderWidth: 1,
+    borderColor: '#004aad40',
   },
   pinnedText: {
-    fontSize: FontSizes.xs,
-    fontWeight: FontWeights.semibold,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   timeStamp: { 
     fontSize: FontSizes.xs, 

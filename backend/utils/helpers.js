@@ -86,6 +86,8 @@ function transformPost(post) {
         liked: post.isLiked || false,
         isBookmarked: post.isBookmarked || false,
         bookmarked: post.isBookmarked || false,
+        // Include pinned status
+        isPinned: post.isPinned || false,
     };
 }
 
