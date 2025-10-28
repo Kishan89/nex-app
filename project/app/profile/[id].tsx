@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, memo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, memo, useRef } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,7 @@ import CommentsModal from '../../components/Comments';
 import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
 import XPRulesModal from '@/components/XPRulesModal';
+import { useThrottledCallback } from '@/hooks/useDebounce';
 
 export default function ProfileScreen() {
   const { user } = useAuth();
@@ -46,6 +47,7 @@ export default function ProfileScreen() {
   const [postsPage, setPostsPage] = useState(1);
   const [hasMoreUserPosts, setHasMoreUserPosts] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
+  const isLoadingMoreRef = useRef(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [showXPRules, setShowXPRules] = useState(false);
   const [userXPRank, setUserXPRank] = useState<number | null>(null);
@@ -65,8 +67,9 @@ export default function ProfileScreen() {
   };
 
   const fetchUserPosts = useCallback(async (page = 1, append = false) => {
-    if (!userId || loadingPosts) return;
+    if (!userId || isLoadingMoreRef.current) return;
 
+    isLoadingMoreRef.current = true;
     setLoadingPosts(true);
     try {
       const fetchedPosts = await apiService.getUserPosts(userId, page, 20);
@@ -89,8 +92,9 @@ export default function ProfileScreen() {
       console.error('Error fetching user posts:', err);
     } finally {
       setLoadingPosts(false);
+      isLoadingMoreRef.current = false;
     }
-  }, [userId, loadingPosts]);
+  }, [userId]);
 
   const fetchProfileData = useCallback(async (forceRefresh = false) => {
     if (!userId) {
@@ -231,12 +235,30 @@ export default function ProfileScreen() {
   }, [isMyProfile, activeTab, userPosts, bookmarkedPosts]);
 
   const loadMoreUserPosts = useCallback(() => {
-    if (!loadingPosts && hasMoreUserPosts && activeTab === 'Posts') {
-      const nextPage = postsPage + 1;
-      setPostsPage(nextPage);
-      fetchUserPosts(nextPage, true);
+    if (isLoadingMoreRef.current || !hasMoreUserPosts || activeTab !== 'Posts') {
+      return;
     }
-  }, [loadingPosts, hasMoreUserPosts, postsPage, activeTab, fetchUserPosts]);
+    const nextPage = postsPage + 1;
+    setPostsPage(nextPage);
+    fetchUserPosts(nextPage, true);
+  }, [hasMoreUserPosts, postsPage, activeTab, fetchUserPosts]);
+  
+  // Throttle navigation buttons
+  const handleEditProfilePress = useThrottledCallback(() => {
+    router.push('/edit-profile');
+  }, 1000);
+  
+  const handleCreatePostPress = useThrottledCallback(() => {
+    router.push('/create-post');
+  }, 1000);
+  
+  const handleBackPress = useThrottledCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.push('/(tabs)/chats');
+    }
+  }, 1000);
 
   const formatRelativeTime = useCallback((raw?: string) => {
     if (!raw) return '';
@@ -401,23 +423,17 @@ export default function ProfileScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onCombinedRefresh} tintColor={colors.primary} />}
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          const paddingToBottom = 20;
+          const paddingToBottom = 100;
           if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
             loadMoreUserPosts();
           }
         }}
-        scrollEventThrottle={400}
+        scrollEventThrottle={200}
       >
         <View style={styles.bannerSection}>
           <Image source={{ uri: bannerUri }} style={styles.banner} />
           {/* Floating Back Button */}
-          <TouchableOpacity style={styles.floatingBackButton} onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.push('/(tabs)/chats');
-            }
-          }}>
+          <TouchableOpacity style={styles.floatingBackButton} onPress={handleBackPress}>
             <ArrowLeft size={24} color="#ffffff" />
           </TouchableOpacity>
         </View>
@@ -452,7 +468,7 @@ export default function ProfileScreen() {
             {/* Action Buttons */}
             <View style={styles.actionButtonsContainer}>
               {isMyProfile ? (
-                <TouchableOpacity style={styles.editButton} onPress={() => router.push('/edit-profile')}>
+                <TouchableOpacity style={styles.editButton} onPress={handleEditProfilePress}>
                   <Edit size={20} color={colors.primary} />
                 </TouchableOpacity>
               ) : (
@@ -531,7 +547,7 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
       {isMyProfile && (
-        <TouchableOpacity style={styles.fab} onPress={() => router.push('/create-post')}>
+        <TouchableOpacity style={styles.fab} onPress={handleCreatePostPress}>
           <View style={styles.fabContent}>
             <PenTool size={24} color="#ffffff" />
           </View>

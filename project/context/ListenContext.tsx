@@ -218,10 +218,10 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
       const savedComments = await loadSavedComments();
       const savedPollVotes = await loadSavedPollVotes();
       // Add pagination parameters
-      const postsData = await apiService.getPosts(page, 10); // 10 posts per page
+      const postsData = await apiService.getPosts(page, 20); // 20 posts per page
       const normalized = (postsData || []).map(normalizePost);
       // Check if we have more posts
-      setHasMorePosts(normalized.length === 10); // If we got less than 10, no more posts
+      setHasMorePosts(normalized.length === 20); // If we got less than 20, no more posts
       // Use server data for like counts and status - prioritize server truth
       const combinedInteractions: Record<string, { liked: boolean; bookmarked: boolean }> = {};
       normalized.forEach(p => {

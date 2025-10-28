@@ -32,6 +32,7 @@ import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles,
 import { useTheme } from '../../context/ThemeContext';
 import { useNotificationCount } from '../../context/NotificationCountContext';
 import { trackScreenView, trackEvent } from '../../lib/firebase';
+import { useThrottledCallback } from '../../hooks/useDebounce';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -99,33 +100,33 @@ export default function HomeScreen() {
   const handleScroll = useCallback((event: any) => {
     const currentScrollY = event.nativeEvent.contentOffset.y;
     const scrollDiff = currentScrollY - lastScrollY.current;
-    // Only trigger animation if scroll difference is significant
-    if (Math.abs(scrollDiff) > 5) {
-      if (scrollDiff > 0 && currentScrollY > 100) {
-        // Scrolling down - hide header and FAB
+    // Lower threshold for faster response
+    if (Math.abs(scrollDiff) > 2) {
+      if (scrollDiff > 0 && currentScrollY > 50) {
+        // Scrolling down - hide header and FAB faster
         Animated.parallel([
           Animated.timing(headerTranslateY, {
             toValue: -120, // Hide header (topBar + tabs height)
-            duration: 200,
+            duration: 150, // Faster animation
             useNativeDriver: true,
           }),
           Animated.timing(fabScale, {
             toValue: 0,
-            duration: 200,
+            duration: 150, // Faster animation
             useNativeDriver: true,
           }),
         ]).start();
-      } else if (scrollDiff < 0 || currentScrollY < 50) {
+      } else if (scrollDiff < 0 || currentScrollY < 30) {
         // Scrolling up or near top - show header and FAB
         Animated.parallel([
           Animated.timing(headerTranslateY, {
             toValue: 0,
-            duration: 200,
+            duration: 150, // Faster animation
             useNativeDriver: true,
           }),
           Animated.timing(fabScale, {
             toValue: 1,
-            duration: 200,
+            duration: 150, // Faster animation
             useNativeDriver: true,
           }),
         ]).start();
@@ -216,10 +217,21 @@ export default function HomeScreen() {
     // For "Latest" - return posts as they come from API (newest first)
     return posts;
   }, [activeTab, posts, followingPosts, trendingPosts]);
-  const handleNotificationPress = () => {
+  // Throttle navigation to prevent double-clicks
+  const handleNotificationPress = useThrottledCallback(() => {
     markNotificationsAsRead();
     router.push('/(tabs)/notifications');
-  };
+  }, 1000);
+  
+  const handleProfilePress = useThrottledCallback(() => {
+    if (user?.id) {
+      router.push(`/profile/${user.id}`);
+    }
+  }, 1000);
+  
+  const handleCreatePostPress = useThrottledCallback(() => {
+    router.push('/create-post');
+  }, 1000);
   const handleRefresh = useCallback(async () => {
     setRefreshKey(prev => prev + 1); // Increment refresh key to reset TruncatedText states
     await onRefresh();
@@ -240,10 +252,10 @@ export default function HomeScreen() {
     // Don't animate indicator separately - let handleHorizontalScroll handle it
     // This ensures indicator moves exactly with the scroll
     
-    // Scroll horizontal FlatList to the selected tab
+    // Scroll horizontal FlatList to the selected tab - INSTANT (no animation)
     horizontalFlatListRef.current?.scrollToIndex({
       index,
-      animated: true,
+      animated: false, // Instant scroll for ultra-fast response
     });
     
     // Reset header and FAB visibility when changing tabs
@@ -269,7 +281,7 @@ export default function HomeScreen() {
       loadTrendingPosts();
     }
   }, [loadFollowingPosts, loadTrendingPosts, activeTab, headerTranslateY, fabScale, tabs]);
-  // Handle horizontal scroll for tab indicator - direct setValue for instant sync
+  // Handle horizontal scroll for tab indicator - ULTRA FAST instant sync
   const handleHorizontalScroll = useCallback((event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const normalizedPosition = offsetX / SCREEN_WIDTH;
@@ -278,12 +290,12 @@ export default function HomeScreen() {
     // This also updates tab text colors via interpolation - instant visual update!
     tabIndicatorPosition.setValue(normalizedPosition);
     
-    // Update active tab state immediately during scroll
-    // Use threshold-based switching for earlier tab change
+    // ULTRA FAST tab switching - lower threshold for instant response
+    // Switch tabs as soon as 25% of the way to next tab
     let activeIndex = 0;
-    if (normalizedPosition >= 0.5 && normalizedPosition < 1.5) {
+    if (normalizedPosition >= 0.25 && normalizedPosition < 1.25) {
       activeIndex = 1;
-    } else if (normalizedPosition >= 1.5) {
+    } else if (normalizedPosition >= 1.25) {
       activeIndex = 2;
     }
     
@@ -487,7 +499,7 @@ export default function HomeScreen() {
             <View style={[styles.topBar, { backgroundColor: colors.background }]}>
               <TouchableOpacity
                 style={[styles.profileButton, { borderColor: colors.primary }]}
-                onPress={() => user?.id && router.push(`/profile/${user.id}`)}
+                onPress={handleProfilePress}
               >
                 <Image
                   source={user?.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/default-avatar.png')}
@@ -603,7 +615,7 @@ export default function HomeScreen() {
       >
         <TouchableOpacity
           style={styles.fabTouchable}
-          onPress={() => router.push('/create-post')}
+          onPress={handleCreatePostPress}
         >
           <View style={styles.fabContent}>
             <PenTool size={24} color="#ffffff" />

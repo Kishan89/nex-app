@@ -3,14 +3,15 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Modal, Ale
 import { Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, Pin } from 'lucide-react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { NormalizedPost } from '@/types';
+import TruncatedText from './TruncatedText';
 import PollComponent from './PollComponent';
 import YouTubePreview from './YouTubePreview';
-import TruncatedText from './TruncatedText';
 import LinkDetector from './LinkDetector';
-import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
-import { useTheme } from '@/context/ThemeContext';
-import { ShareService } from '@/lib/shareService';
 import ImageOptimizer from '@/lib/imageOptimizer';
+import { useTheme } from '@/context/ThemeContext';
+import { useThrottledCallback } from '@/hooks/useDebounce';
+import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
+import { ShareService } from '@/lib/shareService';
 const { width } = Dimensions.get('window');
 type Props = {
   post: NormalizedPost;
@@ -56,16 +57,6 @@ export default function PostCard({
 }: Props) {
   const { colors } = useTheme();
   
-  // Debug: Log isPinned value
-  React.useEffect(() => {
-    console.log('🔍 POST DEBUG:', {
-      id: post.id,
-      username: post.username,
-      isPinned: post.isPinned,
-      isPinnedType: typeof post.isPinned
-    });
-  }, [post.isPinned, post.id, post.username]);
-  
   // Use post.liked as the source of truth, with isLiked as fallback
   const [localIsLiked, setLocalIsLiked] = useState(post.liked ?? isLiked ?? false);
   const [localLikesCount, setLocalLikesCount] = useState(post.likesCount || post.likes || 0);
@@ -95,14 +86,24 @@ export default function PostCard({
       }).then(setOptimizedImageUri);
     }
   }, [post.image]);
-  const handleLike = () => {
+  // Throttle handlers to prevent rapid clicks
+  const handleLike = useThrottledCallback(() => {
     // Animate heart
     likeScale.value = withSpring(1.2, {}, () => {
       likeScale.value = withSpring(1);
     });
     // Call parent handler (which handles optimistic updates)
     onLike?.();
-  };
+  }, 500);
+  
+  const handleComment = useThrottledCallback(() => {
+    onComment?.();
+  }, 500);
+  
+  const handleBookmark = useThrottledCallback(() => {
+    onBookmark?.();
+  }, 500);
+  
   const handleShare = async () => {
     setShowOptionsMenu(false);
     // Show message that this feature will come in future update
@@ -257,7 +258,7 @@ export default function PostCard({
       {/* Actions - Reply left, Like and Bookmark right */}
       <View style={styles.postActions}>
         {/* Left side - Reply button */}
-        <TouchableOpacity style={styles.replyButton} onPress={onComment}>
+        <TouchableOpacity style={styles.replyButton} onPress={handleComment}>
           <Text style={[styles.replyText, { color: '#004aad' }]}>
             {localCommentsCount === 0 ? '0 replies' : localCommentsCount === 1 ? '1 reply' : `${localCommentsCount} replies`}
           </Text>
@@ -277,7 +278,7 @@ export default function PostCard({
               {localLikesCount}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={onBookmark}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleBookmark}>
             <Bookmark
               size={18}
               color={isBookmarked || post.bookmarked ? colors.bookmark : colors.textMuted}
