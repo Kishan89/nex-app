@@ -58,10 +58,13 @@ export default function PostCard({
   
   // Debug: Log isPinned value
   React.useEffect(() => {
-    if (post.isPinned) {
-      console.log('📌 PINNED POST:', post.id, 'isPinned:', post.isPinned);
-    }
-  }, [post.isPinned, post.id]);
+    console.log('🔍 POST DEBUG:', {
+      id: post.id,
+      username: post.username,
+      isPinned: post.isPinned,
+      isPinnedType: typeof post.isPinned
+    });
+  }, [post.isPinned, post.id, post.username]);
   
   // Use post.liked as the source of truth, with isLiked as fallback
   const [localIsLiked, setLocalIsLiked] = useState(post.liked ?? isLiked ?? false);
@@ -162,9 +165,9 @@ export default function PostCard({
                 <Text style={[styles.username, { color: colors.text }]} numberOfLines={1}>{post.username}</Text>
               </TouchableOpacity>
               {post.isPinned && (
-                <View style={[styles.pinnedBadge, { backgroundColor: colors.primaryAlpha || '#004aad20' }]}>
-                  <Pin size={14} color={colors.primary || '#004aad'} strokeWidth={2.5} />
-                  <Text style={[styles.pinnedText, { color: colors.primary || '#004aad' }]}>Pinned</Text>
+                <View style={[styles.pinnedBadge, { backgroundColor: '#004aad15', borderColor: '#004aad30' }]}>
+                  <Pin size={13} color="#004aad" strokeWidth={2.8} fill="#004aad" />
+                  <Text style={[styles.pinnedText, { color: '#004aad' }]}>Pinned</Text>
                 </View>
               )}
             </View>

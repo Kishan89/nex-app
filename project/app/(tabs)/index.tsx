@@ -21,6 +21,7 @@ import { PenTool, Bell } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PostCard from '../../components/PostCard';
 import CommentsModal from '../../components/Comments';
+import ProfileCompletionBanner from '../../components/ProfileCompletionBanner';
 import { PostSkeleton, HomeSkeleton } from '../../components/skeletons';
 import { useListen } from '../../context/ListenContext';
 import { useAuth } from '../../context/AuthContext';
@@ -393,6 +394,18 @@ export default function HomeScreen() {
           data={tabPosts}
           renderItem={renderPostItem}
           keyExtractor={(post) => `${item}-${post.id}`}
+          ListHeaderComponent={
+            item === 'Latest' && user ? (
+              <ProfileCompletionBanner
+                userId={user.id}
+                hasAvatar={!!user.avatar_url}
+                hasBio={!!user.bio}
+                hasName={!!user.name}
+                hasBanner={!!user.banner_url}
+                username={user.username || ''}
+              />
+            ) : null
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -459,6 +472,12 @@ export default function HomeScreen() {
                   source={user?.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/default-avatar.png')}
                   style={styles.profileImage}
                 />
+                {/* Profile Incomplete Indicator */}
+                {user && (!user.avatar_url || !user.bio) && (
+                  <View style={[styles.profileIncompleteBadge, { backgroundColor: '#FFD700', borderColor: colors.background }]}>
+                    <Text style={styles.profileIncompleteBadgeText}>!</Text>
+                  </View>
+                )}
               </TouchableOpacity>
               <Text style={[styles.logo, { color: colors.text }]}>Nexeed</Text>
               <View style={styles.rightActions}>
@@ -565,9 +584,9 @@ export default function HomeScreen() {
           style={styles.fabTouchable}
           onPress={() => router.push('/create-post')}
         >
-          <LinearGradient colors={['#004aad', '#004aad']} style={styles.fabGradient}>
+          <View style={styles.fabContent}>
             <PenTool size={24} color="#ffffff" />
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </Animated.View>
       {/* Comments Modal */}
@@ -620,8 +639,29 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.background,
     ...Shadows.small,
   },
-  profileButton: { width: 50, height: 50, borderRadius: 25, overflow: 'hidden', borderWidth: 1.5, borderColor: colors.primary },
+  profileButton: { width: 50, height: 50, borderRadius: 25, overflow: 'visible', borderWidth: 1.5, borderColor: colors.primary, position: 'relative' },
   profileImage: { width: '100%', height: '100%', borderRadius: ComponentStyles.avatar.medium / 2 },
+  profileIncompleteBadge: { 
+    position: 'absolute', 
+    top: -4, 
+    right: -4, 
+    width: 20, 
+    height: 20, 
+    borderRadius: 10, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  profileIncompleteBadgeText: { 
+    fontSize: 12, 
+    fontWeight: FontWeights.extrabold, 
+    color: '#000000',
+  },
   logo: { fontSize: FontSizes.xxxl, fontWeight: FontWeights.extrabold, color: colors.text, letterSpacing: 1 },
   rightActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   notificationButton: { padding: Spacing.sm, borderRadius: BorderRadius.round, backgroundColor: colors.backgroundTertiary, position: 'relative' },
@@ -667,7 +707,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   fab: { position: 'absolute', right: 16, bottom: 80, height: 52, width: 52, borderRadius: 26, overflow: 'hidden' },
   fabTouchable: { width: '100%', height: '100%' },
-  fabGradient: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  fabContent: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#004aad' },
   errorText: { color: colors.error, textAlign: 'center', marginTop: Spacing.lg, fontSize: FontSizes.md, fontWeight: FontWeights.medium },
   loadingFooter: {
     paddingVertical: Spacing.md,

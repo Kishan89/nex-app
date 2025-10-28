@@ -472,9 +472,9 @@ export default function ProfileScreen() {
       </ScrollView>
       {isMyProfile && (
         <TouchableOpacity style={styles.fab} onPress={() => router.push('/create-post')}>
-          <LinearGradient colors={[colors.secondary, colors.primary]} style={styles.fabGradient}>
+          <View style={styles.fabContent}>
             <PenTool size={24} color="#ffffff" />
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       )}
       {/* XP Rules Modal */}
@@ -795,12 +795,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 28,
     // Removed shadow to prevent octagon-like appearance
   },
-  fabGradient: { 
+  fabContent: { 
     width: 56, 
     height: 56, 
     borderRadius: 28, 
     alignItems: 'center', 
-    justifyContent: 'center' 
+    justifyContent: 'center',
+    backgroundColor: '#004aad'
   },
   centered: { 
     flex: 1, 

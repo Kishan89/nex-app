@@ -22,9 +22,14 @@ class PostService {
           },
         },
         poll: {
-          include: {
+          select: {
+            id: true,
+            question: true,
             options: {
-              include: {
+              select: {
+                id: true,
+                text: true,
+                votesCount: true,
                 _count: { select: { votes: true } }
               }
             }
@@ -56,9 +61,14 @@ class PostService {
           },
         },
         poll: {
-          include: {
+          select: {
+            id: true,
+            question: true,
             options: {
-              include: {
+              select: {
+                id: true,
+                text: true,
+                votesCount: true,
                 _count: { select: { votes: true } }
               }
             }
@@ -104,9 +114,14 @@ class PostService {
           select: { id: true, username: true, name: true, avatar: true, verified: true },
         },
         poll: {
-          include: {
+          select: {
+            id: true,
+            question: true,
             options: {
-              include: {
+              select: {
+                id: true,
+                text: true,
+                votesCount: true,
                 _count: { select: { votes: true } }
               }
             }
@@ -395,9 +410,14 @@ class PostService {
           },
         },
         poll: {
-          include: {
+          select: {
+            id: true,
+            question: true,
             options: {
-              include: {
+              select: {
+                id: true,
+                text: true,
+                votesCount: true,
                 _count: { select: { votes: true } }
               }
             }
@@ -434,9 +454,14 @@ class PostService {
           },
         },
         poll: {
-          include: {
+          select: {
+            id: true,
+            question: true,
             options: {
-              include: {
+              select: {
+                id: true,
+                text: true,
+                votesCount: true,
                 _count: { select: { votes: true } }
               }
             }
@@ -520,9 +545,14 @@ class PostService {
           },
         },
         poll: {
-          include: {
+          select: {
+            id: true,
+            question: true,
             options: {
-              include: {
+              select: {
+                id: true,
+                text: true,
+                votesCount: true,
                 _count: { select: { votes: true } }
               }
             }
@@ -563,9 +593,14 @@ class PostService {
           },
         },
         poll: {
-          include: {
+          select: {
+            id: true,
+            question: true,
             options: {
-              include: {
+              select: {
+                id: true,
+                text: true,
+                votesCount: true,
                 _count: { select: { votes: true } }
               }
             }

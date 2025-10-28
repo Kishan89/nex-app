@@ -58,6 +58,7 @@ const normalizePost = (p: any): NormalizedPost => {
   const liked = Boolean(p.liked ?? p.isLiked ?? false);
   const bookmarked = Boolean(p.bookmarked ?? p.isBookmarked ?? false);
   const userId = String(p.userId ?? p.author?.id ?? p.user?.id ?? 'unknown');
+  const isPinned = Boolean(p.isPinned ?? false);
   return {
     id,
     avatar,
@@ -72,6 +73,7 @@ const normalizePost = (p: any): NormalizedPost => {
     likeCount: likes,
     liked,
     bookmarked,
+    isPinned,
     // Include poll data
     poll: p.poll ? {
       id: p.poll.id,

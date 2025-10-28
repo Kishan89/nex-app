@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -36,7 +36,7 @@ interface PollComponentProps {
   userVote?: string;
   onVote: (pollId: string, optionId: string) => Promise<void>;
 }
-export const PollComponent: React.FC<PollComponentProps> = ({
+export const PollComponent: React.FC<PollComponentProps> = React.memo(({
   poll,
   hasVoted = false,
   userVote,
@@ -45,51 +45,29 @@ export const PollComponent: React.FC<PollComponentProps> = ({
   const { colors, isDark } = useTheme();
   const { hasVotedOnPoll, getUserVoteForPoll, syncPollVoteAcrossScreens } = usePollVote();
   const [isVoting, setIsVoting] = useState(false);
-  // Use global poll vote state with fallback to props
-  const globalHasVoted = hasVotedOnPoll(poll.id);
-  const globalUserVote = getUserVoteForPoll(poll.id);
+  
+  // Use global poll vote state with fallback to props - memoized to prevent recalculation
+  const globalHasVoted = useMemo(() => hasVotedOnPoll(poll.id), [hasVotedOnPoll, poll.id]);
+  const globalUserVote = useMemo(() => getUserVoteForPoll(poll.id), [getUserVoteForPoll, poll.id]);
+  
   // Prioritize stored vote state over props to maintain persistence
   const [localHasVoted, setLocalHasVoted] = useState(globalHasVoted || hasVoted);
   const [localUserVote, setLocalUserVote] = useState(globalUserVote || userVote);
   const [localOptions, setLocalOptions] = useState(poll.options);
-  // Force update local state when global state loads from AsyncStorage
+  
+  // Single effect to sync all vote state changes - no setTimeout delays
   useEffect(() => {
     const storedHasVoted = hasVotedOnPoll(poll.id);
     const storedUserVote = getUserVoteForPoll(poll.id);
-    if (storedHasVoted) {
+    
+    if (storedHasVoted && storedUserVote) {
       setLocalHasVoted(true);
       setLocalUserVote(storedUserVote);
     }
-  }, [poll.id, hasVotedOnPoll, getUserVoteForPoll]);
-  // Initialize vote state on component mount
-  useEffect(() => {
-    const initializeVoteState = () => {
-      const storedHasVoted = hasVotedOnPoll(poll.id);
-      const storedUserVote = getUserVoteForPoll(poll.id);
-      if (storedHasVoted && storedUserVote) {
-        setLocalHasVoted(true);
-        setLocalUserVote(storedUserVote);
-      }
-    };
-    // Small delay to ensure AsyncStorage has loaded
-    const timer = setTimeout(initializeVoteState, 100);
-    return () => clearTimeout(timer);
-  }, [poll.id]);
-  // Update local options when poll data changes (e.g., after server refresh)
-  useEffect(() => {
+    
+    // Update options if poll data changed
     setLocalOptions(poll.options);
-  }, [poll.options]);
-  // Sync with global poll vote state changes
-  useEffect(() => {
-    const currentGlobalHasVoted = hasVotedOnPoll(poll.id);
-    const currentGlobalUserVote = getUserVoteForPoll(poll.id);
-    if (currentGlobalHasVoted !== localHasVoted) {
-      setLocalHasVoted(currentGlobalHasVoted);
-    }
-    if (currentGlobalUserVote !== localUserVote) {
-      setLocalUserVote(currentGlobalUserVote);
-    }
-  }, [poll.id, hasVotedOnPoll, getUserVoteForPoll, localHasVoted, localUserVote]);
+  }, [poll.id, poll.options, hasVotedOnPoll, getUserVoteForPoll]);
   // Listen for poll vote sync events from other screens
   useEffect(() => {
     const handlePollVoteSync = (data: { pollId: string; optionId: string }) => {
@@ -104,10 +82,13 @@ export const PollComponent: React.FC<PollComponentProps> = ({
     const subscription = DeviceEventEmitter.addListener('pollVoteSync', handlePollVoteSync);
     return () => subscription.remove();
   }, [poll.id]);
-  // Calculate total votes using local options
-  const totalVotes = localOptions.reduce((sum, option) => {
-    return sum + (option._count?.votes || option.votesCount || 0);
-  }, 0);
+  
+  // Memoize expensive calculations
+  const totalVotes = useMemo(() => {
+    return localOptions.reduce((sum, option) => {
+      return sum + (option._count?.votes || option.votesCount || 0);
+    }, 0);
+  }, [localOptions]);
   // Handle vote submission
   const handleVote = async (optionId: string) => {
     if (localHasVoted || isVoting) return;
@@ -132,14 +113,17 @@ export const PollComponent: React.FC<PollComponentProps> = ({
       setIsVoting(false);
     }
   };
-  // Get percentage for an option
-  const getPercentage = (option: PollOption): number => {
-    if (totalVotes === 0) return 0;
-    const votes = option._count?.votes || option.votesCount || 0;
-    return Math.round((votes / totalVotes) * 100);
-  };
-  // Get the winning option(s)
-  const getWinningOptions = (): string[] => {
+  // Memoize percentage calculation
+  const getPercentage = useMemo(() => {
+    return (option: PollOption): number => {
+      if (totalVotes === 0) return 0;
+      const votes = option._count?.votes || option.votesCount || 0;
+      return Math.round((votes / totalVotes) * 100);
+    };
+  }, [totalVotes]);
+  
+  // Memoize winning options calculation
+  const winningOptions = useMemo(() => {
     if (totalVotes === 0) return [];
     const maxVotes = Math.max(...localOptions.map(option => 
       option._count?.votes || option.votesCount || 0
@@ -147,8 +131,7 @@ export const PollComponent: React.FC<PollComponentProps> = ({
     return localOptions
       .filter(option => (option._count?.votes || option.votesCount || 0) === maxVotes)
       .map(option => option.id);
-  };
-  const winningOptions = getWinningOptions();
+  }, [localOptions, totalVotes]);
   // Create dynamic styles inside component to access colors
   const styles = createStyles(colors, isDark);
   return (
@@ -166,7 +149,7 @@ export const PollComponent: React.FC<PollComponentProps> = ({
           const isUserVote = localUserVote === option.id;
           const isWinning = winningOptions.includes(option.id) && totalVotes > 0;
           return (
-            <PollOptionItem
+            <MemoizedPollOptionItem
               key={option.id}
               option={option}
               percentage={percentage}
@@ -193,7 +176,7 @@ export const PollComponent: React.FC<PollComponentProps> = ({
       </View>
     </View>
   );
-};
+});
 interface PollOptionItemProps {
   option: PollOption;
   percentage: number;
@@ -206,7 +189,7 @@ interface PollOptionItemProps {
   colors: any;
   isDark: boolean;
 }
-const PollOptionItem: React.FC<PollOptionItemProps> = ({
+const PollOptionItem: React.FC<PollOptionItemProps> = React.memo(({
   option,
   percentage,
   votes,
@@ -285,7 +268,20 @@ const PollOptionItem: React.FC<PollOptionItemProps> = ({
       </View>
     </TouchableOpacity>
   );
-};
+});
+
+// Memoized version to prevent unnecessary re-renders
+const MemoizedPollOptionItem = React.memo(PollOptionItem, (prevProps, nextProps) => {
+  return (
+    prevProps.option.id === nextProps.option.id &&
+    prevProps.percentage === nextProps.percentage &&
+    prevProps.votes === nextProps.votes &&
+    prevProps.isUserVote === nextProps.isUserVote &&
+    prevProps.isWinning === nextProps.isWinning &&
+    prevProps.hasVoted === nextProps.hasVoted &&
+    prevProps.isVoting === nextProps.isVoting
+  );
+});
 // Create dynamic styles function
 const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 interface PollVoteData {
@@ -19,6 +19,9 @@ const PollVoteContext = createContext<PollVoteContextType | undefined>(undefined
 const POLL_VOTES_STORAGE_KEY = '@nexeed_poll_votes';
 export const PollVoteProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [pollVotes, setPollVotes] = useState<Record<string, PollVoteData>>({});
+  const [isLoaded, setIsLoaded] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
   // Load poll votes from storage on app start
   useEffect(() => {
     loadPollVotes();
@@ -30,15 +33,35 @@ export const PollVoteProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const parsedVotes = JSON.parse(stored);
         setPollVotes(parsedVotes);
       }
+      setIsLoaded(true);
     } catch (error) {
-      }
+      console.error('Failed to load poll votes:', error);
+      setIsLoaded(true);
+    }
   };
-  const savePollVotes = async (votes: Record<string, PollVoteData>) => {
-    try {
-      await AsyncStorage.setItem(POLL_VOTES_STORAGE_KEY, JSON.stringify(votes));
-    } catch (error) {
+  // Debounced save to batch multiple updates
+  const savePollVotesDebounced = useCallback((votes: Record<string, PollVoteData>) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await AsyncStorage.setItem(POLL_VOTES_STORAGE_KEY, JSON.stringify(votes));
+      } catch (error) {
+        console.error('Failed to save poll votes:', error);
       }
-  };
+    }, 300); // Batch writes within 300ms
+  }, []);
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
   const setPollVote = useCallback((pollId: string, optionId: string) => {
     const newVoteData: PollVoteData = {
       hasVoted: true,
@@ -47,10 +70,10 @@ export const PollVoteProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
     setPollVotes(prev => {
       const updated = { ...prev, [pollId]: newVoteData };
-      savePollVotes(updated);
+      savePollVotesDebounced(updated);
       return updated;
     });
-  }, []);
+  }, [savePollVotesDebounced]);
   const getPollVote = useCallback((pollId: string): PollVoteData | null => {
     return pollVotes[pollId] || null;
   }, [pollVotes]);
@@ -64,17 +87,18 @@ export const PollVoteProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setPollVotes(prev => {
       const updated = { ...prev };
       delete updated[pollId];
-      savePollVotes(updated);
+      savePollVotesDebounced(updated);
       return updated;
     });
-  }, []);
+  }, [savePollVotesDebounced]);
   // Global sync function to update poll votes across all screens
   const syncPollVoteAcrossScreens = useCallback((pollId: string, optionId: string) => {
     setPollVote(pollId, optionId);
     // Emit custom event for other components to listen
     DeviceEventEmitter.emit('pollVoteSync', { pollId, optionId });
   }, [setPollVote]);
-  const value: PollVoteContextType = {
+  // Memoize context value to prevent unnecessary re-renders
+  const value: PollVoteContextType = React.useMemo(() => ({
     pollVotes,
     setPollVote,
     getPollVote,
@@ -82,7 +106,7 @@ export const PollVoteProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     getUserVoteForPoll,
     clearPollVote,
     syncPollVoteAcrossScreens,
-  };
+  }), [pollVotes, setPollVote, getPollVote, hasVotedOnPoll, getUserVoteForPoll, clearPollVote, syncPollVoteAcrossScreens]);
   return (
     <PollVoteContext.Provider value={value}>
       {children}

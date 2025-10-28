@@ -177,10 +177,10 @@ export default function EditProfileScreen() {
             {/* Banner */}
             <View style={styles.bannerContainer}>
               <Image source={{ uri: bannerUrl }} style={styles.bannerImage} />
-              <TouchableOpacity onPress={() => pickImage('banner')} style={[styles.bannerIcon, { borderColor: colors.primary }]} disabled={loading}>
-                <LinearGradient colors={[colors.secondary, colors.primary]} style={styles.iconGradient}>
+              <TouchableOpacity onPress={() => pickImage('banner')} style={[styles.bannerIcon, { borderColor: '#004aad' }]} disabled={loading}>
+                <View style={[styles.iconGradient, { backgroundColor: '#004aad' }]}>
                   <ImageIcon size={20} color="#ffffff" />
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
             {/* Avatar */}
@@ -223,9 +223,9 @@ export default function EditProfileScreen() {
             </View>
             {/* Save Button */}
             <TouchableOpacity onPress={handleSaveChanges} style={styles.saveButton} disabled={loading}>
-              <LinearGradient colors={[colors.secondary, colors.primary]} style={styles.buttonGradient}>
+              <View style={[styles.buttonGradient, {backgroundColor: '#004aad'}]}>
                 <Text style={[styles.saveButtonText, { color: '#ffffff' }]}>{loading ? 'Saving...' : 'Save Changes'}</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           </ScrollView>
         </KeyboardWrapper>
@@ -305,6 +305,7 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: BorderRadius.round,
+      backgroundColor: '#004aad',
     },
     // Avatar
     profileImageContainer: {
@@ -325,7 +326,7 @@ const createStyles = (colors: any) =>
       position: 'absolute',
       bottom: 0,
       right: 0,
-      backgroundColor: colors.primary,
+      backgroundColor: '#004aad',
       padding: Spacing.sm,
       borderRadius: BorderRadius.round,
       borderWidth: 2,
