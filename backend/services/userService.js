@@ -213,6 +213,52 @@ const findOrCreateUserByGoogleEmail = async (googleEmail, googleProfile = {}) =>
   }
 };
 
+const getUserPosts = async (userId, options = {}) => {
+  try {
+    const { page = 1, limit = 20 } = options;
+    const skip = (page - 1) * limit;
+
+    const posts = await prisma.post.findMany({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            avatar: true,
+            verified: true,
+          },
+        },
+        poll: {
+          select: {
+            id: true,
+            question: true,
+            options: {
+              select: {
+                id: true,
+                text: true,
+                votesCount: true,
+                _count: { select: { votes: true } }
+              }
+            }
+          }
+        },
+        likes: false,
+        bookmarks: false,
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    });
+
+    return posts;
+  } catch (error) {
+    console.error('Error fetching user posts:', error);
+    throw new Error('Could not retrieve user posts.');
+  }
+};
+
 module.exports = {
   createUser,
   findUserByEmail,
@@ -223,4 +269,5 @@ module.exports = {
   searchUsersByUsername,
   updateBanner,
   findOrCreateUserByGoogleEmail,
+  getUserPosts,
 };

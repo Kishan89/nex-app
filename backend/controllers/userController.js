@@ -598,6 +598,31 @@ const unblockUser = async (req, res, next) => {
     }
 };
 
+// Get user's posts with pagination
+const getUserPosts = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const { page = 1, limit = 20 } = req.query;
+        
+        console.log('🔍 getUserPosts called:', { userId, page, limit });
+        
+        const posts = await userService.getUserPosts(userId, {
+            page: parseInt(page),
+            limit: parseInt(limit)
+        });
+        
+        // Transform posts to include proper counts
+        const { transformPost } = require('../utils/helpers');
+        const transformedPosts = posts.map(transformPost);
+        
+        console.log(`✅ Found ${transformedPosts.length} posts for user ${userId}`);
+        res.status(200).json({ posts: transformedPosts });
+    } catch (error) {
+        console.error('❌ Error fetching user posts:', error);
+        next(error);
+    }
+};
+
 module.exports = {
     register,
     login,
@@ -611,4 +636,5 @@ module.exports = {
     deleteBanner,
     blockUser,
     unblockUser,
+    getUserPosts,
 };

@@ -240,22 +240,22 @@ export default function HomeScreen() {
     // Don't animate indicator separately - let handleHorizontalScroll handle it
     // This ensures indicator moves exactly with the scroll
     
-    // Scroll horizontal FlatList to the selected tab - instant for better performance
+    // Scroll horizontal FlatList to the selected tab
     horizontalFlatListRef.current?.scrollToIndex({
       index,
-      animated: false,
+      animated: true,
     });
     
     // Reset header and FAB visibility when changing tabs
     Animated.parallel([
       Animated.timing(headerTranslateY, {
         toValue: 0,
-        duration: 150,
+        duration: 200,
         useNativeDriver: true,
       }),
       Animated.timing(fabScale, {
         toValue: 1,
-        duration: 150,
+        duration: 200,
         useNativeDriver: true,
       }),
     ]).start();
@@ -354,14 +354,34 @@ export default function HomeScreen() {
   
   // Render footer for loading more posts
   const renderFooter = useCallback(() => {
-    if (!loadingMore) return null;
-    return (
-      <View style={styles.loadingFooter}>
-        <ActivityIndicator size="small" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading more posts...</Text>
-      </View>
-    );
-  }, [loadingMore, colors.primary, colors.textSecondary]);
+    if (activeTab !== 'Latest') return null;
+    
+    if (loadingMore) {
+      return (
+        <View style={styles.loadingFooter}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading more posts...</Text>
+        </View>
+      );
+    }
+    
+    // Show "Load More" button if there are more posts but not currently loading
+    if (hasMorePosts && !loadingMore) {
+      return (
+        <TouchableOpacity 
+          style={styles.loadMoreButton} 
+          onPress={() => {
+            console.log('📱 Load More button pressed');
+            loadMorePosts();
+          }}
+        >
+          <Text style={[styles.loadMoreText, { color: colors.primary }]}>Load More Posts</Text>
+        </TouchableOpacity>
+      );
+    }
+    
+    return null;
+  }, [activeTab, loadingMore, hasMorePosts, loadMorePosts, colors.primary, colors.textSecondary]);
   
   // Render vertical FlatList for each tab
   const renderTabContent = useCallback(({ item, index }: { item: string; index: number }) => {
@@ -422,20 +442,21 @@ export default function HomeScreen() {
           contentContainerStyle={{ paddingBottom: 80, paddingTop: 100 }}
           onEndReached={() => {
             if (item === 'Latest' && hasMorePosts && !loadingMore) {
+              console.log('🔄 onEndReached triggered - loading more posts');
               loadMorePosts();
             }
           }}
-          onEndReachedThreshold={0.1}
+          onEndReachedThreshold={0.5}
           ListFooterComponent={item === 'Latest' ? renderFooter : null}
           onScroll={handleScroll}
           scrollEventThrottle={16}
           bounces={true}
           alwaysBounceVertical={true}
           removeClippedSubviews={true}
-          maxToRenderPerBatch={5}
-          updateCellsBatchingPeriod={100}
-          initialNumToRender={5}
-          windowSize={5}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={10}
+          windowSize={21}
         />
       </Animated.View>
     );
@@ -555,10 +576,10 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               onScroll={handleHorizontalScroll}
               onMomentumScrollEnd={handleHorizontalScrollEnd}
-              scrollEventThrottle={16}
+              scrollEventThrottle={1}
               bounces={false}
-              removeClippedSubviews={true}
-              decelerationRate="fast"
+              removeClippedSubviews={false}
+              decelerationRate={0.9999}
               snapToInterval={SCREEN_WIDTH}
               snapToAlignment="center"
               disableIntervalMomentum={true}
@@ -720,5 +741,22 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.medium,
+  },
+  loadMoreButton: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    backgroundColor: colors.backgroundTertiary,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  loadMoreText: {
+    color: colors.primary,
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
   },
 });

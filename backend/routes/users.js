@@ -30,4 +30,7 @@ router.delete('/:userId/banner', userController.deleteBanner);
 router.post('/:userId/block', verifyAuthToken, userController.blockUser);
 router.post('/:userId/unblock', verifyAuthToken, userController.unblockUser);
 
+// Get user's posts with pagination
+router.get('/:userId/posts', userController.getUserPosts);
+
 module.exports = router;

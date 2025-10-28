@@ -30,6 +30,7 @@ import CommentsModal from '../../components/Comments';
 import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
 import XPRulesModal from '@/components/XPRulesModal';
+
 export default function ProfileScreen() {
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
@@ -37,9 +38,13 @@ export default function ProfileScreen() {
   const userId = Array.isArray(routeId) ? routeId[0] : routeId || user?.id;
   const { posts, postInteractions, refreshing, onRefresh, toggleLike, toggleBookmark, votePoll, comments, addComment, loadComments } = useListen();
   const [profile, setProfile] = useState<ApiProfileData | null>(null);
+  const [userPosts, setUserPosts] = useState<NormalizedPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPosts, setLoadingPosts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'Posts' | 'Bookmarks'>('Posts');
+  const [postsPage, setPostsPage] = useState(1);
+  const [hasMoreUserPosts, setHasMoreUserPosts] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [showXPRules, setShowXPRules] = useState(false);
@@ -47,6 +52,7 @@ export default function ProfileScreen() {
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<NormalizedPost | null>(null);
   const isMyProfile = user?.id === userId;
+
   // Function to get medal emoji for top 3 XP users
   const getXPMedal = (rank: number | null) => {
     if (!rank) return null;
@@ -57,6 +63,35 @@ export default function ProfileScreen() {
       default: return null;
     }
   };
+
+  const fetchUserPosts = useCallback(async (page = 1, append = false) => {
+    if (!userId || loadingPosts) return;
+
+    setLoadingPosts(true);
+    try {
+      const fetchedPosts = await apiService.getUserPosts(userId, page, 20);
+      const normalized = fetchedPosts.map((p: any) => ({
+        ...p,
+        liked: p.liked || false,
+        bookmarked: p.bookmarked || false,
+        hasVotedOnPoll: false,
+        userPollVote: undefined
+      }));
+
+      setHasMoreUserPosts(normalized.length === 20);
+
+      if (append) {
+        setUserPosts(prev => [...prev, ...normalized]);
+      } else {
+        setUserPosts(normalized);
+      }
+    } catch (err) {
+      console.error('Error fetching user posts:', err);
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, [userId, loadingPosts]);
+
   const fetchProfileData = useCallback(async (forceRefresh = false) => {
     if (!userId) {
       setError('User ID not provided.');
@@ -73,6 +108,8 @@ export default function ProfileScreen() {
         if (!isMyProfile) {
           setIsFollowing(cachedProfile.isFollowing);
         }
+        // Fetch user posts after profile loads
+        await fetchUserPosts(1, false);
       } else {
         setError('Profile not found.');
       }
@@ -85,10 +122,12 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [userId, isMyProfile]);
+  }, [userId, isMyProfile, fetchUserPosts]);
+
   useEffect(() => {
     fetchProfileData();
   }, [fetchProfileData]);
+
   // Listen for follow state changes from other screens
   useEffect(() => {
     if (!userId || isMyProfile) return;
@@ -107,6 +146,7 @@ export default function ProfileScreen() {
 
   const onCombinedRefresh = useCallback(() => {
     onRefresh();
+    setPostsPage(1);
     fetchProfileData(true); // Force refresh on manual pull
   }, [onRefresh, fetchProfileData]);
 
@@ -178,19 +218,26 @@ export default function ProfileScreen() {
       setChatLoading(false);
     }
   }, [userId, chatLoading]);
+
   // Optimized post filtering with early returns
-  const userPosts = useMemo(() => {
-    if (!profile?.username) return [];
-    return posts.filter(p => p.username === profile.username);
-  }, [posts, profile?.username]);
   const bookmarkedPosts = useMemo(() => {
     if (!isMyProfile) return [];
     return posts.filter(p => postInteractions[p.id]?.bookmarked);
   }, [posts, postInteractions, isMyProfile]);
+
   const displayedPosts = useMemo(() => {
     if (!isMyProfile) return userPosts;
     return activeTab === 'Posts' ? userPosts : bookmarkedPosts;
   }, [isMyProfile, activeTab, userPosts, bookmarkedPosts]);
+
+  const loadMoreUserPosts = useCallback(() => {
+    if (!loadingPosts && hasMoreUserPosts && activeTab === 'Posts') {
+      const nextPage = postsPage + 1;
+      setPostsPage(nextPage);
+      fetchUserPosts(nextPage, true);
+    }
+  }, [loadingPosts, hasMoreUserPosts, postsPage, activeTab, fetchUserPosts]);
+
   const formatRelativeTime = useCallback((raw?: string) => {
     if (!raw) return '';
     const s = String(raw).trim();
@@ -352,6 +399,14 @@ export default function ProfileScreen() {
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onCombinedRefresh} tintColor={colors.primary} />}
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const paddingToBottom = 20;
+          if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
+            loadMoreUserPosts();
+          }
+        }}
+        scrollEventThrottle={400}
       >
         <View style={styles.bannerSection}>
           <Image source={{ uri: bannerUri }} style={styles.banner} />
@@ -468,6 +523,11 @@ export default function ProfileScreen() {
         )}
         <View style={styles.contentSection}>
           {displayedPosts.length > 0 ? displayedPosts.map(renderPost) : <Text style={styles.emptyText}>No posts found.</Text>}
+          {loadingPosts && (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          )}
         </View>
       </ScrollView>
       {isMyProfile && (

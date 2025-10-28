@@ -33,7 +33,7 @@ type Props = {
   onTextToggle?: () => void; // Callback for text expand/collapse
   refreshKey?: number; // Key to reset TruncatedText state on refresh
 };
-function PostCard({
+export default function PostCard({
   post,
   isLiked,
   isBookmarked,
@@ -56,6 +56,15 @@ function PostCard({
 }: Props) {
   const { colors } = useTheme();
   
+  // Debug: Log isPinned value
+  React.useEffect(() => {
+    console.log('🔍 POST DEBUG:', {
+      id: post.id,
+      username: post.username,
+      isPinned: post.isPinned,
+      isPinnedType: typeof post.isPinned
+    });
+  }, [post.isPinned, post.id, post.username]);
   
   // Use post.liked as the source of truth, with isLiked as fallback
   const [localIsLiked, setLocalIsLiked] = useState(post.liked ?? isLiked ?? false);
@@ -80,10 +89,10 @@ function PostCard({
   React.useEffect(() => {
     if (post.image) {
       ImageOptimizer.optimizeImage(post.image, {
-        quality: 0.6,
-        maxWidth: 600,
-        maxHeight: 400
-      }).then(setOptimizedImageUri).catch(() => setOptimizedImageUri(post.image));
+        quality: 0.8,
+        maxWidth: 800,
+        maxHeight: 600
+      }).then(setOptimizedImageUri);
     }
   }, [post.image]);
   const handleLike = () => {
@@ -318,7 +327,6 @@ function PostCard({
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   postCard: { 
     paddingVertical: Spacing.sm,
@@ -481,5 +489,3 @@ const styles = StyleSheet.create({
     fontWeight: FontWeights.medium,
   },
 });
-
-export default React.memo(PostCard);

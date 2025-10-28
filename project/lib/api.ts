@@ -38,6 +38,7 @@ const API_ENDPOINTS = {
     REPORT_COMMENT: (postId: string, commentId: string) => `/posts/${postId}/comments/${commentId}/report`,
     POST_BY_ID: (postId: string) => `/posts/${postId}`,
     USER_BOOKMARKS: (userId: string) => `/users/${userId}/bookmarks`,
+    USER_POSTS: (userId: string) => `/users/${userId}/posts`,
     SEARCH_USERS: "/search/users",
     SUGGESTED_USERS: "/search/users/suggested",
     RECENT_USERS: "/search/users/recent",
@@ -259,6 +260,15 @@ class ApiService {
         }
     }
     getPostsByUser(userId: string) { return this.get<Post[]>(`${API_ENDPOINTS.POSTS}?userId=${userId}`); }
+    async getUserPosts(userId: string, page: number = 1, limit: number = 20): Promise<any[]> {
+        try {
+            const response = await this.get<any>(`${API_ENDPOINTS.USER_POSTS(userId)}?page=${page}&limit=${limit}`);
+            return response?.posts || [];
+        } catch (error) {
+            console.error('Error fetching user posts:', error);
+            return [];
+        }
+    }
     getUserProfile(userId: string) { 
         return this.get<ProfileData>(API_ENDPOINTS.USER_PROFILE(userId)); 
     }
