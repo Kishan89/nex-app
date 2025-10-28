@@ -240,22 +240,22 @@ export default function HomeScreen() {
     // Don't animate indicator separately - let handleHorizontalScroll handle it
     // This ensures indicator moves exactly with the scroll
     
-    // Scroll horizontal FlatList to the selected tab
+    // Scroll horizontal FlatList to the selected tab - instant for better performance
     horizontalFlatListRef.current?.scrollToIndex({
       index,
-      animated: true,
+      animated: false,
     });
     
     // Reset header and FAB visibility when changing tabs
     Animated.parallel([
       Animated.timing(headerTranslateY, {
         toValue: 0,
-        duration: 200,
+        duration: 150,
         useNativeDriver: true,
       }),
       Animated.timing(fabScale, {
         toValue: 1,
-        duration: 200,
+        duration: 150,
         useNativeDriver: true,
       }),
     ]).start();
@@ -432,10 +432,10 @@ export default function HomeScreen() {
           bounces={true}
           alwaysBounceVertical={true}
           removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
-          initialNumToRender={10}
-          windowSize={21}
+          maxToRenderPerBatch={5}
+          updateCellsBatchingPeriod={100}
+          initialNumToRender={5}
+          windowSize={5}
         />
       </Animated.View>
     );
@@ -555,10 +555,10 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               onScroll={handleHorizontalScroll}
               onMomentumScrollEnd={handleHorizontalScrollEnd}
-              scrollEventThrottle={1}
+              scrollEventThrottle={16}
               bounces={false}
-              removeClippedSubviews={false}
-              decelerationRate={0.9999}
+              removeClippedSubviews={true}
+              decelerationRate="fast"
               snapToInterval={SCREEN_WIDTH}
               snapToAlignment="center"
               disableIntervalMomentum={true}
