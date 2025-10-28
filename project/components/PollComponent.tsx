@@ -13,7 +13,8 @@ import Animated, {
   useSharedValue, 
   useAnimatedStyle, 
   withSpring,
-  withTiming 
+  withTiming,
+  interpolate
 } from 'react-native-reanimated';
 import { useTheme } from '@/context/ThemeContext';
 import { usePollVote } from '@/context/PollVoteContext';
@@ -223,9 +224,13 @@ const PollOptionItem: React.FC<PollOptionItemProps> = ({
       progressWidth.value = withSpring(percentage);
     }
   }, [hasVoted, percentage]);
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${progressWidth.value}%`,
-  }));
+  const progressStyle = useAnimatedStyle(() => {
+    'worklet';
+    return { 
+      width: `${progressWidth.value}%`
+    };
+  });
+
   // Create dynamic styles inside component to access colors
   const styles = createStyles(colors, isDark);
   const getOptionStyle = () => {
@@ -312,16 +317,21 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   optionButton: {
     backgroundColor: colors.backgroundTertiary,
     borderRadius: 25,
-    padding: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     marginBottom: 8,
+    minHeight: 40,
+    justifyContent: 'center',
   },
   optionResult: {
     backgroundColor: colors.backgroundTertiary,
     borderRadius: 25,
-    padding: 14,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
     marginBottom: 8,
     position: 'relative',
     overflow: 'hidden',
+    minHeight: 44,
   },
   userVoteOption: {
     backgroundColor: colors.primary + '10',
@@ -336,12 +346,16 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     bottom: 0,
     backgroundColor: colors.primary + '30',
     borderRadius: 25,
+    marginLeft: 0,
+    marginTop: 0,
+    marginBottom: 0,
   },
   optionContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     zIndex: 1,
+    padding: 14,
   },
   optionLeft: {
     flex: 1,

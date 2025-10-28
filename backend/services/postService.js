@@ -8,8 +8,43 @@ class PostService {
     const { page = 1, limit = 20, userId } = options;
     const skip = (page - 1) * limit;
 
+    // Fetch pinned posts separately (always from page 1)
+    const pinnedPosts = page === 1 ? await prisma.post.findMany({
+      where: { isPinned: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            avatar: true,
+            verified: true,
+          },
+        },
+        poll: {
+          include: {
+            options: {
+              include: {
+                _count: { select: { votes: true } }
+              }
+            }
+          }
+        },
+        likes: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false,
+        bookmarks: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false,
+      },
+      orderBy: { createdAt: 'desc' },
+    }) : [];
 
+    // Fetch regular posts (excluding pinned ones)
     const posts = await prisma.post.findMany({
+      where: { isPinned: false },
       include: {
         user: {
           select: {
@@ -44,8 +79,10 @@ class PostService {
       take: limit,
     });
 
+    // Combine pinned posts first, then regular posts
+    const allPosts = [...pinnedPosts, ...posts];
     
-    return posts.map((post) => {
+    return allPosts.map((post) => {
       // Add like status to post object
       const postWithStatus = {
         ...post,
@@ -344,9 +381,44 @@ class PostService {
         return [];
       }
 
-    // Get posts only from followed users
+    // Fetch pinned posts separately (always from page 1)
+    const pinnedPosts = page === 1 ? await prisma.post.findMany({
+      where: { isPinned: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            avatar: true,
+            verified: true,
+          },
+        },
+        poll: {
+          include: {
+            options: {
+              include: {
+                _count: { select: { votes: true } }
+              }
+            }
+          }
+        },
+        likes: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false,
+        bookmarks: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false,
+      },
+      orderBy: { createdAt: 'desc' },
+    }) : [];
+
+    // Get posts only from followed users (excluding pinned)
     const posts = await prisma.post.findMany({
       where: {
+        isPinned: false,
         userId: {
           in: followedUserIds
         }
@@ -385,8 +457,10 @@ class PostService {
       take: limit,
     });
 
+    // Combine pinned posts first, then regular posts
+    const allPosts = [...pinnedPosts, ...posts];
     
-    return posts.map((post) => {
+    return allPosts.map((post) => {
       // Add like status to post object
       const postWithStatus = {
         ...post,
@@ -432,14 +506,48 @@ class PostService {
     const { page = 1, limit = 20, userId } = options;
     const skip = (page - 1) * limit;
 
+    // Fetch pinned posts separately (always from page 1)
+    const pinnedPosts = page === 1 ? await prisma.post.findMany({
+      where: { isPinned: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            avatar: true,
+            verified: true,
+          },
+        },
+        poll: {
+          include: {
+            options: {
+              include: {
+                _count: { select: { votes: true } }
+              }
+            }
+          }
+        },
+        likes: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false,
+        bookmarks: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false,
+      },
+      orderBy: { createdAt: 'desc' },
+    }) : [];
 
     // Calculate date 7 days ago
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // Get posts from the last 7 days with their counts
+    // Get posts from the last 7 days with their counts (excluding pinned)
     const posts = await prisma.post.findMany({
       where: {
+        isPinned: false,
         createdAt: {
           gte: sevenDaysAgo
         }
@@ -498,8 +606,20 @@ class PostService {
     // Sort by trending score (highest first)
     postsWithScores.sort((a, b) => b.trendingScore - a.trendingScore);
 
-    // Remove the trendingScore from the final response (optional)
-    return postsWithScores.map(({ trendingScore, ...post }) => post);
+    // Transform pinned posts
+    const transformedPinnedPosts = pinnedPosts.map((post) => {
+      const postWithStatus = {
+        ...post,
+        isLiked: userId ? post.likes.length > 0 : false,
+        isBookmarked: userId ? post.bookmarks.length > 0 : false,
+      };
+      return transformPost(postWithStatus);
+    });
+
+    // Combine pinned posts first, then trending posts
+    const finalPosts = [...transformedPinnedPosts, ...postsWithScores.map(({ trendingScore, ...post }) => post)];
+
+    return finalPosts;
   }
 }
 

@@ -175,10 +175,10 @@ export default function SettingsScreen() {
               Contact & Support
             </Text>
             <Text style={[styles.aboutText, { color: colors.textSecondary }]}>
-              Email: support@nexeed.app
+              Email: team@nexeed.in
             </Text>
             <Text style={[styles.aboutText, { color: colors.textSecondary }]}>
-              Website: www.nexeed.app
+              Website: Nexeed.in
             </Text>
           </View>
           <View

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Modal, Alert, Share as RNShare } from 'react-native';
-import { Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2 } from 'lucide-react-native';
+import { Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, Pin } from 'lucide-react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { NormalizedPost } from '@/types';
 import PollComponent from './PollComponent';
@@ -149,9 +149,17 @@ export default function PostCard({
         <View style={styles.contentSection}>
           {/* Username and more button */}
           <View style={styles.userInfoHeader}>
-            <TouchableOpacity onPress={onUserPress} activeOpacity={0.7} style={styles.usernameContainer}>
-              <Text style={[styles.username, { color: colors.text }]} numberOfLines={1}>{post.username}</Text>
-            </TouchableOpacity>
+            <View style={styles.usernameRow}>
+              <TouchableOpacity onPress={onUserPress} activeOpacity={0.7} style={styles.usernameContainer}>
+                <Text style={[styles.username, { color: colors.text }]} numberOfLines={1}>{post.username}</Text>
+              </TouchableOpacity>
+              {post.isPinned && (
+                <View style={[styles.pinnedBadge, { backgroundColor: colors.primaryAlpha }]}>
+                  <Pin size={12} color={colors.primary} />
+                  <Text style={[styles.pinnedText, { color: colors.primary }]}>Pinned</Text>
+                </View>
+              )}
+            </View>
             <TouchableOpacity 
               ref={moreButtonRef}
               style={styles.shareButton}
@@ -336,14 +344,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: Spacing.xs,
   },
-  usernameContainer: {
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    marginRight: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  usernameContainer: {
+    flexShrink: 1,
   },
   username: { 
     fontSize: FontSizes.md, 
     fontWeight: FontWeights.semibold, 
     color: Colors.text,
+  },
+  pinnedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+    gap: 4,
+  },
+  pinnedText: {
+    fontSize: FontSizes.xs,
+    fontWeight: FontWeights.semibold,
   },
   timeStamp: { 
     fontSize: FontSizes.xs, 

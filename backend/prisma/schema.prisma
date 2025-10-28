@@ -58,6 +58,7 @@ model Post {
   commentsCount    Int            @default(0)
   bookmarksCount   Int            @default(0)
   reportsCount     Int            @default(0)
+  isPinned         Boolean        @default(false)
   youtubeAuthor    String?
   youtubeDuration  String?
   youtubeThumbnail String?

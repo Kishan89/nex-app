@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef, startTransition } from 'react';
 import {
   View,
   Text,
@@ -82,11 +82,15 @@ export default function HomeScreen() {
   
   // Current tab index
   const currentTabIndex = useRef(0);
+  
+  // Tabs array
+  const tabs = ['Latest', 'Trending', 'Following'];
+  const tabsRef = useRef(tabs);
+  
   // Track screen view when component mounts
   useEffect(() => {
     trackScreenView('home_screen');
   }, []);
-  const tabs = ['Latest', 'Trending', 'Following'];
   // Notification count is now handled by NotificationCountContext
   // Real-time notifications removed - clean FCM handles this now
   // Notification counting is handled by NotificationCountContext
@@ -232,19 +236,14 @@ export default function HomeScreen() {
       previous_tab: activeTab.toLowerCase()
     });
     
+    // Don't animate indicator separately - let handleHorizontalScroll handle it
+    // This ensures indicator moves exactly with the scroll
+    
     // Scroll horizontal FlatList to the selected tab
     horizontalFlatListRef.current?.scrollToIndex({
       index,
       animated: true,
     });
-    
-    // Animate tab indicator
-    Animated.spring(tabIndicatorPosition, {
-      toValue: index,
-      useNativeDriver: true,
-      tension: 100,
-      friction: 10,
-    }).start();
     
     // Reset header and FAB visibility when changing tabs
     Animated.parallel([
@@ -268,32 +267,47 @@ export default function HomeScreen() {
     } else if (tab === 'Trending') {
       loadTrendingPosts();
     }
-  }, [loadFollowingPosts, loadTrendingPosts, activeTab, headerTranslateY, fabScale, tabIndicatorPosition, tabs]);
-  // Handle horizontal scroll for tab indicator
+  }, [loadFollowingPosts, loadTrendingPosts, activeTab, headerTranslateY, fabScale, tabs]);
+  // Handle horizontal scroll for tab indicator - direct setValue for instant sync
   const handleHorizontalScroll = useCallback((event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
-    const index = Math.round(offsetX / SCREEN_WIDTH);
+    const normalizedPosition = offsetX / SCREEN_WIDTH;
     
-    // Update tab indicator position continuously for smooth animation
-    tabIndicatorPosition.setValue(offsetX / SCREEN_WIDTH);
+    // Update indicator position instantly using setValue (synchronous)
+    // This also updates tab text colors via interpolation - instant visual update!
+    tabIndicatorPosition.setValue(normalizedPosition);
     
-    // Update active tab in real-time during scroll for instant color change
-    if (index !== currentTabIndex.current && index >= 0 && index < tabs.length) {
-      currentTabIndex.current = index;
-      setActiveTab(tabs[index]);
+    // Update active tab state immediately during scroll
+    // Use threshold-based switching for earlier tab change
+    let activeIndex = 0;
+    if (normalizedPosition >= 0.5 && normalizedPosition < 1.5) {
+      activeIndex = 1;
+    } else if (normalizedPosition >= 1.5) {
+      activeIndex = 2;
     }
-  }, [tabIndicatorPosition, tabs]);
+    
+    if (activeIndex !== currentTabIndex.current && activeIndex >= 0 && activeIndex < tabsRef.current.length) {
+      currentTabIndex.current = activeIndex;
+      setActiveTab(tabsRef.current[activeIndex]);
+    }
+  }, [tabIndicatorPosition]);
   
-  // Handle scroll end to load tab data
+  // Handle scroll end to ensure data is loaded and state is synced
   const handleHorizontalScrollEnd = useCallback((event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / SCREEN_WIDTH);
     
-    // Ensure tab is set and load data when scroll completes
+    // Update tab state and load data when scroll completes
     if (index >= 0 && index < tabs.length) {
       const tab = tabs[index];
       
-      // Load data for the new tab
+      // Update active tab state (for non-visual logic like data loading)
+      if (currentTabIndex.current !== index) {
+        currentTabIndex.current = index;
+        setActiveTab(tab);
+      }
+      
+      // Load data for the new tab (will be cached if already loaded)
       if (tab === 'Following') {
         loadFollowingPosts();
       } else if (tab === 'Trending') {
@@ -302,7 +316,7 @@ export default function HomeScreen() {
     }
   }, [tabs, loadFollowingPosts, loadTrendingPosts]);
   
-  const renderPostItem = ({ item }: { item: NormalizedPost }) => {
+  const renderPostItem = useCallback(({ item }: { item: NormalizedPost }) => {
     const post = getPostById(item.id) || item;
     if (!post.id) return null;
     return (
@@ -335,10 +349,21 @@ export default function HomeScreen() {
         refreshKey={refreshKey}
       />
     );
-  };
+  }, [getPostById, postInteractions, toggleLike, openComments, toggleBookmark, votePoll, handleSharePost, handleReportPostFromFeed, handleDeletePost, user?.id, refreshKey]);
+  
+  // Render footer for loading more posts
+  const renderFooter = useCallback(() => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading more posts...</Text>
+      </View>
+    );
+  }, [loadingMore, colors.primary, colors.textSecondary]);
   
   // Render vertical FlatList for each tab
-  const renderTabContent = ({ item, index }: { item: string; index: number }) => {
+  const renderTabContent = useCallback(({ item, index }: { item: string; index: number }) => {
     let tabPosts: NormalizedPost[] = [];
     
     if (item === 'Latest') {
@@ -349,8 +374,20 @@ export default function HomeScreen() {
       tabPosts = followingPosts;
     }
     
+    // Calculate opacity based on scroll position for smooth fade effect
+    const inputRange = [
+      (index - 1) * SCREEN_WIDTH,
+      index * SCREEN_WIDTH,
+      (index + 1) * SCREEN_WIDTH,
+    ];
+    const opacity = tabIndicatorPosition.interpolate({
+      inputRange: [index - 1, index, index + 1],
+      outputRange: [0.3, 1, 0.3],
+      extrapolate: 'clamp',
+    });
+    
     return (
-      <View style={[styles.tabContentContainer, { width: SCREEN_WIDTH }]}>
+      <Animated.View style={[styles.tabContentContainer, { width: SCREEN_WIDTH, opacity }]}>
         <FlatList
           ref={(ref) => { verticalFlatListRefs.current[item] = ref; }}
           data={tabPosts}
@@ -381,24 +418,20 @@ export default function HomeScreen() {
           scrollEventThrottle={16}
           bounces={true}
           alwaysBounceVertical={true}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={10}
+          windowSize={21}
         />
-      </View>
+      </Animated.View>
     );
-  };
+  }, [posts, trendingPosts, followingPosts, renderPostItem, refreshing, handleRefresh, colors.primary, colors.textSecondary, colors.background, hasMorePosts, loadingMore, loadMorePosts, renderFooter, handleScroll, tabIndicatorPosition]);
   const handleLoadMore = useCallback(() => {
     if (activeTab === 'Latest' && hasMorePosts && !loadingMore) {
       loadMorePosts();
     }
   }, [activeTab, hasMorePosts, loadingMore, loadMorePosts]);
-  const renderFooter = useCallback(() => {
-    if (!loadingMore) return null;
-    return (
-      <View style={styles.loadingFooter}>
-        <ActivityIndicator size="small" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading more posts...</Text>
-      </View>
-    );
-  }, [loadingMore]);
   // Create dynamic styles inside component to access colors
   const styles = createStyles(colors);
   return (
@@ -445,14 +478,43 @@ export default function HomeScreen() {
             <View style={[styles.tabContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
               <View style={styles.tabWrapper}>
                 {tabs.map((tab, index) => {
-                  const isActive = activeTab === tab;
+                  // Animated text color based on scroll position
+                  const textColor = tabIndicatorPosition.interpolate({
+                    inputRange: [index - 0.5, index, index + 0.5],
+                    outputRange: [colors.textMuted, colors.primary, colors.textMuted],
+                    extrapolate: 'clamp',
+                  });
+                  
                   return (
                     <TouchableOpacity key={tab} style={styles.tab} onPress={() => handleTabChange(tab, index)}>
-                      <Text style={[styles.tabText, { color: colors.textMuted }, isActive && { color: colors.primary }]}>{tab}</Text>
+                      <Animated.Text style={[styles.tabText, { color: textColor }]}>{tab}</Animated.Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
+              {/* Animated Gradient Indicator */}
+              <Animated.View
+                style={[
+                  styles.tabIndicator,
+                  {
+                    transform: [
+                      {
+                        translateX: tabIndicatorPosition.interpolate({
+                          inputRange: [0, 1, 2],
+                          outputRange: [0, SCREEN_WIDTH / 3, (SCREEN_WIDTH / 3) * 2],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={[colors.primary, colors.secondary]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.tabIndicatorGradient}
+                />
+              </Animated.View>
             </View>
           </Animated.View>
           
@@ -474,8 +536,13 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               onScroll={handleHorizontalScroll}
               onMomentumScrollEnd={handleHorizontalScrollEnd}
-              scrollEventThrottle={16}
+              scrollEventThrottle={1}
               bounces={false}
+              removeClippedSubviews={false}
+              decelerationRate={0.9999}
+              snapToInterval={SCREEN_WIDTH}
+              snapToAlignment="center"
+              disableIntervalMomentum={true}
               getItemLayout={(data, index) => ({
                 length: SCREEN_WIDTH,
                 offset: SCREEN_WIDTH * index,
@@ -582,12 +649,16 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   tabText: { fontSize: 17, fontWeight: FontWeights.semibold, color: colors.textMuted },
   activeTabText: { color: colors.text },
-  activeTabIndicator: {
+  tabIndicator: {
     position: 'absolute',
     bottom: 0,
-    left: SCREEN_WIDTH / 3 * 0.2, // Offset to center the narrower indicator
-    width: SCREEN_WIDTH / 3 * 0.6, // 60% of tab width to match text
+    left: SCREEN_WIDTH / 3 * 0.2, // 20% offset for centering
+    width: SCREEN_WIDTH / 3 * 0.6, // 60% of tab width
     height: 3,
+  },
+  tabIndicatorGradient: {
+    width: '100%',
+    height: '100%',
     borderRadius: 2,
   },
   tabContentContainer: {

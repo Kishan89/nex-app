@@ -211,6 +211,27 @@ class PostController {
       next(error);
     }
   }
+
+  /**
+   * Toggle pin status on a post (admin only)
+   */
+  async togglePinPost(req, res, next) {
+    try {
+      const { postId } = req.params;
+      const { isPinned } = req.body;
+      
+      if (typeof isPinned !== 'boolean') {
+        return res.status(400).json(errorResponse('isPinned must be a boolean value'));
+      }
+      
+      const post = await postService.updatePost(postId, { isPinned });
+      
+      res.json(successResponse(post, isPinned ? 'Post pinned successfully' : 'Post unpinned successfully'));
+    } catch (error) {
+      console.error('❌ Error in togglePinPost:', error);
+      next(error);
+    }
+  }
 }
 
 module.exports = new PostController();

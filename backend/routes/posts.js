@@ -35,4 +35,7 @@ router.post('/:postId/like', verifyAuthToken, likeController.toggleLike);
 // Bookmark/unbookmark a post
 router.post('/:postId/bookmark', verifyAuthToken, postController.toggleBookmark);
 
+// Pin/unpin a post (admin only - add admin middleware later if needed)
+router.post('/:postId/pin', verifyAuthToken, postController.togglePinPost);
+
 module.exports = router;

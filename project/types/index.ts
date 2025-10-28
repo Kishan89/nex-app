@@ -147,6 +147,7 @@ export interface NormalizedPost {
   likeCount: number;
   liked: boolean;
   bookmarked: boolean;
+  isPinned?: boolean;
   // Poll data
   poll?: Poll | null;
   // Poll voting state
