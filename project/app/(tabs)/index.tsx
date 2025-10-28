@@ -89,9 +89,19 @@ export default function HomeScreen() {
   const tabs = ['Latest', 'Trending', 'Following'];
   const tabsRef = useRef(tabs);
   
-  // Track screen view when component mounts
+  // Track screen view and prefetch tab data when component mounts
   useEffect(() => {
     trackScreenView('home_screen');
+    
+    // INSTANT prefetch - start immediately for fastest tab switching
+    setTimeout(() => {
+      if (trendingPosts.length === 0) {
+        loadTrendingPosts();
+      }
+      if (followingPosts.length === 0) {
+        loadFollowingPosts();
+      }
+    }, 100); // Start prefetch after just 100ms
   }, []);
   // Notification count is now handled by NotificationCountContext
   // Real-time notifications removed - clean FCM handles this now
@@ -240,17 +250,9 @@ export default function HomeScreen() {
   const handleTabChange = useCallback((tab: string, tabIndex?: number) => {
     const index = tabIndex !== undefined ? tabIndex : tabs.indexOf(tab);
     
+    // INSTANT UI update - no blocking
     setActiveTab(tab);
     currentTabIndex.current = index;
-    
-    // Track tab change event
-    trackEvent('home_tab_change', {
-      tab_name: tab.toLowerCase(),
-      previous_tab: activeTab.toLowerCase()
-    });
-    
-    // Don't animate indicator separately - let handleHorizontalScroll handle it
-    // This ensures indicator moves exactly with the scroll
     
     // Scroll horizontal FlatList to the selected tab - INSTANT (no animation)
     horizontalFlatListRef.current?.scrollToIndex({
@@ -275,33 +277,34 @@ export default function HomeScreen() {
     // Reset scroll position tracking
     lastScrollY.current = 0;
     
-    if (tab === 'Following') {
-      loadFollowingPosts();
-    } else if (tab === 'Trending') {
-      loadTrendingPosts();
-    }
-  }, [loadFollowingPosts, loadTrendingPosts, activeTab, headerTranslateY, fabScale, tabs]);
-  // Handle horizontal scroll for tab indicator - ULTRA FAST instant sync
+    // Load data in background (non-blocking) - only if not already loaded
+    setTimeout(() => {
+      if (tab === 'Following' && followingPosts.length === 0) {
+        loadFollowingPosts();
+      } else if (tab === 'Trending' && trendingPosts.length === 0) {
+        loadTrendingPosts();
+      }
+      
+      // Track tab change event (non-blocking)
+      trackEvent('home_tab_change', {
+        tab_name: tab.toLowerCase(),
+        previous_tab: activeTab.toLowerCase()
+      });
+    }, 0);
+  }, [loadFollowingPosts, loadTrendingPosts, activeTab, headerTranslateY, fabScale, tabs, followingPosts.length, trendingPosts.length]);
+  // Handle horizontal scroll for tab indicator - 100% ANIMATION-DRIVEN (no setState)
   const handleHorizontalScroll = useCallback((event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const normalizedPosition = offsetX / SCREEN_WIDTH;
     
-    // Update indicator position instantly using setValue (synchronous)
-    // This also updates tab text colors via interpolation - instant visual update!
+    // Update indicator position instantly using setValue (synchronous, native thread)
+    // This drives ALL animations: indicator position, text colors, scale - ZERO lag
     tabIndicatorPosition.setValue(normalizedPosition);
     
-    // ULTRA FAST tab switching - lower threshold for instant response
-    // Switch tabs as soon as 25% of the way to next tab
-    let activeIndex = 0;
-    if (normalizedPosition >= 0.25 && normalizedPosition < 1.25) {
-      activeIndex = 1;
-    } else if (normalizedPosition >= 1.25) {
-      activeIndex = 2;
-    }
-    
+    // Update current index for data loading logic (doesn't trigger re-render)
+    const activeIndex = Math.round(normalizedPosition);
     if (activeIndex !== currentTabIndex.current && activeIndex >= 0 && activeIndex < tabsRef.current.length) {
       currentTabIndex.current = activeIndex;
-      setActiveTab(tabsRef.current[activeIndex]);
     }
   }, [tabIndicatorPosition]);
   
@@ -320,14 +323,16 @@ export default function HomeScreen() {
         setActiveTab(tab);
       }
       
-      // Load data for the new tab (will be cached if already loaded)
-      if (tab === 'Following') {
-        loadFollowingPosts();
-      } else if (tab === 'Trending') {
-        loadTrendingPosts();
-      }
+      // Load data in background - only if not already cached
+      setTimeout(() => {
+        if (tab === 'Following' && followingPosts.length === 0) {
+          loadFollowingPosts();
+        } else if (tab === 'Trending' && trendingPosts.length === 0) {
+          loadTrendingPosts();
+        }
+      }, 0);
     }
-  }, [tabs, loadFollowingPosts, loadTrendingPosts]);
+  }, [tabs, loadFollowingPosts, loadTrendingPosts, followingPosts.length, trendingPosts.length]);
   
   const renderPostItem = useCallback(({ item }: { item: NormalizedPost }) => {
     const post = getPostById(item.id) || item;
@@ -364,10 +369,11 @@ export default function HomeScreen() {
     );
   }, [getPostById, postInteractions, toggleLike, openComments, toggleBookmark, votePoll, handleSharePost, handleReportPostFromFeed, handleDeletePost, user?.id, refreshKey]);
   
-  // Render footer for loading more posts
+  // Render footer for loading more posts - ONLY show loading indicator
   const renderFooter = useCallback(() => {
     if (activeTab !== 'Latest') return null;
     
+    // Only show loading indicator when actually loading
     if (loadingMore) {
       return (
         <View style={styles.loadingFooter}>
@@ -377,23 +383,8 @@ export default function HomeScreen() {
       );
     }
     
-    // Show "Load More" button if there are more posts but not currently loading
-    if (hasMorePosts && !loadingMore) {
-      return (
-        <TouchableOpacity 
-          style={styles.loadMoreButton} 
-          onPress={() => {
-            console.log('📱 Load More button pressed');
-            loadMorePosts();
-          }}
-        >
-          <Text style={[styles.loadMoreText, { color: colors.primary }]}>Load More Posts</Text>
-        </TouchableOpacity>
-      );
-    }
-    
     return null;
-  }, [activeTab, loadingMore, hasMorePosts, loadMorePosts, colors.primary, colors.textSecondary]);
+  }, [activeTab, loadingMore, colors.primary, colors.textSecondary]);
   
   // Render vertical FlatList for each tab
   const renderTabContent = useCallback(({ item, index }: { item: string; index: number }) => {
@@ -407,20 +398,9 @@ export default function HomeScreen() {
       tabPosts = followingPosts;
     }
     
-    // Calculate opacity based on scroll position for smooth fade effect
-    const inputRange = [
-      (index - 1) * SCREEN_WIDTH,
-      index * SCREEN_WIDTH,
-      (index + 1) * SCREEN_WIDTH,
-    ];
-    const opacity = tabIndicatorPosition.interpolate({
-      inputRange: [index - 1, index, index + 1],
-      outputRange: [0.3, 1, 0.3],
-      extrapolate: 'clamp',
-    });
-    
+    // NO OPACITY ANIMATION - instant visibility for fast switching
     return (
-      <Animated.View style={[styles.tabContentContainer, { width: SCREEN_WIDTH, opacity }]}>
+      <View style={[styles.tabContentContainer, { width: SCREEN_WIDTH }]}>
         <FlatList
           ref={(ref) => { verticalFlatListRefs.current[item] = ref; }}
           data={tabPosts}
@@ -470,9 +450,9 @@ export default function HomeScreen() {
           initialNumToRender={10}
           windowSize={21}
         />
-      </Animated.View>
+      </View>
     );
-  }, [posts, trendingPosts, followingPosts, renderPostItem, refreshing, handleRefresh, colors.primary, colors.textSecondary, colors.background, hasMorePosts, loadingMore, loadMorePosts, renderFooter, handleScroll, tabIndicatorPosition]);
+  }, [posts, trendingPosts, followingPosts, renderPostItem, refreshing, handleRefresh, colors.primary, colors.textSecondary, colors.background, hasMorePosts, loadingMore, loadMorePosts, renderFooter, handleScroll]);
   const handleLoadMore = useCallback(() => {
     if (activeTab === 'Latest' && hasMorePosts && !loadingMore) {
       loadMorePosts();
@@ -530,33 +510,90 @@ export default function HomeScreen() {
             <View style={[styles.tabContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
               <View style={styles.tabWrapper}>
                 {tabs.map((tab, index) => {
-                  // Animated text color based on scroll position
+                  // NATIVE-FAST color transition with overlapping ranges for smooth blending
+                  // Build valid monotonic inputRange based on tab index
+                  let colorInputRange: number[];
+                  let colorOutputRange: string[];
+                  
+                  if (index === 0) {
+                    // First tab: [0, 0.1, 0.5]
+                    colorInputRange = [0, 0.1, 0.5];
+                    colorOutputRange = [colors.primary, colors.textMuted, colors.textMuted];
+                  } else if (index === 1) {
+                    // Middle tab: [0.5, 0.9, 1, 1.1, 1.5]
+                    colorInputRange = [0.5, 0.9, 1, 1.1, 1.5];
+                    colorOutputRange = [colors.textMuted, colors.textMuted, colors.primary, colors.textMuted, colors.textMuted];
+                  } else {
+                    // Last tab: [1.5, 1.9, 2]
+                    colorInputRange = [1.5, 1.9, 2];
+                    colorOutputRange = [colors.textMuted, colors.textMuted, colors.primary];
+                  }
+                  
                   const textColor = tabIndicatorPosition.interpolate({
-                    inputRange: [index - 0.5, index, index + 0.5],
-                    outputRange: [colors.textMuted, colors.primary, colors.textMuted],
+                    inputRange: colorInputRange,
+                    outputRange: colorOutputRange,
+                    extrapolate: 'clamp',
+                  });
+                  
+                  // Subtle scale with tight sync to scroll
+                  let scaleInputRange: number[];
+                  if (index === 0) {
+                    scaleInputRange = [0, 0.3];
+                  } else if (index === 1) {
+                    scaleInputRange = [0.7, 1, 1.3];
+                  } else {
+                    scaleInputRange = [1.7, 2];
+                  }
+                  
+                  const scale = tabIndicatorPosition.interpolate({
+                    inputRange: scaleInputRange,
+                    outputRange: index === 1 ? [0.96, 1.04, 0.96] : [1.04, 0.96],
                     extrapolate: 'clamp',
                   });
                   
                   return (
                     <TouchableOpacity key={tab} style={styles.tab} onPress={() => handleTabChange(tab, index)}>
-                      <Animated.Text style={[styles.tabText, { color: textColor }]}>{tab}</Animated.Text>
+                      <Animated.Text style={[styles.tabText, { color: textColor, transform: [{ scale }] }]}>{tab}</Animated.Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-              {/* Animated Gradient Indicator */}
+              {/* Animated Gradient Indicator - PERFECTLY SYNCED with scroll */}
               <Animated.View
                 style={[
                   styles.tabIndicator,
                   {
                     transform: [
                       {
+                        // Locked to scroll position - moves with finger
                         translateX: tabIndicatorPosition.interpolate({
                           inputRange: [0, 1, 2],
                           outputRange: [0, SCREEN_WIDTH / 3, (SCREEN_WIDTH / 3) * 2],
+                          extrapolate: 'clamp',
                         }),
                       },
                     ],
+                    // Dynamic width - stretches during transition for fluid feel
+                    width: tabIndicatorPosition.interpolate({
+                      inputRange: [
+                        0, 0.05, 0.2, 0.8, 0.95,
+                        1, 1.05, 1.2, 1.8, 1.95, 2
+                      ],
+                      outputRange: [
+                        SCREEN_WIDTH / 3 * 0.6,  // Rest
+                        SCREEN_WIDTH / 3 * 0.62, // Start stretch
+                        SCREEN_WIDTH / 3 * 0.68, // Mid stretch
+                        SCREEN_WIDTH / 3 * 0.68, // Hold stretch
+                        SCREEN_WIDTH / 3 * 0.62, // End stretch
+                        SCREEN_WIDTH / 3 * 0.6,  // Rest
+                        SCREEN_WIDTH / 3 * 0.62, // Start stretch
+                        SCREEN_WIDTH / 3 * 0.68, // Mid stretch
+                        SCREEN_WIDTH / 3 * 0.68, // Hold stretch
+                        SCREEN_WIDTH / 3 * 0.62, // End stretch
+                        SCREEN_WIDTH / 3 * 0.6,  // Rest
+                      ],
+                      extrapolate: 'clamp',
+                    }),
                   },
                 ]}
               >
@@ -726,8 +763,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     left: SCREEN_WIDTH / 3 * 0.2, // 20% offset for centering
-    width: SCREEN_WIDTH / 3 * 0.6, // 60% of tab width
-    height: 3,
+    height: 3.5, // Slightly thicker for better visibility
+    borderRadius: 2,
+    overflow: 'hidden',
   },
   tabIndicatorGradient: {
     width: '100%',
@@ -753,22 +791,5 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.medium,
-  },
-  loadMoreButton: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: Spacing.md,
-    marginHorizontal: Spacing.lg,
-    backgroundColor: colors.backgroundTertiary,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  loadMoreText: {
-    color: colors.primary,
-    fontSize: FontSizes.md,
-    fontWeight: FontWeights.semibold,
   },
 });
