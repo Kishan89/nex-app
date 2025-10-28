@@ -6,48 +6,108 @@ const youtubeService = require('./youtubeService');
 class PostService {
   async getAllPosts(options = {}) {
     const { page = 1, limit = 20, userId } = options;
-    const skip = (page - 1) * limit;
-
-    // Fetch pinned posts separately (always from page 1)
-    const pinnedPosts = page === 1 ? await prisma.post.findMany({
-      where: { isPinned: true },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            name: true,
-            avatar: true,
-            verified: true,
+    
+    // For page 1, include pinned posts at the top
+    if (page === 1) {
+      // Fetch pinned posts
+      const pinnedPosts = await prisma.post.findMany({
+        where: { isPinned: true },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              name: true,
+              avatar: true,
+              verified: true,
+            },
           },
-        },
-        poll: {
-          select: {
-            id: true,
-            question: true,
-            options: {
-              select: {
-                id: true,
-                text: true,
-                votesCount: true,
-                _count: { select: { votes: true } }
+          poll: {
+            select: {
+              id: true,
+              question: true,
+              options: {
+                select: {
+                  id: true,
+                  text: true,
+                  votesCount: true,
+                  _count: { select: { votes: true } }
+                }
               }
             }
-          }
+          },
+          likes: userId ? {
+            where: { userId },
+            select: { id: true }
+          } : false,
+          bookmarks: userId ? {
+            where: { userId },
+            select: { id: true }
+          } : false,
         },
-        likes: userId ? {
-          where: { userId },
-          select: { id: true }
-        } : false,
-        bookmarks: userId ? {
-          where: { userId },
-          select: { id: true }
-        } : false,
-      },
-      orderBy: { createdAt: 'desc' },
-    }) : [];
+        orderBy: { createdAt: 'desc' },
+      });
 
-    // Fetch regular posts (excluding pinned ones)
+      const pinnedCount = pinnedPosts.length;
+      
+      // Fetch regular posts (limit minus pinned posts count)
+      const regularPostsLimit = Math.max(1, limit - pinnedCount);
+      const posts = await prisma.post.findMany({
+        where: { isPinned: false },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              name: true,
+              avatar: true,
+              verified: true,
+            },
+          },
+          poll: {
+            select: {
+              id: true,
+              question: true,
+              options: {
+                select: {
+                  id: true,
+                  text: true,
+                  votesCount: true,
+                  _count: { select: { votes: true } }
+                }
+              }
+            }
+          },
+          likes: userId ? {
+            where: { userId },
+            select: { id: true }
+          } : false,
+          bookmarks: userId ? {
+            where: { userId },
+            select: { id: true }
+          } : false,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: regularPostsLimit,
+      });
+
+      // Combine pinned posts first, then regular posts
+      const allPosts = [...pinnedPosts, ...posts];
+      
+      return allPosts.map((post) => {
+        const postWithStatus = {
+          ...post,
+          isLiked: userId ? post.likes.length > 0 : false,
+          isBookmarked: userId ? post.bookmarks.length > 0 : false,
+        };
+        delete postWithStatus.likes;
+        delete postWithStatus.bookmarks;
+        return transformPost(postWithStatus);
+      });
+    }
+    
+    // For page 2+, skip pinned posts and paginate regular posts
+    const skip = (page - 1) * limit;
     const posts = await prisma.post.findMany({
       where: { isPinned: false },
       include: {
@@ -74,7 +134,6 @@ class PostService {
             }
           }
         },
-        // Include like status for authenticated user
         likes: userId ? {
           where: { userId },
           select: { id: true }
@@ -89,8 +148,7 @@ class PostService {
       take: limit,
     });
 
-    // Combine pinned posts first, then regular posts
-    const allPosts = [...pinnedPosts, ...posts];
+    const allPosts = posts;
     
     return allPosts.map((post) => {
       // Add like status to post object
