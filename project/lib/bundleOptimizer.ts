@@ -5,12 +5,12 @@ import { lazy, ComponentType } from 'react';
 export const LazyCommentsModal = lazy(() => import('@/components/Comments'));
 export const LazyImageViewer = lazy(() => import('@/components/ImageViewer'));
 export const LazyChatScreen = lazy(() => import('@/components/chat/FastChatScreen'));
-export const LazySearchScreen = lazy(() => import('@/app/search.tsx'));
+export const LazySearchScreen = lazy(() => import('@/app/(tabs)/search'));
 
 // Lazy load screens
-export const LazyProfileScreen = lazy(() => import('@/app/profile/[id].tsx'));
-export const LazyPostScreen = lazy(() => import('@/app/post/[id].tsx'));
-export const LazyCreatePostScreen = lazy(() => import('@/app/create-post.tsx'));
+export const LazyProfileScreen = lazy(() => import('@/app/profile/[id]'));
+export const LazyPostScreen = lazy(() => import('@/app/post/[id]'));
+export const LazyCreatePostScreen = lazy(() => import('@/app/create-post'));
 
 // Lazy load heavy libraries
 export const lazyLoadLibrary = async <T>(importFn: () => Promise<T>): Promise<T> => {
@@ -49,7 +49,7 @@ export const preloadComponents = async () => {
 };
 
 // Tree shaking helpers
-export const importOnly = <T>(module: T, keys: (keyof T)[]): Partial<T> => {
+export const importOnly = <T extends object>(module: T, keys: (keyof T)[]): Partial<T> => {
   const result: Partial<T> = {};
   keys.forEach(key => {
     if (key in module) {
