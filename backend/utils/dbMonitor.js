@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
-const logger = require('./logger');
+const { createLogger } = require('./logger');
+const logger = createLogger('DBMonitor');
 
 class DatabaseMonitor {
   constructor() {

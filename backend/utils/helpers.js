@@ -108,7 +108,8 @@ function transformComment(comment) {
         userId = comment.userId;
     }
     
-    const logger = require('./logger');
+    const { createLogger } = require('./logger');
+    const logger = createLogger('Helpers');
     
     // Final fallback: If still no userId, log warning but don't hardcode
     if (!userId) {
