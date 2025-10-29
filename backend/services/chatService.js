@@ -1,7 +1,10 @@
 const { prisma } = require('../config/database');
 const { formatTimeAgo } = require('../utils/helpers');
-const followService = require('./followService');
-const userCacheService = require('./userCacheService');
+const { createLogger } = require('../utils/logger');
+const { MESSAGE_STATUS, PAGINATION } = require('../constants');
+const { NotFoundError } = require('../utils/errors');
+
+const logger = createLogger('ChatService');
 
 class ChatService {
   /**
@@ -11,15 +14,13 @@ class ChatService {
    */
   async getUserChats(userId) {
     try {
-      console.log(`🔍 Getting chats for user: ${userId}`);
+      logger.debug(`Getting chats for user: ${userId}`);
       
-      // Validate userId
       if (!userId || userId === 'undefined' || userId === 'null') {
-        console.warn('⚠️ ChatService: Invalid userId provided:', userId);
+        logger.warn('Invalid userId provided:', userId);
         return [];
       }
       
-      // 🚀 OPTIMIZED QUERY: Single query with all data
       const chats = await prisma.chat.findMany({
           where: {
             participants: {
@@ -62,15 +63,14 @@ class ChatService {
                 }
               },
               orderBy: { createdAt: 'desc' },
-              take: 1, // Get latest message only
+              take: 1,
             },
-            // Get unread count in single query
             _count: {
               select: {
                 messages: {
                   where: {
                     senderId: { not: userId },
-                    status: { not: 'READ' }
+                    status: { not: MESSAGE_STATUS.READ }
                   }
                 }
               }
@@ -81,13 +81,11 @@ class ChatService {
           }
         });
 
-      // 🚀 FAST FORMATTING: Process all chats in single pass
       const formattedChats = chats.map((chat) => {
         const otherParticipant = chat.participants[0]?.user;
         const lastMessage = chat.messages[0];
         const unreadCount = chat._count?.messages || 0;
         
-        // Fast last seen formatting
         let lastSeenText = 'Last seen recently';
         if (otherParticipant?.isOnline) {
           lastSeenText = 'Online';
@@ -108,7 +106,6 @@ class ChatService {
           lastSeen: otherParticipant?.lastSeen,
           lastSeenText: lastSeenText,
           unread: unreadCount,
-          // Add caching metadata
           lastUpdated: chat.updatedAt,
           lastMessageId: lastMessage?.id,
         };
@@ -117,7 +114,7 @@ class ChatService {
       return formattedChats;
       
     } catch (error) {
-      console.error('❌ ChatService: Error getting user chats:', error);
+      logger.error('Error getting user chats:', error);
       return [];
     }
   }
@@ -130,17 +127,13 @@ class ChatService {
    */
   async getChatMessages(chatId, options = {}) {
     try {
-      const { page = 1, limit = 1000, userId, cursor } = options;
+      const { page = PAGINATION.DEFAULT_PAGE, limit = PAGINATION.MAX_LIMIT, userId, cursor } = options;
       
-      // Loading messages for chat
-      
-      // Build query with cursor-based pagination for better performance
       const whereClause = { chatId };
       if (cursor) {
         whereClause.createdAt = { gt: new Date(cursor) };
       }
       
-      // Optimized query with minimal data selection
       const messages = await prisma.message.findMany({
         where: whereClause,
         select: {
@@ -160,16 +153,14 @@ class ChatService {
         orderBy: {
           createdAt: 'asc'
         },
-        take: limit, // No skip for cursor-based pagination
+        take: limit,
       });
-      
-      // Retrieved messages from database
   
       return messages.map(message => ({
         id: message.id,
         text: message.content,
         isUser: message.senderId === userId,
-        timestamp: message.createdAt.toISOString(), // Send ISO timestamp for proper timezone handling
+        timestamp: message.createdAt.toISOString(),
         status: message.status.toLowerCase(),
         sender: {
           id: message.sender.id,
@@ -190,10 +181,7 @@ class ChatService {
   async sendMessage(messageData) {
     try {
       const { content, chatId, senderId } = messageData;
-      
-      // Saving message to database
 
-      // Verify sender is a participant in the chat
       const chatParticipant = await prisma.chatParticipant.findFirst({
         where: {
           chatId,
@@ -210,7 +198,7 @@ class ChatService {
           content,
           chatId,
           senderId,
-          status: 'SENT',
+          status: MESSAGE_STATUS.SENT,
         },
         include: {
           sender: {
@@ -222,14 +210,12 @@ class ChatService {
           }
         },
       });
-      
-      // Message saved successfully
   
       return {
         id: message.id,
         text: message.content,
         isUser: true,
-        timestamp: message.createdAt.toISOString(), // Send ISO timestamp for proper timezone handling
+        timestamp: message.createdAt.toISOString(),
         status: message.status.toLowerCase(),
         sender: {
           id: message.sender.id,
@@ -250,10 +236,8 @@ class ChatService {
   async createChat(chatData) {
     try {
       const { name, isGroup = false, participantIds, currentUserId } = chatData;
-  
-      // Allow anyone to chat with anyone - no follow requirement
 
-      // Check if chat already exists between these users
+      // Check if chat already exists for 1-on-1 conversations
       if (!isGroup && participantIds.length === 2) {
         const existingChat = await prisma.chat.findFirst({
           where: {
@@ -291,10 +275,7 @@ class ChatService {
           name,
           isGroup,
           participants: {
-            create: participantIds.map(userId => ({ 
-              userId,
-              // lastReadAt will be null by default
-            }))
+            create: participantIds.map(userId => ({ userId }))
           }
         },
         include: {
@@ -326,17 +307,14 @@ class ChatService {
    */
   async markMessagesAsRead(chatId, userId) {
     try {
-      // Temporarily simplified - just mark messages as READ
-      // TODO: Re-enable lastReadAt tracking once Prisma client is fixed
-      
       const updatedMessages = await prisma.message.updateMany({
         where: {
           chatId: chatId,
-          senderId: { not: userId }, // Don't mark own messages
-          status: { not: 'READ' } // Only update unread messages
+          senderId: { not: userId },
+          status: { not: MESSAGE_STATUS.READ }
         },
         data: {
-          status: 'READ'
+          status: MESSAGE_STATUS.READ
         }
       });
 
@@ -358,9 +336,6 @@ class ChatService {
    */
   async markChatAsRead(chatId, userId) {
     try {
-      // Marking entire chat as read
-      
-      // Get the chat to verify it exists and user is participant
       const chat = await prisma.chat.findFirst({
         where: {
           id: chatId,
@@ -376,20 +351,17 @@ class ChatService {
       });
 
       if (!chat) {
-        throw new Error('Chat not found or user is not a participant');
+        throw new NotFoundError('Chat not found or user is not a participant');
       }
-
-      // Temporarily simplified - just mark messages as READ
-      // TODO: Re-enable lastReadAt tracking once Prisma client is fixed
       
       const updatedMessages = await prisma.message.updateMany({
         where: {
           chatId: chatId,
-          senderId: { not: userId }, // Don't mark own messages
-          status: { not: 'READ' } // Only update unread messages
+          senderId: { not: userId },
+          status: { not: MESSAGE_STATUS.READ }
         },
         data: {
-          status: 'READ'
+          status: MESSAGE_STATUS.READ
         }
       });
       
@@ -416,14 +388,11 @@ class ChatService {
    */
   async getUnreadMessages(chatId, userId) {
     try {
-      // Temporarily simplified - get messages with status != 'READ'
-      // TODO: Re-enable lastReadAt tracking once Prisma client is fixed
-      
       const unreadMessages = await prisma.message.findMany({
         where: {
           chatId: chatId,
           senderId: { not: userId },
-          status: { not: 'READ' } // Get messages that are not marked as read
+          status: { not: MESSAGE_STATUS.READ }
         },
         include: {
           sender: {
@@ -434,7 +403,7 @@ class ChatService {
           }
         },
         orderBy: {
-          createdAt: 'asc' // Oldest first for banner
+          createdAt: 'asc'
         }
       });
 

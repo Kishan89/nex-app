@@ -1,7 +1,10 @@
 // Smart Queue Service with Redis + Fallback
 // Provides instant responses with background processing
 
-console.log('📋 Using fallback queue service (in-memory processing)');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('QueueService');
+
+logger.info('Using fallback queue service (in-memory processing)');
 const fallbackQueue = require('./fallbackQueue');
 
 module.exports = {

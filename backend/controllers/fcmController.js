@@ -1,6 +1,7 @@
 // controllers/fcmController.js
 const { saveFCMToken, removeFCMToken, getUserFCMTokens, sendMessageNotification } = require('../services/fcmService');
 const { successResponse, errorResponse } = require('../utils/helpers');
+const logger = require('../utils/logger');
 
 class FCMController {
   /**
@@ -23,7 +24,7 @@ class FCMController {
         res.status(500).json(errorResponse(result.error || 'Failed to save FCM token.'));
       }
     } catch (error) {
-      console.error('❌ Error in saveToken:', error);
+      logger.error('Error in saveToken', { error: error.message, userId: req.user?.userId });
       next(error);
     }
   }
@@ -47,7 +48,7 @@ class FCMController {
         res.status(500).json(errorResponse(result.error || 'Failed to remove FCM token.'));
       }
     } catch (error) {
-      console.error('❌ Error in removeToken:', error);
+      logger.error('Error in removeToken', { error: error.message });
       next(error);
     }
   }
@@ -66,7 +67,7 @@ class FCMController {
       const tokens = await getUserFCMTokens(userId);
       res.status(200).json(successResponse(tokens, 'FCM tokens retrieved successfully.'));
     } catch (error) {
-      console.error('❌ Error in getUserTokens:', error);
+      logger.error('Error in getUserTokens', { error: error.message, userId: req.user?.userId });
       next(error);
     }
   }
@@ -91,7 +92,7 @@ class FCMController {
 
       res.status(200).json(successResponse(result, 'Test notification sent successfully.'));
     } catch (error) {
-      console.error('❌ Error in testNotification:', error);
+      logger.error('Error in testNotification', { error: error.message });
       next(error);
     }
   }
@@ -118,7 +119,7 @@ class FCMController {
 
       res.status(200).json(successResponse(result, 'Test message notification sent successfully.'));
     } catch (error) {
-      console.error('❌ Error in testMessageNotification:', error);
+      logger.error('Error in testMessageNotification', { error: error.message });
       next(error);
     }
   }
@@ -131,7 +132,7 @@ class FCMController {
       const { userId } = req.params;
       const { prisma } = require('../config/database');
 
-      console.log('🔍 Debugging FCM tokens for user:', userId);
+      logger.info('Debugging FCM tokens', { userId });
 
       // Get all FCM tokens for this user
       const tokens = await prisma.fcmToken.findMany({
@@ -146,7 +147,7 @@ class FCMController {
         }
       });
 
-      console.log('🔍 Found tokens:', tokens);
+      logger.info('Found FCM tokens', { userId, tokenCount: tokens.length });
 
       res.status(200).json(successResponse({
         userId,
@@ -161,7 +162,7 @@ class FCMController {
         }))
       }, 'FCM tokens debug info'));
     } catch (error) {
-      console.error('❌ Error in debugTokens:', error);
+      logger.error('Error in debugTokens', { error: error.message, userId: req.params.userId });
       next(error);
     }
   }

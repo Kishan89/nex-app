@@ -2,6 +2,9 @@ const { prisma, resetConnection } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const { OAuth2Client } = require('google-auth-library');
 require('dotenv').config();
+const { createLogger } = require('../utils/logger');
+
+const logger = createLogger('UserService');
 const HASH_SALT_ROUNDS = 10;
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -20,11 +23,11 @@ const createUser = async ({ email, username, password }) => {
       });
       return newUser;
     } catch (error) {
-      console.error(`Error creating user in database (attempt ${retryCount + 1}):`, error);
+      logger.error('Error creating user in database', { attempt: retryCount + 1, error: error.message });
       
       // Handle prepared statement conflicts with retry
       if ((error.message?.includes('prepared statement') || error.code === 'P2010') && retryCount < maxRetries) {
-        console.log(`🔄 Retrying user creation after prepared statement error (attempt ${retryCount + 1})`);
+        logger.warn('Retrying user creation after prepared statement error', { attempt: retryCount + 1 });
         await resetConnection();
         retryCount++;
         continue;
@@ -46,7 +49,7 @@ const findUserByEmail = async (email) => {
     });
     return user;
   } catch (error) {
-    console.error('Error finding user by email:', error);
+    logger.error('Error finding user by email:', error);
     throw new Error('Could not retrieve user data.');
   }
 };
@@ -59,7 +62,7 @@ const findUserByUsername = async (username) => {
     });
     return user;
   } catch (error) {
-    console.error('Error finding user by username:', error);
+    logger.error('Error finding user by username:', error);
     throw new Error('Could not retrieve user data.');
   }
 };
@@ -76,7 +79,7 @@ const findUserById = async (id) => {
     });
     return user;
   } catch (error) {
-    console.error('Error finding user by ID:', error);
+    logger.error('Error finding user by ID:', error);
     throw new Error('Could not retrieve user data.');
   }
 };
@@ -104,7 +107,7 @@ const updateUser = async (id, updates) => {
     });
     return updatedUser;
   } catch (error) {
-    console.error('Error updating user in database:', error);
+    logger.error('Error updating user in database:', error);
     if (error.message === 'USERNAME_TAKEN') {
       throw new Error('Username is already taken. Please choose a different username.');
     }
@@ -141,7 +144,7 @@ const getBookmarks = async (userId) => {
         author: b.post.user,
       }));
   } catch (error) {
-    console.error('Error fetching bookmarks:', error);
+    logger.error('Error fetching bookmarks:', error);
     throw new Error('Could not retrieve bookmarks.');
   }
 };
@@ -156,7 +159,7 @@ const searchUsersByUsername = async (query) => {
 
     return users.map(user => ({ ...user, avatar_url: user.avatar, avatar: undefined }));
   } catch (error) {
-    console.error('Error searching for users:', error);
+    logger.error('Error searching for users:', error);
     throw new Error('Could not search for users.');
   }
 };
@@ -166,7 +169,7 @@ const findOrCreateUserByGoogleEmail = async (googleEmail, googleProfile = {}) =>
     let user = await findUserByEmail(googleEmail);
 
     if (user) {
-      console.log('✅ Existing user found:', { id: user.id, email: user.email, username: user.username });
+      logger.info('Existing user found', { id: user.id, email: user.email, username: user.username });
       if (!user.avatar && googleProfile.picture) user = await updateUser(user.id, { avatar: googleProfile.picture });
       return user;
     } else {
@@ -180,10 +183,10 @@ const findOrCreateUserByGoogleEmail = async (googleEmail, googleProfile = {}) =>
       
       while (attempt < maxAttempts) {
         try {
-          console.log(`🔄 Attempting to create user with username: ${uniqueUsername}`);
+          logger.debug('Attempting to create user with username', { username: uniqueUsername });
           const newUser = await createUser({ email: googleEmail, username: uniqueUsername, password: tempPassword });
           
-          console.log('✅ User created successfully:', { id: newUser.id, email: newUser.email, username: newUser.username });
+          logger.info('User created successfully', { id: newUser.id, email: newUser.email, username: newUser.username });
           
           let createdUser = await findUserById(newUser.id);
           if (createdUser) {
@@ -197,7 +200,7 @@ const findOrCreateUserByGoogleEmail = async (googleEmail, googleProfile = {}) =>
           if (createError.message?.includes('Username already taken')) {
             attempt++;
             uniqueUsername = `${baseUsername}_${attempt}`;
-            console.log(`⚠️ Username taken, trying: ${uniqueUsername}`);
+            logger.warn('Username taken, trying new username', { username: uniqueUsername });
             continue;
           } else {
             throw createError;
@@ -208,7 +211,7 @@ const findOrCreateUserByGoogleEmail = async (googleEmail, googleProfile = {}) =>
       throw new Error('Could not generate unique username after multiple attempts');
     }
   } catch (error) {
-    console.error('Error finding or creating user by Google email:', error);
+    logger.error('Error finding or creating user by Google email:', error);
     throw new Error('Failed to find or create user account via Google.');
   }
 };
@@ -254,7 +257,7 @@ const getUserPosts = async (userId, options = {}) => {
 
     return posts;
   } catch (error) {
-    console.error('Error fetching user posts:', error);
+    logger.error('Error fetching user posts:', error);
     throw new Error('Could not retrieve user posts.');
   }
 };

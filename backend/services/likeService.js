@@ -5,16 +5,19 @@ const { sendPushNotification } = require('./pushNotificationService');
 const { sendLikeNotification } = require('./fcmService');
 const { supabase } = require('../config/database');
 const { awardLikeReceivedXP, removeLikeXP } = require('./xpService');
+const { createLogger } = require('../utils/logger');
+
+const logger = createLogger('LikeService');
 
 class LikeService {
   async toggleLike({ postId, userId }) {
-    console.log('🔹 toggleLikeService called with:', { postId, userId });
+    logger.debug('toggleLike called', { postId, userId });
 
     // Check if the user has already liked the post
     const existingLike = await prisma.like.findUnique({
       where: { userId_postId: { userId, postId } },
     });
-    console.log('➡️ Existing like:', existingLike ? existingLike.id : null);
+    logger.debug('Existing like found', { likeId: existingLike?.id });
 
     if (existingLike) {
       // Get post owner before deleting like
@@ -41,15 +44,15 @@ class LikeService {
           });
         }
       });
-      console.log('➡️ Like removed');
+      logger.debug('Like removed');
       
       // Remove XP from post owner for losing a like
       if (post?.userId && post.userId !== userId) {
         try {
           await removeLikeXP(post.userId);
-          console.log('✅ XP removed from post owner for like removal');
+          logger.info('XP removed from post owner for like removal');
         } catch (xpError) {
-          console.error('❌ Failed to remove XP for like removal:', xpError);
+          logger.error('Failed to remove XP for like removal:', xpError);
           // Don't fail the unlike operation if XP fails
         }
       }
@@ -64,7 +67,7 @@ class LikeService {
             payload: { postId, userId, liked: false }
           });
       } catch (error) {
-        console.error('Failed to broadcast like removal:', error);
+        logger.error('Failed to broadcast like removal:', error);
       }
       
       return { liked: false, postOwnerId: post?.userId };
@@ -77,7 +80,7 @@ class LikeService {
           data: { likesCount: { increment: 1 } },
         }),
       ]);
-      console.log('➡️ Like added');
+      logger.debug('Like added');
 
       // Fetch post owner with more details
       const post = await prisma.post.findUnique({
@@ -93,24 +96,24 @@ class LikeService {
       });
 
       if (!post) {
-        console.error('❌ Post not found:', postId);
+        logger.error('Post not found', { postId });
         return { liked: true };
       }
 
-      console.log('🔹 Post owner found:', post.userId);
+      logger.debug('Post owner found', { postOwnerId: post.userId });
       
       // Don't create notification if user likes their own post
       if (post.userId === userId) {
-        console.log('ℹ️ User liked their own post, skipping notification');
+        logger.debug('User liked their own post, skipping notification');
         return { liked: true, ownerId: post.userId };
       }
 
       // Award XP to post owner for receiving a like
       try {
         await awardLikeReceivedXP(post.userId);
-        console.log('✅ XP awarded to post owner for receiving like');
+        logger.info('XP awarded to post owner for receiving like');
       } catch (xpError) {
-        console.error('❌ Failed to award XP for like:', xpError);
+        logger.error('Failed to award XP for like:', xpError);
         // Don't fail the like operation if XP fails
       }
       
@@ -126,12 +129,11 @@ class LikeService {
           const message = `${likerName} liked your post`;
           
           // Create notification in database
-          console.log('🔹 Attempting to create notification with data:', {
+          logger.debug('Attempting to create notification', {
             userId: post.userId,
             fromUserId: userId,
             postId,
             type: 'LIKE',
-            message,
           });
           
           const notification = await createNotification({
@@ -143,9 +145,9 @@ class LikeService {
           });
           
           if (notification) {
-            console.log('✅ Notification created successfully:', notification.id);
+            logger.debug('Notification created successfully', { notificationId: notification.id });
           } else {
-            console.log('⚠️ No notification was created, possibly due to self-like or duplicate check')
+            logger.debug('No notification was created, possibly due to self-like or duplicate check');
           }
 
           // Send FCM push notification
@@ -156,7 +158,7 @@ class LikeService {
             where: { userId: post.userId },
             select: { token: true },
           });
-          console.log('🔹 Legacy push tokens found:', tokens.length);
+          logger.debug('Legacy push tokens found', { count: tokens.length });
 
           if (tokens.length > 0) {
             const pushResult = await sendPushNotification(
@@ -171,10 +173,10 @@ class LikeService {
                 avatar: likerAvatar
               }
             );
-            console.log('🔹 Legacy push notification result:', pushResult);
+            logger.debug('Legacy push notification sent', { result: pushResult });
           }
         } catch (err) {
-          console.error('❌ Error creating notification / sending push:', err);
+          logger.error('Error creating notification / sending push:', err);
         }
 
       // Broadcast like addition for real-time sync
@@ -187,7 +189,7 @@ class LikeService {
             payload: { postId, userId, liked: true }
           });
       } catch (error) {
-        console.error('Failed to broadcast like addition:', error);
+        logger.error('Failed to broadcast like addition:', error);
       }
 
       return { liked: true, postOwnerId: post?.userId };

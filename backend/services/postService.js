@@ -2,6 +2,9 @@ const { prisma } = require('../config/database');
 const { transformPost } = require('../utils/helpers');
 const { removePostDeletionXP, removeCommentXP, removeLikeXP } = require('./xpService');
 const youtubeService = require('./youtubeService');
+const { createLogger } = require('../utils/logger');
+
+const logger = createLogger('PostService');
 
 class PostService {
   async getAllPosts(options = {}) {
@@ -223,7 +226,7 @@ class PostService {
       processedContent = processed.content;
       youtubeData = processed.youtubeData;
     } catch (error) {
-      console.error('Error processing YouTube content:', error);
+      logger.error('Error processing YouTube content:', error);
       // Continue with original content if YouTube processing fails
     }
 
@@ -363,9 +366,9 @@ class PostService {
       if (post.userId) {
         try {
           await removePostDeletionXP(post.userId);
-          console.log('✅ XP removed from user for post deletion');
+          logger.info('XP removed from user for post deletion');
         } catch (xpError) {
-          console.error('❌ Failed to remove post deletion XP:', xpError);
+          logger.error('Failed to remove post deletion XP:', xpError);
         }
 
         // Remove XP for all likes the post received
@@ -375,9 +378,9 @@ class PostService {
             for (let i = 0; i < post._count.likes; i++) {
               await removeLikeXP(post.userId);
             }
-            console.log(`✅ XP removed for ${post._count.likes} likes on deleted post`);
+            logger.info('XP removed for likes on deleted post', { likesCount: post._count.likes });
           } catch (xpError) {
-            console.error('❌ Failed to remove like XP for deleted post:', xpError);
+            logger.error('Failed to remove like XP for deleted post:', xpError);
           }
         }
 
@@ -388,16 +391,16 @@ class PostService {
             for (let i = 0; i < post._count.comments; i++) {
               await removeCommentXP(post.userId);
             }
-            console.log(`✅ XP removed for ${post._count.comments} comments on deleted post`);
+            logger.info('XP removed for comments on deleted post', { commentsCount: post._count.comments });
           } catch (xpError) {
-            console.error('❌ Failed to remove comment XP for deleted post:', xpError);
+            logger.error('Failed to remove comment XP for deleted post:', xpError);
           }
         }
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Error in deletePost:', error);
+      logger.error('Error in deletePost:', error);
       throw error;
     }
   }
@@ -432,25 +435,25 @@ class PostService {
       const { page = 1, limit = 20, userId } = options;
       const skip = (page - 1) * limit;
 
-      console.log('🔍 getFollowingPosts called with:', { page, limit, userId });
+      logger.debug('getFollowingPosts called', { page, limit, userId });
 
       if (!userId) {
-        console.log('⚠️ No userId provided, returning empty array');
+        logger.warn('No userId provided for getFollowingPosts');
         return [];
       }
 
       // Get list of users that current user follows
-      console.log('📋 Fetching followed users for userId:', userId);
+      logger.debug('Fetching followed users', { userId });
       const followedUsers = await prisma.follow.findMany({
         where: { followerId: userId },
         select: { followingId: true }
       });
 
       const followedUserIds = followedUsers.map(follow => follow.followingId);
-      console.log('👥 Found followed users:', followedUserIds.length);
+      logger.debug('Found followed users', { count: followedUserIds.length });
 
       if (followedUserIds.length === 0) {
-        console.log('📭 User follows no one, returning empty array');
+        logger.debug('User follows no one');
         return [];
       }
 
@@ -555,7 +558,7 @@ class PostService {
       return transformed;
     });
     } catch (error) {
-      console.error('❌ Error in getFollowingPosts service:', error);
+      logger.error('Error in getFollowingPosts:', error);
       throw error;
     }
   }

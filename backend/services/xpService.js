@@ -1,5 +1,8 @@
 // services/xpService.js
 const { prisma } = require('../config/database');
+const { createLogger } = require('../utils/logger');
+
+const logger = createLogger('XPService');
 
 // XP Rules
 const XP_RULES = {
@@ -32,7 +35,7 @@ const awardXP = async (userId, xpAmount, reason = 'Unknown') => {
 
     return updatedUser;
   } catch (error) {
-    console.error(`❌ Error awarding XP to user ${userId}:`, error);
+    logger.error('Error awarding XP to user', { userId, error: error.message });
     throw error;
   }
 };
@@ -84,7 +87,7 @@ const removeLikeXP = async (postOwnerId) => {
 
     return updatedUser;
   } catch (error) {
-    console.error(`❌ Error removing XP from user ${postOwnerId}:`, error);
+    logger.error('Error removing XP from user', { userId: postOwnerId, error: error.message });
     throw error;
   }
 };
@@ -128,7 +131,7 @@ const removePostDeletionXP = async (userId) => {
 
     return updatedUser;
   } catch (error) {
-    console.error(`❌ Error removing post deletion XP from user ${userId}:`, error);
+    logger.error('Error removing post deletion XP from user', { userId, error: error.message });
     throw error;
   }
 };
@@ -164,7 +167,7 @@ const removeCommentXP = async (postOwnerId) => {
 
     return updatedUser;
   } catch (error) {
-    console.error(`❌ Error removing comment XP from user ${postOwnerId}:`, error);
+    logger.error('Error removing comment XP from user', { userId: postOwnerId, error: error.message });
     throw error;
   }
 };
@@ -183,7 +186,7 @@ const getUserXP = async (userId) => {
     
     return user?.xp || 0;
   } catch (error) {
-    console.error(`❌ Error fetching XP for user ${userId}:`, error);
+    logger.error('Error fetching XP for user', { userId, error: error.message });
     return 0;
   }
 };

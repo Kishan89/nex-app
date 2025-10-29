@@ -12,6 +12,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useThrottledCallback } from '@/hooks/useDebounce';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
 import { ShareService } from '@/lib/shareService';
+import { QuickShareService } from '@/lib/shareServiceQuick';
 const { width } = Dimensions.get('window');
 type Props = {
   post: NormalizedPost;
@@ -106,14 +107,12 @@ const PostCard = React.memo(function PostCard({
   
   const handleShare = async () => {
     setShowOptionsMenu(false);
-    // Show message that this feature will come in future update
-    Alert.alert(
-      'Coming Soon!',
-      'Post sharing feature will be available in the next app update. Stay tuned!',
-      [
-        { text: 'OK', style: 'default' }
-      ]
-    );
+    try {
+      // Use QuickShareService which gives users multiple options
+      await QuickShareService.sharePostWithOptions(post.id, post.username, post.content);
+    } catch (error) {
+      console.error('Share error:', error);
+    }
     // Call the onShare callback for analytics
     onShare?.();
   };

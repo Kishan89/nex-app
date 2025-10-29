@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { UnauthorizedError } = require("../utils/errors");
+const logger = require('../utils/logger');
 
 const JWT_SECRET =
   process.env.JWT_SECRET ||
@@ -9,7 +10,7 @@ const verifyAuthToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    console.warn("⛔ No auth token provided");
+    logger.warn('No auth token provided');
     return next(new UnauthorizedError("No authentication token provided."));
   }
 
@@ -20,7 +21,7 @@ const verifyAuthToken = (req, res, next) => {
 
     req.user = { userId: decodedToken.userId };
 
-    console.log("✅ Authenticated request:", {
+    logger.debug('Authenticated request', {
       userId: req.user.userId,
       path: req.originalUrl,
       method: req.method,
@@ -28,7 +29,7 @@ const verifyAuthToken = (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error("❌ Token verification failed:", error.message);
+    logger.error('Token verification failed', { error: error.message });
 
     if (error.name === "TokenExpiredError") {
       return next(new UnauthorizedError("Authentication token has expired."));
@@ -42,7 +43,7 @@ const optionalAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    console.log("ℹ️ No auth token provided - proceeding as guest");
+    logger.debug('No auth token provided - proceeding as guest');
     req.user = null; // Set user to null for guest access
     return next();
   }
@@ -53,7 +54,7 @@ const optionalAuth = (req, res, next) => {
     const decodedToken = jwt.verify(token, JWT_SECRET);
     req.user = { userId: decodedToken.userId };
 
-    console.log("✅ Authenticated request:", {
+    logger.debug('Authenticated request', {
       userId: req.user.userId,
       path: req.originalUrl,
       method: req.method,
@@ -61,10 +62,10 @@ const optionalAuth = (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error("❌ Token verification failed:", error.message);
+    logger.warn('Token verification failed', { error: error.message });
     
     // For optional auth, proceed as guest instead of rejecting
-    console.log("ℹ️ Invalid token - proceeding as guest");
+    logger.debug('Invalid token - proceeding as guest');
     req.user = null;
     next();
   }

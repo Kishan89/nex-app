@@ -1,6 +1,11 @@
 const followService = require('../services/followService');
 const { addFollowNotificationJob, addFollowCountUpdateJob } = require('../services/queueService');
 const { successResponse, errorResponse } = require('../utils/helpers');
+const { createLogger } = require('../utils/logger');
+const { HTTP_STATUS, ERROR_MESSAGES } = require('../constants');
+const { BadRequestError, UnauthorizedError } = require('../utils/errors');
+
+const logger = createLogger('FollowController');
 
 class FollowController {
   /**
@@ -8,44 +13,38 @@ class FollowController {
    */
   async followUser(req, res, next) {
     try {
-      const { userId } = req.params; // User to follow
-      const followerId = req.user?.userId; // Current user
+      const { userId } = req.params;
+      const followerId = req.user?.userId;
 
-      console.log(`Follow request: ${followerId} wants to follow ${userId}`);
+      logger.debug(`Follow request: ${followerId} wants to follow ${userId}`);
 
       if (!followerId) {
-        return res.status(401).json(errorResponse('Authentication required'));
+        throw new UnauthorizedError(ERROR_MESSAGES.AUTH_REQUIRED);
       }
 
       if (followerId === userId) {
-        return res.status(400).json(errorResponse('Cannot follow yourself'));
+        throw new BadRequestError('Cannot follow yourself');
       }
 
       const follow = await followService.followUser(followerId, userId);
 
-      // 🚀 INSTANT RESPONSE - Send success immediately
-      console.log(`Follow successful: ${followerId} -> ${userId}`);
-      res.status(201).json(successResponse(follow, 'User followed successfully'));
-
-      // 🔄 BACKGROUND PROCESSING - Queue notification and count updates
-      try {
-        const followerUsername = follow.follower?.username || 'Someone';
-        
-        // Add notification job to queue (processed in background)
-        await addFollowNotificationJob(userId, followerId, followerUsername);
-        
-        // Add follow count update job to queue
-        await addFollowCountUpdateJob(followerId, userId);
-        
-        console.log(`📋 Background jobs queued for follow: ${followerId} -> ${userId}`);
-      } catch (queueError) {
-        console.error('Failed to queue background jobs:', queueError);
-        // Don't affect the response since it's already sent
-      }
+      logger.info(`Follow successful: ${followerId} -> ${userId}`);
+      res.status(HTTP_STATUS.CREATED).json(successResponse(follow, 'User followed successfully'));
+      
+      setImmediate(async () => {
+        try {
+          const followerUsername = follow.follower?.username || 'Someone';
+          await addFollowNotificationJob(userId, followerId, followerUsername);
+          await addFollowCountUpdateJob(followerId, userId);
+          logger.debug(`Background jobs queued for follow: ${followerId} -> ${userId}`);
+        } catch (queueError) {
+          logger.error('Failed to queue background jobs:', queueError);
+        }
+      });
     } catch (error) {
-      console.error('Error in followUser:', error);
+      logger.error('Error in followUser:', error);
       if (error.message === 'Already following this user') {
-        return res.status(400).json(errorResponse(error.message));
+        return res.status(HTTP_STATUS.BAD_REQUEST).json(errorResponse(error.message));
       }
       next(error);
     }
@@ -56,36 +55,34 @@ class FollowController {
    */
   async unfollowUser(req, res, next) {
     try {
-      const { userId } = req.params; // User to unfollow
-      const followerId = req.user?.userId; // Current user
+      const { userId } = req.params;
+      const followerId = req.user?.userId;
 
-      console.log(`Unfollow request: ${followerId} wants to unfollow ${userId}`);
+      logger.debug(`Unfollow request: ${followerId} wants to unfollow ${userId}`);
 
       if (!followerId) {
-        return res.status(401).json(errorResponse('Authentication required'));
+        throw new UnauthorizedError(ERROR_MESSAGES.AUTH_REQUIRED);
       }
 
       const success = await followService.unfollowUser(followerId, userId);
 
       if (!success) {
-        return res.status(404).json(errorResponse('Follow relationship not found'));
+        return res.status(HTTP_STATUS.NOT_FOUND).json(errorResponse('Follow relationship not found'));
       }
 
-      // 🚀 INSTANT RESPONSE - Send success immediately
-      console.log(`Unfollow successful: ${followerId} -> ${userId}`);
-      res.status(200).json(successResponse(null, 'User unfollowed successfully'));
+      logger.info(`Unfollow successful: ${followerId} -> ${userId}`);
+      res.status(HTTP_STATUS.OK).json(successResponse(null, 'User unfollowed successfully'));
 
-      // 🔄 BACKGROUND PROCESSING - Queue count updates
-      try {
-        // Add follow count update job to queue
-        await addFollowCountUpdateJob(followerId, userId);
-        console.log(`📋 Background count update queued for unfollow: ${followerId} -> ${userId}`);
-      } catch (queueError) {
-        console.error('Failed to queue background jobs for unfollow:', queueError);
-        // Don't affect the response since it's already sent
-      }
+      setImmediate(async () => {
+        try {
+          await addFollowCountUpdateJob(followerId, userId);
+          logger.debug(`Background count update queued for unfollow: ${followerId} -> ${userId}`);
+        } catch (queueError) {
+          logger.error('Failed to queue background jobs for unfollow:', queueError);
+        }
+      });
     } catch (error) {
-      console.error('Error in unfollowUser:', error);
+      logger.error('Error in unfollowUser:', error);
       next(error);
     }
   }
@@ -99,18 +96,18 @@ class FollowController {
       const currentUserId = req.user?.userId;
 
       if (!currentUserId) {
-        return res.status(401).json(errorResponse('Authentication required'));
+        throw new UnauthorizedError(ERROR_MESSAGES.AUTH_REQUIRED);
       }
 
       if (currentUserId === userId) {
-        return res.status(200).json(successResponse({ isFollowing: false }, 'Cannot follow yourself'));
+        return res.status(HTTP_STATUS.OK).json(successResponse({ isFollowing: false }, 'Cannot follow yourself'));
       }
 
       const isFollowing = await followService.isFollowing(currentUserId, userId);
 
-      res.status(200).json(successResponse({ isFollowing }, 'Follow status retrieved'));
+      res.status(HTTP_STATUS.OK).json(successResponse({ isFollowing }, 'Follow status retrieved'));
     } catch (error) {
-      console.error('Error in checkFollowStatus:', error);
+      logger.error('Error in checkFollowStatus:', error);
       next(error);
     }
   }
@@ -126,7 +123,7 @@ class FollowController {
 
       const following = await followService.getFollowing(userId, parseInt(limit), offset);
 
-      res.status(200).json(successResponse(following, 'Following list retrieved'));
+      res.status(HTTP_STATUS.OK).json(successResponse(following, 'Following list retrieved'));
     } catch (error) {
       next(error);
     }
@@ -143,7 +140,7 @@ class FollowController {
 
       const followers = await followService.getFollowers(userId, parseInt(limit), offset);
 
-      res.status(200).json(successResponse(followers, 'Followers list retrieved'));
+      res.status(HTTP_STATUS.OK).json(successResponse(followers, 'Followers list retrieved'));
     } catch (error) {
       next(error);
     }
@@ -158,7 +155,7 @@ class FollowController {
 
       const counts = await followService.getFollowCounts(userId);
 
-      res.status(200).json(successResponse(counts, 'Follow counts retrieved'));
+      res.status(HTTP_STATUS.OK).json(successResponse(counts, 'Follow counts retrieved'));
     } catch (error) {
       next(error);
     }
@@ -173,7 +170,7 @@ class FollowController {
 
       const counts = await followService.getAndUpdateFollowCounts(userId);
 
-      res.status(200).json(successResponse(counts, 'Follow counts updated and retrieved'));
+      res.status(HTTP_STATUS.OK).json(successResponse(counts, 'Follow counts updated and retrieved'));
     } catch (error) {
       next(error);
     }
@@ -187,12 +184,12 @@ class FollowController {
       const currentUserId = req.user?.userId;
 
       if (!currentUserId) {
-        return res.status(401).json(errorResponse('Authentication required'));
+        throw new UnauthorizedError(ERROR_MESSAGES.AUTH_REQUIRED);
       }
 
       const users = await followService.getMessagableUsers(currentUserId);
 
-      res.status(200).json(successResponse(users, 'Messagable users retrieved'));
+      res.status(HTTP_STATUS.OK).json(successResponse(users, 'Messagable users retrieved'));
     } catch (error) {
       next(error);
     }

@@ -195,13 +195,6 @@ function AppWithNotifications() {
           }}
         />
         <Stack.Screen
-          name="search"
-          options={{
-            animation: 'slide_from_right',
-            contentStyle: { backgroundColor: colors.background },
-          }}
-        />
-        <Stack.Screen
           name="edit-profile"
           options={{
             animation: 'slide_from_right',

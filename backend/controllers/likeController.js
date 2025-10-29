@@ -1,6 +1,10 @@
-// controllers/likeController.js
 const likeService = require("../services/likeService");
 const { successResponse, errorResponse } = require("../utils/helpers");
+const { createLogger } = require('../utils/logger');
+const { HTTP_STATUS, ERROR_MESSAGES } = require('../constants');
+const { UnauthorizedError } = require('../utils/errors');
+
+const logger = createLogger('LikeController');
 
 class LikeController {
   async toggleLike(req, res, next) {
@@ -8,27 +12,23 @@ class LikeController {
       const { postId } = req.params;
       const { userId } = req.user || {};
 
-      console.log("🔹 toggleLike called for postId:", postId, "by userId:", userId);
+      logger.debug("toggleLike called for postId:", postId, "by userId:", userId);
 
       if (!userId) {
-        console.log("❌ No userId found, authentication required.");
-        return res.status(401).json(errorResponse("Authentication required."));
+        throw new UnauthorizedError(ERROR_MESSAGES.AUTH_REQUIRED);
       }
 
-      // Toggle like (notifications are handled in the service)
       const result = await likeService.toggleLike({ postId, userId });
-      console.log("🔹 Result from likeService:", result);
-
-      // XP is handled in likeService to avoid duplication
+      logger.debug("Result from likeService:", result);
 
       const message = result.liked
         ? "Post liked successfully"
         : "Post unliked successfully";
 
-      res.status(200).json(successResponse(result, message));
+      res.status(HTTP_STATUS.OK).json(successResponse(result, message));
 
     } catch (error) {
-      console.error("❌ Error in toggleLike:", error);
+      logger.error("Error in toggleLike:", error);
       next(error);
     }
   }

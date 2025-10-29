@@ -1,6 +1,7 @@
 // services/fcmService.js
 const admin = require('../lib/firebaseAdmin');
 const { prisma } = require('../config/database');
+const logger = require('../utils/logger');
 
 /**
  * Send FCM push notification to specific users
@@ -14,7 +15,7 @@ const { prisma } = require('../config/database');
  */
 async function sendFCMNotification(userIds, notification, data = {}) {
   try {
-    console.log('🔍 FCM Debug - Input:', {
+    logger.info('FCM notification request', {
       userIds,
       notificationTitle: notification.title,
       notificationBody: notification.body,
@@ -22,12 +23,12 @@ async function sendFCMNotification(userIds, notification, data = {}) {
     });
 
     if (!Array.isArray(userIds) || userIds.length === 0) {
-      console.log('❌ No user IDs provided. Skipping FCM notification.');
+      logger.warn('No user IDs provided for FCM notification');
       return { success: false, message: 'No user IDs provided' };
     }
 
     // Get FCM tokens for the users
-    console.log('🔍 Searching FCM tokens for users:', userIds);
+    logger.info('Searching FCM tokens', { userIds });
     const fcmTokens = await prisma.fcmToken.findMany({
       where: {
         userId: {
@@ -43,19 +44,19 @@ async function sendFCMNotification(userIds, notification, data = {}) {
       }
     });
 
-    console.log('🔍 Found FCM tokens:', {
+    logger.info('FCM tokens found', {
       tokenCount: fcmTokens.length,
       tokens: fcmTokens.map(t => ({ userId: t.userId, platform: t.platform, tokenPreview: t.token.substring(0, 20) + '...' }))
     });
 
     if (fcmTokens.length === 0) {
-      console.log('❌ No FCM tokens found for users. Skipping notification.');
+      logger.warn('No FCM tokens found for users');
       return { success: false, message: 'No FCM tokens found' };
     }
 
     const tokens = fcmTokens.map(tokenRecord => tokenRecord.token);
     
-    console.log(`📱 Sending FCM notification to ${tokens.length} devices`);
+    logger.info('Sending FCM notification', { deviceCount: tokens.length });
 
     // Prepare the message payload with enhanced configuration for reliable delivery
     const message = {
@@ -159,7 +160,7 @@ async function sendFCMNotification(userIds, notification, data = {}) {
     };
 
     // Send to multiple tokens
-    console.log('🚀 Attempting to send FCM notification with payload:', {
+    logger.info('Sending FCM notification with payload', {
       tokenCount: tokens.length,
       notificationTitle: message.notification.title,
       notificationBody: message.notification.body,
@@ -171,14 +172,14 @@ async function sendFCMNotification(userIds, notification, data = {}) {
       ...message
     });
 
-    console.log(`📊 FCM notification result: Success: ${response.successCount}, Failed: ${response.failureCount}`);
+    logger.info('FCM notification result', { successCount: response.successCount, failureCount: response.failureCount });
     
     if (response.responses) {
       response.responses.forEach((resp, idx) => {
         if (resp.success) {
-          console.log(`✅ Token ${idx + 1}: Message sent successfully`);
+          logger.debug('FCM message sent successfully', { tokenIndex: idx + 1 });
         } else {
-          console.log(`❌ Token ${idx + 1}: Failed - ${resp.error?.code} - ${resp.error?.message}`);
+          logger.warn('FCM message failed', { tokenIndex: idx + 1, code: resp.error?.code, message: resp.error?.message });
         }
       });
     }
@@ -189,7 +190,7 @@ async function sendFCMNotification(userIds, notification, data = {}) {
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const error = resp.error;
-          console.error(`❌ Failed to send to token ${tokens[idx]}: ${error.code} - ${error.message}`);
+          logger.error('Failed to send FCM notification to token', { token: tokens[idx], code: error.code, message: error.message });
           
           // Remove invalid tokens from database
           if (error.code === 'messaging/invalid-registration-token' || 
@@ -208,7 +209,7 @@ async function sendFCMNotification(userIds, notification, data = {}) {
             }
           }
         });
-        console.log(`🗑️ Removed ${failedTokens.length} invalid FCM tokens from database`);
+        logger.info('Removed invalid FCM tokens', { count: failedTokens.length });
       }
     }
 
@@ -220,7 +221,7 @@ async function sendFCMNotification(userIds, notification, data = {}) {
     };
 
   } catch (error) {
-    console.error('❌ Error sending FCM notification:', error);
+    logger.error('Error sending FCM notification', { error: error.message, stack: error.stack });
     return {
       success: false,
       error: error.message,
@@ -238,7 +239,7 @@ async function sendFCMNotification(userIds, notification, data = {}) {
  */
 async function sendLikeNotification(postOwnerId, likerUserId, postId, likerUsername) {
   if (postOwnerId === likerUserId) {
-    console.log('ℹ️ Skipping like notification - user liked their own post');
+    logger.debug('Skipping like notification - user liked their own post', { userId: postOwnerId });
     return;
   }
 
@@ -251,7 +252,7 @@ async function sendLikeNotification(postOwnerId, likerUserId, postId, likerUsern
     });
     likerAvatar = liker?.avatar || '';
   } catch (error) {
-    console.error('Failed to get liker avatar:', error);
+    logger.error('Failed to get liker avatar', { error: error.message, likerUserId });
   }
 
   const notification = {
@@ -280,7 +281,7 @@ async function sendLikeNotification(postOwnerId, likerUserId, postId, likerUsern
  */
 async function sendCommentNotification(postOwnerId, commenterUserId, postId, commenterUsername, commentText) {
   if (postOwnerId === commenterUserId) {
-    console.log('ℹ️ Skipping comment notification - user commented on their own post');
+    logger.debug('Skipping comment notification - user commented on their own post', { userId: postOwnerId });
     return;
   }
 
@@ -293,7 +294,7 @@ async function sendCommentNotification(postOwnerId, commenterUserId, postId, com
     });
     commenterAvatar = commenter?.avatar || '';
   } catch (error) {
-    console.error('Failed to get commenter avatar:', error);
+    logger.error('Failed to get commenter avatar', { error: error.message, commenterUserId });
   }
 
   // Truncate comment text for notification
@@ -326,7 +327,7 @@ async function sendCommentNotification(postOwnerId, commenterUserId, postId, com
  */
 async function sendFollowNotification(followedUserId, followerUserId, followerUsername) {
   if (followedUserId === followerUserId) {
-    console.log('ℹ️ Skipping follow notification - cannot follow yourself');
+    logger.debug('Skipping follow notification - cannot follow yourself', { userId: followedUserId });
     return;
   }
 
@@ -339,7 +340,7 @@ async function sendFollowNotification(followedUserId, followerUserId, followerUs
     });
     followerAvatar = follower?.avatar || '';
   } catch (error) {
-    console.error('Failed to get follower avatar:', error);
+    logger.error('Failed to get follower avatar', { error: error.message, followerUserId });
   }
 
   const notification = {
@@ -367,11 +368,11 @@ async function sendFollowNotification(followedUserId, followerUserId, followerUs
  */
 async function sendMessageNotification(recipientUserIds, senderUserId, senderUsername, messageContent, chatId) {
   if (!recipientUserIds || recipientUserIds.length === 0) {
-    console.log('ℹ️ No recipients for message notification');
+    logger.warn('No recipients for message notification', { chatId });
     return { success: false, message: 'No recipients provided' };
   }
 
-  console.log('📱 Preparing message notification:', {
+  logger.info('Preparing message notification', {
     recipientCount: recipientUserIds.length,
     senderUsername,
     chatId,
@@ -387,7 +388,7 @@ async function sendMessageNotification(recipientUserIds, senderUserId, senderUse
     });
     senderAvatar = sender?.avatar || '';
   } catch (error) {
-    console.error('Failed to get sender avatar:', error);
+    logger.error('Failed to get sender avatar', { error: error.message, senderUserId });
   }
 
   // Truncate message content for notification
@@ -409,29 +410,21 @@ async function sendMessageNotification(recipientUserIds, senderUserId, senderUse
     action: 'open_chat'
   };
 
-  console.log('📱 Sending FCM message notification...');
-  console.log('📱 Message notification details:', {
+  logger.info('Sending message notification', {
     recipientCount: recipientUserIds.length,
     senderUsername,
     chatId,
     messagePreview: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : ''),
     notificationTitle: `${senderUsername}`,
-    notificationBody: messageContent.length > 50 ? messageContent.substring(0, 50) + '...' : messageContent,
-    dataPayload: {
-      type: 'message',
-      chatId: chatId.toString(),
-      senderId: senderUserId.toString(),
-      username: senderUsername,
-      action: 'open_chat'
-    }
+    notificationBody: messageContent.length > 50 ? messageContent.substring(0, 50) + '...' : messageContent
   });
 
   const result = await sendFCMNotification(recipientUserIds, notification, data);
   
   if (result.success) {
-    console.log('✅ Message notification sent successfully');
+    logger.info('Message notification sent successfully', { chatId, successCount: result.successCount });
   } else {
-    console.log('❌ Message notification failed:', result.message);
+    logger.error('Message notification failed', { chatId, message: result.message });
   }
   
   return result;
@@ -464,14 +457,14 @@ async function saveFCMToken(userId, token, platform = 'unknown') {
       }
     });
 
-    console.log(`✅ Upserted FCM token for user ${userId} (${result.id ? 'updated' : 'created'})`);
+    logger.info('Upserted FCM token', { userId, action: result.id ? 'updated' : 'created' });
     return { success: true };
   } catch (error) {
-    console.error('❌ Error saving FCM token:', error);
+    logger.error('Error saving FCM token', { error: error.message, userId });
     
     // Handle specific duplicate key error gracefully
     if (error.code === 'P2002' && error.meta?.target?.includes('token')) {
-      console.log('ℹ️ FCM token already exists, attempting to update...');
+      logger.info('FCM token already exists, attempting to update', { userId });
       try {
         // Fallback: try to update the existing token
         await prisma.fcmToken.update({
@@ -483,10 +476,10 @@ async function saveFCMToken(userId, token, platform = 'unknown') {
             lastUsed: new Date()
           }
         });
-        console.log(`✅ Updated existing FCM token for user ${userId}`);
+        logger.info('Updated existing FCM token', { userId });
         return { success: true };
       } catch (updateError) {
-        console.error('❌ Failed to update existing FCM token:', updateError);
+        logger.error('Failed to update existing FCM token', { error: updateError.message, userId });
         return { success: false, error: updateError.message };
       }
     }
@@ -504,10 +497,10 @@ async function removeFCMToken(token) {
     await prisma.fcmToken.delete({
       where: { token }
     });
-    console.log(`✅ Removed FCM token: ${token.substring(0, 20)}...`);
+    logger.info('Removed FCM token', { tokenPreview: token.substring(0, 20) + '...' });
     return { success: true };
   } catch (error) {
-    console.error('❌ Error removing FCM token:', error);
+    logger.error('Error removing FCM token', { error: error.message });
     return { success: false, error: error.message };
   }
 }
@@ -531,7 +524,7 @@ async function getUserFCMTokens(userId) {
     });
     return tokens;
   } catch (error) {
-    console.error('❌ Error getting user FCM tokens:', error);
+    logger.error('Error getting user FCM tokens', { error: error.message, userId });
     return [];
   }
 }
@@ -544,7 +537,7 @@ async function getUserFCMTokens(userId) {
 async function getFCMTokensByUserIds(userIds) {
   try {
     if (!Array.isArray(userIds) || userIds.length === 0) {
-      console.log('ℹ️ No user IDs provided for FCM token lookup');
+      logger.warn('No user IDs provided for FCM token lookup');
       return [];
     }
 
@@ -563,10 +556,10 @@ async function getFCMTokensByUserIds(userIds) {
       }
     });
 
-    console.log(`📱 Found ${fcmTokens.length} FCM tokens for ${userIds.length} users`);
+    logger.info('Found FCM tokens', { tokenCount: fcmTokens.length, userCount: userIds.length });
     return fcmTokens;
   } catch (error) {
-    console.error('❌ Error getting FCM tokens by user IDs:', error);
+    logger.error('Error getting FCM tokens by user IDs', { error: error.message, userCount: userIds.length });
     return [];
   }
 }

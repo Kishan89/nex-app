@@ -1,5 +1,8 @@
 // User Cache Service for instant avatar and name loading
 const { prisma } = require('../config/database');
+const { createLogger } = require('../utils/logger');
+
+const logger = createLogger('UserCacheService');
 
 class UserCacheService {
   constructor() {
@@ -43,7 +46,7 @@ class UserCacheService {
 
       return null;
     } catch (error) {
-      console.error('❌ Error fetching user data:', error);
+      logger.error('Error fetching user data:', error);
       return cached?.data || null; // Return stale cache if available
     }
   }
@@ -89,7 +92,7 @@ class UserCacheService {
           result[user.id] = user;
         }
       } catch (error) {
-        console.error('❌ Error fetching multiple users data:', error);
+        logger.error('Error fetching multiple users data:', error);
       }
     }
 
@@ -173,9 +176,9 @@ class UserCacheService {
       setImmediate(async () => {
         try {
           await this.getMultipleUsersData(uncachedIds);
-          console.log(`📋 Preloaded ${uncachedIds.length} users to cache`);
+          logger.debug('Preloaded users to cache', { count: uncachedIds.length });
         } catch (error) {
-          console.error('❌ Error preloading users:', error);
+          logger.error('Error preloading users:', error);
         }
       });
     }

@@ -1,5 +1,6 @@
 // controllers/xpController.js
 const xpService = require('../services/xpService');
+const logger = require('../utils/logger');
 
 /**
  * Get XP rules for display in the app
@@ -9,7 +10,7 @@ const getXPRules = async (req, res, next) => {
     const rules = xpService.getXPRules();
     res.status(200).json(rules);
   } catch (error) {
-    console.error('❌ Error fetching XP rules:', error);
+    logger.error('Error fetching XP rules', { error: error.message });
     next(error);
   }
 };
@@ -27,7 +28,7 @@ const getUserXP = async (req, res, next) => {
       xp 
     });
   } catch (error) {
-    console.error('❌ Error fetching user XP:', error);
+    logger.error('Error fetching user XP', { error: error.message, userId: req.params.userId });
     next(error);
   }
 };

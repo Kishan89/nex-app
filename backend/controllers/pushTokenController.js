@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const logger = require('../utils/logger');
 
 const savePushToken = async (req, res) => {
   try {
@@ -13,7 +14,7 @@ const savePushToken = async (req, res) => {
       return res.status(401).json({ message: 'User authentication required' });
     }
 
-    console.log(`📱 Saving push token for user ${userId}: ${token}`);
+    logger.info('Saving push token', { userId, tokenPreview: token.substring(0, 20) + '...' });
 
     // First check if this token exists but belongs to another user
     const existingToken = await prisma.pushToken.findUnique({
@@ -21,7 +22,7 @@ const savePushToken = async (req, res) => {
     });
 
     if (existingToken && existingToken.userId !== userId) {
-      console.log(`⚠️ Token ${token} previously belonged to user ${existingToken.userId}, updating to ${userId}`);
+      logger.info('Updating push token ownership', { oldUserId: existingToken.userId, newUserId: userId });
     }
 
     const upsert = await prisma.pushToken.upsert({
@@ -30,10 +31,10 @@ const savePushToken = async (req, res) => {
       create: { token, userId },
     });
 
-    console.log(`✅ Push token saved successfully for user ${userId}`);
+    logger.info('Push token saved successfully', { userId });
     return res.status(200).json({ message: 'Token saved successfully', token: upsert });
   } catch (error) {
-    console.error('❌ Error saving push token:', error);
+    logger.error('Error saving push token', { error: error.message, userId });
     return res.status(500).json({ message: 'Failed to save push token' });
   }
 };

@@ -1,13 +1,14 @@
+const logger = require('../utils/logger');
+
 /**
  * Global error handling middleware
  */
 function errorHandler(error, req, res, next) {
-  console.error('💥 Unhandled error:', {
+  logger.error('Unhandled error', {
     message: error.message,
     stack: error.stack,
     url: req.url,
-    method: req.method,
-    timestamp: new Date().toISOString(),
+    method: req.method
   });
 
   // Prisma error handling
@@ -46,7 +47,7 @@ function errorHandler(error, req, res, next) {
  * 404 Not Found handler
  */
 function notFoundHandler(req, res) {
-  console.log('❌ Route not found:', req.path);
+  logger.warn('Route not found', { path: req.path, method: req.method });
   res.status(404).json({
     error: 'Not found',
     message: `Route ${req.method} ${req.path} not found`,

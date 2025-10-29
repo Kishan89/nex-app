@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const logger = require('../utils/logger');
 
 // Database health check middleware
 const dbHealthCheck = async (req, res, next) => {
@@ -7,21 +8,21 @@ const dbHealthCheck = async (req, res, next) => {
     await prisma.$queryRaw`SELECT 1`;
     next();
   } catch (error) {
-    console.error('⚠️ Database health check failed:', error.message);
+    logger.warn('Database health check failed', { error: error.message, code: error.code });
     
     // Handle connection pool timeout errors
     if (error.code === 'P2024' || error.message?.includes('connection pool')) {
-      console.log('🔄 Connection pool issue detected, attempting recovery...');
+      logger.info('Connection pool issue detected, attempting recovery');
       
       try {
         // Try to disconnect and reconnect
         await prisma.$disconnect();
         await new Promise(resolve => setTimeout(resolve, 1000));
         await prisma.$queryRaw`SELECT 1`;
-        console.log('✅ Database connection recovered');
+        logger.info('Database connection recovered');
         next();
       } catch (recoveryError) {
-        console.error('❌ Database recovery failed:', recoveryError.message);
+        logger.error('Database recovery failed', { error: recoveryError.message });
         return res.status(503).json({
           success: false,
           error: 'Database temporarily unavailable',
@@ -30,7 +31,7 @@ const dbHealthCheck = async (req, res, next) => {
       }
     } else {
       // For other errors, continue but log the issue
-      console.log('⚠️ Database issue detected but continuing request');
+      logger.warn('Database issue detected but continuing request');
       next();
     }
   }

@@ -1,4 +1,7 @@
 const { prisma } = require('../config/database');
+const { createLogger } = require('../utils/logger');
+
+const logger = createLogger('FollowService');
 
 class FollowService {
   /**
@@ -47,11 +50,11 @@ class FollowService {
         }
       });
 
-      // 🚀 INSTANT RETURN: Skip count updates for speed
+      // INSTANT RETURN: Skip count updates for speed
       // Count updates will be handled by background queue
       return follow;
     } catch (error) {
-      console.error('Error in followUser:', error);
+      logger.error('Error in followUser:', error);
       throw error;
     }
   }
@@ -73,11 +76,11 @@ class FollowService {
         }
       });
 
-      // 🚀 INSTANT RETURN: Skip count updates for speed
+      // INSTANT RETURN: Skip count updates for speed
       // Count updates will be handled by background queue
       return !!deletedFollow;
     } catch (error) {
-      console.error('Error in unfollowUser:', error);
+      logger.error('Error in unfollowUser:', error);
       throw error;
     }
   }
@@ -101,7 +104,7 @@ class FollowService {
 
       return !!follow;
     } catch (error) {
-      console.error('Error in isFollowing:', error);
+      logger.error('Error in isFollowing:', error);
       return false;
     }
   }
@@ -141,7 +144,7 @@ class FollowService {
 
       return following.map(f => f.following);
     } catch (error) {
-      console.error('Error in getFollowing:', error);
+      logger.error('Error in getFollowing:', error);
       throw error;
     }
   }
@@ -181,7 +184,7 @@ class FollowService {
 
       return followers.map(f => f.follower);
     } catch (error) {
-      console.error('Error in getFollowers:', error);
+      logger.error('Error in getFollowers:', error);
       throw error;
     }
   }
@@ -207,7 +210,7 @@ class FollowService {
         followers: followersCount
       };
     } catch (error) {
-      console.error('Error in getFollowCounts:', error);
+      logger.error('Error in getFollowCounts:', error);
       throw error;
     }
   }
@@ -224,10 +227,10 @@ class FollowService {
       
       // Note: User table doesn't have following_count/followers_count columns
       // So we just return the calculated counts without updating stored values
-      console.log(`✅ Retrieved follow counts for user ${userId}: following: ${counts.following}, followers: ${counts.followers}`);
+      logger.debug('Retrieved follow counts for user', { userId, following: counts.following, followers: counts.followers });
       return counts;
     } catch (error) {
-      console.error('Error in getAndUpdateFollowCounts:', error);
+      logger.error('Error in getAndUpdateFollowCounts:', error);
       throw error;
     }
   }
@@ -242,7 +245,7 @@ class FollowService {
       const following = await this.getFollowing(userId, 100, 0);
       return following.filter(user => user.id !== userId);
     } catch (error) {
-      console.error('Error in getMessagableUsers:', error);
+      logger.error('Error in getMessagableUsers:', error);
       throw error;
     }
   }
@@ -261,9 +264,9 @@ class FollowService {
 
       // Note: User table doesn't have following_count/followers_count columns
       // Counts are calculated dynamically from Follow relationships
-      console.log(`✅ Follow counts calculated: ${followerId} following: ${followerCounts.following}, ${followingId} followers: ${followingCounts.followers}`);
+      logger.debug('Follow counts calculated', { followerId, followingId, followerFollowing: followerCounts.following, followingFollowers: followingCounts.followers });
     } catch (error) {
-      console.error('❌ Error calculating follow counts:', error);
+      logger.error('Error calculating follow counts:', error);
       // Don't throw error to prevent follow/unfollow operation from failing
     }
   }

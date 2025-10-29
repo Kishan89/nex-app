@@ -1,8 +1,12 @@
 const chatService = require('../services/chatService');
 const { successResponse, errorResponse } = require('../utils/helpers');
-const { sendPushNotification } = require('../services/pushNotificationService');
 const { sendMessageNotification } = require('../services/fcmService');
 const { prisma } = require('../config/database');
+const { createLogger } = require('../utils/logger');
+const { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES, CACHE, PAGINATION, NOTIFICATION } = require('../constants');
+const { BadRequestError, UnauthorizedError, ForbiddenError } = require('../utils/errors');
+
+const logger = createLogger('ChatController');
 
 class ChatController {
   /**
@@ -14,21 +18,18 @@ class ChatController {
       const requestUserId = req.user?.userId || userId;
       
       if (!requestUserId) {
-        return res.status(400).json(errorResponse('User ID is required'));
+        throw new BadRequestError(ERROR_MESSAGES.USER_ID_REQUIRED);
       }
       
-      // INSTANT RESPONSE: Get chats with optimized query
       const chats = await chatService.getUserChats(requestUserId);
       
-      // Add response headers for caching
       res.set({
-        'Cache-Control': 'private, max-age=30', // Cache for 30 seconds
+        'Cache-Control': `private, max-age=${CACHE.CHATS_MAX_AGE}`,
         'ETag': `"chats-${requestUserId}-${Date.now()}"`,
         'Last-Modified': new Date().toUTCString()
       });
       
-      // Return chats directly for frontend compatibility
-      res.status(200).json(chats);
+      res.status(HTTP_STATUS.OK).json(chats);
     } catch (error) {
       next(error);
     }
@@ -43,16 +44,16 @@ class ChatController {
       const { userId } = req.user || {};
       
       if (!userId) {
-        return res.status(400).json(errorResponse('Authentication required'));
+        throw new UnauthorizedError(ERROR_MESSAGES.AUTH_REQUIRED);
       }
       
       if (!chatId) {
-        return res.status(400).json(errorResponse('Chat ID is required'));
+        throw new BadRequestError(ERROR_MESSAGES.CHAT_ID_REQUIRED);
       }
       
       const markedCount = await chatService.markMessagesAsRead(chatId, userId);
       
-      res.status(200).json(successResponse({ markedCount }, 'Messages marked as read'));
+      res.status(HTTP_STATUS.OK).json(successResponse({ markedCount }, SUCCESS_MESSAGES.MESSAGES_MARKED_READ));
     } catch (error) {
       next(error);
     }
@@ -67,16 +68,16 @@ class ChatController {
       const { userId } = req.user || {};
       
       if (!userId) {
-        return res.status(400).json(errorResponse('Authentication required'));
+        throw new UnauthorizedError(ERROR_MESSAGES.AUTH_REQUIRED);
       }
       
       if (!chatId) {
-        return res.status(400).json(errorResponse('Chat ID is required'));
+        throw new BadRequestError(ERROR_MESSAGES.CHAT_ID_REQUIRED);
       }
       
       const unreadMessages = await chatService.getUnreadMessages(chatId, userId);
       
-      res.status(200).json(successResponse(unreadMessages, 'Unread messages retrieved'));
+      res.status(HTTP_STATUS.OK).json(successResponse(unreadMessages, SUCCESS_MESSAGES.UNREAD_MESSAGES_RETRIEVED));
     } catch (error) {
       next(error);
     }
@@ -92,25 +93,22 @@ class ChatController {
       const userId = req.user?.userId || req.query.userId;
       
       if (!userId) {
-        return res.status(400).json(errorResponse('User ID is required'));
+        throw new BadRequestError(ERROR_MESSAGES.USER_ID_REQUIRED);
       }
       
-      // 🚀 INSTANT LOADING: Get messages with optimized query
       const messages = await chatService.getChatMessages(chatId, { 
-        page: parseInt(page) || 1, 
-        limit: parseInt(limit) || 50, // Smaller initial load for speed
+        page: parseInt(page) || PAGINATION.DEFAULT_PAGE, 
+        limit: parseInt(limit) || PAGINATION.DEFAULT_LIMIT,
         userId,
         cursor 
       });
       
-      // Add caching headers for better performance
       res.set({
-        'Cache-Control': 'private, max-age=10', // Short cache for real-time updates
+        'Cache-Control': `private, max-age=${CACHE.MESSAGES_MAX_AGE}`,
         'ETag': `"messages-${chatId}-${messages.length}"`,
       });
       
-      // Return messages directly for frontend compatibility
-      res.status(200).json(messages);
+      res.status(HTTP_STATUS.OK).json(messages);
     } catch (error) {
       next(error);
     }
@@ -126,35 +124,30 @@ class ChatController {
       const senderId = req.user?.userId || req.body.senderId;
       
       if (!content || !senderId) {
-        return res.status(400).json(errorResponse('Content and senderId are required'));
+        throw new BadRequestError(ERROR_MESSAGES.CONTENT_REQUIRED);
       }
 
-      // 🚀 FAST VALIDATION: Quick participant check
       const chatParticipant = await prisma.chatParticipant.findFirst({
         where: { chatId, userId: senderId }
       });
 
       if (!chatParticipant) {
-        return res.status(403).json(errorResponse('You are not a participant in this chat'));
+        throw new ForbiddenError(ERROR_MESSAGES.NOT_PARTICIPANT);
       }
       
-      // 🚀 INSTANT MESSAGE SAVE: Save message to database
       const message = await chatService.sendMessage({ content, chatId, senderId });
       
-      // 🚀 INSTANT RESPONSE: Send success immediately
-      res.status(201).json(message);
+      res.status(HTTP_STATUS.CREATED).json(message);
       
-      // 🔄 BACKGROUND PROCESSING: Handle notifications and broadcasting
       setImmediate(async () => {
         try {
-          // Broadcast message via socket to all chat participants
           const socketService = require('../services/socketService');
           if (socketService.io) {
             const socketMessage = {
               id: message.id,
               text: message.text,
               content: message.text,
-              isUser: false, // Will be determined by receiver
+              isUser: false,
               timestamp: message.timestamp,
               status: message.status,
               sender: message.sender,
@@ -164,10 +157,9 @@ class ChatController {
             socketService.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
           }
           
-          // Send push notification to other participants (background)
           await this.sendMessageNotification(chatId, senderId, content);
         } catch (backgroundError) {
-          console.error('❌ Background message processing failed:', backgroundError);
+          logger.error('Background message processing failed:', backgroundError);
         }
       });
       
@@ -181,8 +173,6 @@ class ChatController {
    */
   async sendMessageNotification(chatId, senderId, content) {
     try {
-      
-      // Get chat participants (excluding sender)
       const chat = await prisma.chat.findUnique({
         where: { id: chatId },
         include: {
@@ -196,29 +186,19 @@ class ChatController {
         }
       });
 
-      // Chat found
-
       if (!chat) {
         return;
       }
 
-      // Get participant user IDs (excluding sender)
       const participantUserIds = chat.participants
         .filter(p => p.userId !== senderId)
         .map(p => p.userId);
 
-      // Participants analysis completed
-
-      if (participantUserIds.length === 0) {
+      if (participantUserIds.length === 0 || 
+         (participantUserIds.length === 1 && participantUserIds[0] === senderId)) {
         return;
       }
 
-      // Check if this is a self-message (should not send notification)
-      if (participantUserIds.length === 1 && participantUserIds[0] === senderId) {
-        return;
-      }
-
-      // Get sender info
       const sender = await prisma.user.findUnique({
         where: { id: senderId },
         select: { username: true }
@@ -228,9 +208,6 @@ class ChatController {
         return;
       }
 
-      // Notification details prepared
-
-      // Use the dedicated FCM message notification function with retry mechanism
       const result = await sendMessageNotification(
         participantUserIds,
         senderId,
@@ -239,9 +216,6 @@ class ChatController {
         chatId
       );
 
-      // Message notification sent
-
-      // If notification fails, retry once after a short delay
       if (!result.success && result.message !== 'No FCM tokens found') {
         setTimeout(async () => {
           try {
@@ -253,13 +227,13 @@ class ChatController {
               chatId
             );
           } catch (retryError) {
-            // Retry notification failed
+            logger.warn('Notification retry failed', retryError);
           }
-        }, 2000);
+        }, NOTIFICATION.RETRY_DELAY_MS);
       }
 
     } catch (error) {
-      // Error in sendMessageNotification
+      logger.error('Error in sendMessageNotification', error);
     }
   }
 
@@ -271,12 +245,12 @@ class ChatController {
       const { name, isGroup, participantIds } = req.body;
       
       if (!participantIds || !Array.isArray(participantIds) || participantIds.length < 2) {
-        return res.status(400).json(errorResponse('At least 2 participants are required'));
+        throw new BadRequestError(ERROR_MESSAGES.PARTICIPANTS_REQUIRED);
       }
       
       const chat = await chatService.createChat({ name, isGroup, participantIds });
       
-      res.status(201).json(successResponse(chat, 'Chat created successfully'));
+      res.status(HTTP_STATUS.CREATED).json(successResponse(chat, SUCCESS_MESSAGES.CHAT_CREATED));
     } catch (error) {
       next(error);
     }
@@ -291,8 +265,7 @@ class ChatController {
       
       await chatService.deleteChat(chatId);
       
-      // All successful responses will now use the successResponse helper
-      res.status(200).json(successResponse(null, 'Chat deleted successfully'));
+      res.status(HTTP_STATUS.OK).json(successResponse(null, SUCCESS_MESSAGES.CHAT_DELETED));
     } catch (error) {
       next(error);
     }
@@ -307,15 +280,12 @@ class ChatController {
       const userId = req.user?.userId;
       
       if (!userId) {
-        return res.status(401).json(errorResponse('Unauthorized'));
+        throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED);
       }
       
-      // Marking chat as read
-      
-      // Mark all messages in this chat as read for this user
       const result = await chatService.markChatAsRead(chatId, userId);
       
-      res.status(200).json(successResponse(result, 'Chat marked as read'));
+      res.status(HTTP_STATUS.OK).json(successResponse(result, SUCCESS_MESSAGES.CHAT_MARKED_READ));
     } catch (error) {
       next(error);
     }

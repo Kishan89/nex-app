@@ -108,22 +108,20 @@ function transformComment(comment) {
         userId = comment.userId;
     }
     
+    const logger = require('./logger');
+    
     // Final fallback: If still no userId, log warning but don't hardcode
     if (!userId) {
-        console.warn('⚠️ Comment missing userId:', {
+        logger.warn('Comment missing userId', {
             commentId: comment.id,
-            username: username,
-            userObject: userObj
+            username: username
         });
     }
     
-    console.log('🔧 Transform comment:', {
+    logger.debug('Transform comment', {
         commentId: comment.id,
-        originalUser: comment.user,
-        originalUserId: comment.userId,
         extractedUserId: userId,
-        extractedUsername: username,
-        hasUserObject: !!comment.user
+        extractedUsername: username
     });
     
     return {

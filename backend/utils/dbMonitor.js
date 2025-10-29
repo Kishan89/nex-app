@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const logger = require('./logger');
 
 class DatabaseMonitor {
   constructor() {
@@ -23,7 +24,7 @@ class DatabaseMonitor {
         
         // Only log if response is slow (>5 seconds)
         if (duration > 5000) {
-          console.log(`⚠️ Slow database response: ${duration}ms`);
+          logger.warn('Slow database response', { duration });
         }
       } catch (error) {
         this.lastHealthCheck = {
@@ -32,31 +33,31 @@ class DatabaseMonitor {
           timestamp: new Date()
         };
         
-        console.error('❌ Database health check failed:', error.message);
+        logger.error('Database health check failed', { error: error.message, code: error.code });
         
         // If it's a connection pool error, try to recover
         if (error.code === 'P2024' || error.message?.includes('connection pool')) {
-          console.log('🔄 Attempting database recovery...');
+          logger.info('Attempting database recovery');
           try {
             await prisma.$disconnect();
             await new Promise(resolve => setTimeout(resolve, 2000));
             await prisma.$queryRaw`SELECT 1`;
-            console.log('✅ Database recovery successful');
+            logger.info('Database recovery successful');
           } catch (recoveryError) {
-            console.error('❌ Database recovery failed:', recoveryError.message);
+            logger.error('Database recovery failed', { error: recoveryError.message });
           }
         }
       }
     }, 30000); // 30 seconds
 
-    console.log('📊 Database monitoring started');
+    logger.info('Database monitoring started');
   }
 
   stopMonitoring() {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
       this.healthCheckInterval = null;
-      console.log('📊 Database monitoring stopped');
+      logger.info('Database monitoring stopped');
     }
   }
 

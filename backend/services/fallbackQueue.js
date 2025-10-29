@@ -5,17 +5,18 @@ const notificationService = require('./notificationService');
 const { sendFollowNotification } = require('./fcmService');
 const xpService = require('./xpService');
 const socketService = require('./socketService');
+const logger = require('../utils/logger');
 
 class FallbackQueueService {
   constructor() {
     this.jobId = 0;
-    console.log('⚠️ Using fallback queue service (in-memory processing)');
+    logger.warn('Using fallback queue service (in-memory processing)');
   }
 
   // Process follow notification job
   async processFollowNotification(userId, followerId, followerUsername) {
     try {
-      console.log(`🔔 Processing follow notification: ${followerUsername} -> ${userId}`);
+      logger.info('Processing follow notification', { userId, followerId, followerUsername });
       
       // Create in-app notification
       await notificationService.createNotification({
@@ -36,16 +37,16 @@ class FallbackQueueService {
         timestamp: new Date().toISOString()
       });
       
-      console.log(`✅ Follow notification sent successfully`);
+      logger.info('Follow notification sent successfully', { userId, followerId });
     } catch (error) {
-      console.error('❌ Failed to send follow notification:', error);
+      logger.error('Failed to send follow notification', { error: error.message, userId, followerId });
     }
   }
 
   // Process XP award job
   async processXpAward(userId) {
     try {
-      console.log(`🎯 Processing XP award for user: ${userId}`);
+      logger.info('Processing XP award', { userId });
       
       const result = await xpService.awardPostCreationXP(userId);
       
@@ -57,16 +58,16 @@ class FallbackQueueService {
         timestamp: new Date().toISOString()
       });
       
-      console.log(`✅ XP awarded successfully: ${result.xpAwarded} XP`);
+      logger.info('XP awarded successfully', { userId, xpAwarded: result.xpAwarded, totalXp: result.totalXp });
     } catch (error) {
-      console.error('❌ Failed to award XP:', error);
+      logger.error('Failed to award XP', { error: error.message, userId });
     }
   }
 
   // Process follow count update job
   async processFollowCountUpdate(userId, followedUserId) {
     try {
-      console.log(`📊 Processing follow count updates: ${userId} -> ${followedUserId}`);
+      logger.info('Processing follow count updates', { userId, followedUserId });
       
       const followService = require('./followService');
       
@@ -89,16 +90,16 @@ class FallbackQueueService {
         timestamp: new Date().toISOString()
       });
       
-      console.log(`✅ Follow counts updated successfully`);
+      logger.info('Follow counts updated successfully', { userId, followedUserId });
     } catch (error) {
-      console.error('❌ Failed to update follow counts:', error);
+      logger.error('Failed to update follow counts', { error: error.message, userId, followedUserId });
     }
   }
 
   // Add follow notification job
   addFollowNotificationJob(userId, followerId, followerUsername) {
     const jobId = ++this.jobId;
-    console.log(`📋 Queuing follow notification job ${jobId} (fallback)`);
+    logger.debug('Queuing follow notification job', { jobId, userId, followerId });
     
     // Process in background with small delay
     setTimeout(() => {
@@ -111,7 +112,7 @@ class FallbackQueueService {
   // Add XP job
   addXpJob(userId) {
     const jobId = ++this.jobId;
-    console.log(`📋 Queuing XP job ${jobId} (fallback)`);
+    logger.debug('Queuing XP job', { jobId, userId });
     
     // Process in background with small delay
     setTimeout(() => {
@@ -124,7 +125,7 @@ class FallbackQueueService {
   // Add follow count update job
   addFollowCountUpdateJob(userId, followedUserId) {
     const jobId = ++this.jobId;
-    console.log(`📋 Queuing follow count update job ${jobId} (fallback)`);
+    logger.debug('Queuing follow count update job', { jobId, userId, followedUserId });
     
     // Process in background with small delay
     setTimeout(() => {

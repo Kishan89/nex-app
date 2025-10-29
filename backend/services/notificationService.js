@@ -1,5 +1,8 @@
 // services/notificationService.js
 const { prisma } = require('../config/database');
+const { createLogger } = require('../utils/logger');
+
+const logger = createLogger('NotificationService');
 
 /**
  * Create a notification
@@ -16,7 +19,7 @@ async function createNotification(data) {
   try {
     // Don't create notification if it's from the same user
     if (data.userId === data.fromUserId && data.type !== 'SYSTEM') {
-      console.log('ℹ️ Skipping self-notification');
+      logger.debug('Skipping self-notification');
       return null;
     }
 
@@ -37,7 +40,7 @@ async function createNotification(data) {
         });
 
         if (existingNotification) {
-          console.log('ℹ️ Similar notification already exists, updating timestamp');
+          logger.debug('Similar notification already exists, updating timestamp');
           // Update the existing notification instead of creating a new one
           const updatedNotification = await prisma.notification.update({
             where: { id: existingNotification.id },
@@ -50,12 +53,12 @@ async function createNotification(data) {
           return updatedNotification;
         }
       } catch (error) {
-        console.error('❌ Error checking for existing notification:', error);
+        logger.error('Error checking for existing notification:', error);
         // Continue to create a new notification
       }
     }
 
-    console.log(`📣 Creating notification for user ${data.userId} from user ${data.fromUserId} of type ${data.type}`);
+    logger.info('Creating notification', { userId: data.userId, fromUserId: data.fromUserId, type: data.type });
     
     const notification = await prisma.notification.create({
       data: {
@@ -69,10 +72,10 @@ async function createNotification(data) {
       },
     });
 
-    console.log(`✅ Notification created successfully with ID: ${notification.id}`);
+    logger.info('Notification created successfully', { notificationId: notification.id });
     return notification;
   } catch (error) {
-    console.error('❌ Error creating notification:', error);
+    logger.error('Error creating notification:', error);
     throw error;
   }
 }
@@ -86,9 +89,9 @@ async function createNotification(data) {
  */
 async function getNotificationsForUser(userId, limit = 20, offset = 0) {
   try {
-    console.log(`📋 Fetching notifications for user ${userId}, limit: ${limit}, offset: ${offset}`);
+    logger.debug('Fetching notifications for user', { userId, limit, offset });
     
-    // 🚀 OPTIMIZED QUERY: Minimal data selection for speed
+    // OPTIMIZED QUERY: Minimal data selection for speed
     const notifications = await prisma.notification.findMany({
       where: {
         userId,
@@ -125,10 +128,10 @@ async function getNotificationsForUser(userId, limit = 20, offset = 0) {
       skip: offset,
     });
 
-    console.log(`✅ Found ${notifications.length} notifications for user ${userId}`);
+    logger.debug('Found notifications for user', { userId, count: notifications.length });
     return notifications;
   } catch (error) {
-    console.error('❌ Error fetching notifications:', error);
+    logger.error('Error fetching notifications:', error);
     throw error;
   }
 }
@@ -160,10 +163,10 @@ async function markNotificationsAsRead(userId, notificationIds = []) {
       },
     });
 
-    console.log(`✅ Marked ${result.count} notifications as read for user ${userId}`);
+    logger.debug('Marked notifications as read', { userId, count: result.count });
     return result.count;
   } catch (error) {
-    console.error('❌ Error marking notifications as read:', error);
+    logger.error('Error marking notifications as read:', error);
     throw error;
   }
 }
@@ -190,7 +193,7 @@ async function getUnreadNotificationCount(userId) {
 
     return count;
   } catch (error) {
-    console.error('❌ Error counting unread notifications:', error);
+    logger.error('Error counting unread notifications:', error);
     throw error;
   }
 }

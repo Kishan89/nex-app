@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const chatService = require('./chatService');
 const notificationService = require('./notificationService');
 const { sendMessageNotification } = require('./fcmService');
+const logger = require('../utils/logger');
 
 class SocketService {
   constructor() {
@@ -51,7 +52,7 @@ class SocketService {
     // Store user connection
     this.connectedUsers.set(userId, socket.id);
     this.userSockets.set(socket.id, userId);
-    console.log(`✅ [SOCKET] User ${userId} added to connected users (Total: ${this.connectedUsers.size})`);
+    logger.info('User connected to socket', { userId, totalConnected: this.connectedUsers.size });
 
     // Auto-join user to all their chat rooms
     try {
@@ -60,10 +61,10 @@ class SocketService {
         userChats.forEach(chat => {
           socket.join(`chat:${chat.id}`);
         });
-        console.log(`🏠 User ${userId} auto-joined ${userChats.length} chat rooms`);
+        logger.info('User auto-joined chat rooms', { userId, chatCount: userChats.length });
       }
     } catch (error) {
-      console.error('❌ Error auto-joining user chats:', error);
+      logger.error('Error auto-joining user chats', { error: error.message, userId });
     }
 
     // Broadcast online status to other users (limited to 20% to reduce spam)
@@ -74,7 +75,7 @@ class SocketService {
     // Handle joining chat rooms
     socket.on('join_chat', async (chatId) => {
       socket.join(`chat:${chatId}`);
-      console.log(`🏠 User ${userId} manually joined chat room: ${chatId}`);
+      logger.info('User joined chat room', { userId, chatId });
       
       // Ensure other chat participants are also in the room
       await this.ensureChatParticipantsInRoom(chatId);
@@ -90,26 +91,22 @@ class SocketService {
     // Handle leaving chat rooms
     socket.on('leave_chat', (chatId) => {
       socket.leave(`chat:${chatId}`);
-      console.log(`🏠 User ${userId} manually left chat room: ${chatId}`);
-      // Removed verbose leave log to reduce console spam
+      logger.debug('User left chat room', { userId, chatId });
     });
 
     // Handle sending messages with acknowledgment
     socket.on('send_message', async (data, callback) => {
       try {
         const { chatId, content, tempMessageId } = data;
-        console.log(`💬 [SOCKET] User ${userId} sending message to chat ${chatId}`);
-        console.log(`📝 [SOCKET] Message content: "${content.substring(0, 50)}..."`);
-        console.log(`🔄 [SOCKET] Temp message ID: ${tempMessageId}`);
+        logger.info('Socket message send initiated', { userId, chatId, tempMessageId, contentPreview: content.substring(0, 50) + '...' });
 
         // Save message to database
-        console.log(`💾 [SOCKET] Saving message to database...`);
         const message = await chatService.sendMessage({
           content,
           chatId,
           senderId: userId
         });
-        console.log(`✅ [SOCKET] Message saved with ID: ${message.id}`);
+        logger.info('Message saved to database', { messageId: message.id, chatId });
 
         // Update message status to DELIVERED since it's saved in DB
         await this.updateMessageStatus(message.id, 'DELIVERED');
@@ -128,9 +125,8 @@ class SocketService {
         };
 
         // Emit message to all users in the chat (including sender for confirmation)
-        console.log(`📡 [SOCKET] Broadcasting message to chat room: chat:${chatId}`);
+        logger.info('Broadcasting message to chat room', { chatId, messageId: message.id });
         this.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
-        console.log(`✅ [SOCKET] Message broadcasted successfully`);
 
         // Send acknowledgment back to sender with delivery confirmation
         if (callback && typeof callback === 'function') {
@@ -141,7 +137,7 @@ class SocketService {
             status: 'delivered',
             timestamp: message.timestamp
           });
-          console.log(`✅ [SOCKET] Acknowledgment sent to sender for message ${message.id}`);
+          logger.debug('Message acknowledgment sent', { messageId: message.id });
         }
 
         // Send FCM push notification to other chat participants
@@ -150,7 +146,7 @@ class SocketService {
         // Update chat's last message timestamp
         await this.updateChatTimestamp(chatId);
       } catch (error) {
-        console.error('❌ Error sending message:', error);
+        logger.error('Error sending message via socket', { error: error.message, userId, chatId: data.chatId });
         
         // Send error acknowledgment
         if (callback && typeof callback === 'function') {
@@ -200,10 +196,10 @@ class SocketService {
 
     // Handle disconnection
     socket.on('disconnect', (reason) => {
-      console.log(`🔌 [SOCKET] User ${userId} disconnected. Reason: ${reason}`);
+      logger.info('User disconnected from socket', { userId, reason });
       this.connectedUsers.delete(userId);
       this.userSockets.delete(socket.id);
-      console.log(`✅ [SOCKET] User ${userId} removed (Total connected: ${this.connectedUsers.size})`);
+      logger.debug('User removed from connected users', { userId, totalConnected: this.connectedUsers.size });
       this.updateUserOnlineStatus(userId, false);
       socket.broadcast.emit('user_offline', { userId });
     });
@@ -236,7 +232,7 @@ class SocketService {
       });
       
       if (!sender) {
-        console.error(`❌ Sender not found for ID: ${senderId}`);
+        logger.error('Sender not found for message notification', { senderId });
         return;
       }
 
@@ -283,7 +279,7 @@ class SocketService {
       // Note: Socket real-time updates are already handled by new_message event
       // No need for duplicate socket notifications
     } catch (error) {
-      console.error('❌ Error sending FCM notification to chat participants:', error);
+      logger.error('Error sending FCM notification to chat participants', { error: error.message, chatId });
     }
   }
 
@@ -306,7 +302,7 @@ class SocketService {
       });
       
       if (!userExists) {
-        console.log(`⚠️ User ${userId} not found, skipping online status update`);
+        logger.warn('User not found, skipping online status update', { userId });
         return;
       }
       
@@ -318,7 +314,7 @@ class SocketService {
         }
       });
     } catch (error) {
-      console.error('❌ Error updating user online status:', error);
+      logger.error('Error updating user online status', { error: error.message, userId });
     }
   }
 
@@ -332,9 +328,9 @@ class SocketService {
           status: status.toUpperCase()
         }
       });
-      console.log(`✅ [SOCKET] Message ${messageId} status updated to ${status}`);
+      logger.debug('Message status updated', { messageId, status });
     } catch (error) {
-      console.error('❌ Error updating message status:', error);
+      logger.error('Error updating message status', { error: error.message, messageId });
     }
   }
 
@@ -349,7 +345,7 @@ class SocketService {
         }
       });
     } catch (error) {
-      console.error('❌ Error updating chat timestamp:', error);
+      logger.error('Error updating chat timestamp', { error: error.message, chatId });
     }
   }
 
@@ -405,12 +401,12 @@ class SocketService {
           const socket = this.io.sockets.sockets.get(socketId);
           if (socket && !socket.rooms.has(`chat:${chatId}`)) {
             socket.join(`chat:${chatId}`);
-            console.log(`🔄 [SOCKET] Auto-joined user ${participant.userId} to chat room: ${chatId}`);
+            logger.debug('Auto-joined user to chat room', { userId: participant.userId, chatId });
           }
         }
       }
     } catch (error) {
-      console.error('❌ Error ensuring chat participants in room:', error);
+      logger.error('Error ensuring chat participants in room', { error: error.message, chatId });
     }
   }
 }

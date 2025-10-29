@@ -1,6 +1,7 @@
 const { supabase } = require('../config/database');
 const path = require('path');
 const fs = require('fs');
+const logger = require('../utils/logger');
 
 class StorageService {
   constructor() {
@@ -28,7 +29,7 @@ class StorageService {
       const uniqueFileName = `${timestamp}-${baseName}${fileExtension}`;
       const filePath = `${folder}/${uniqueFileName}`;
 
-      console.log(`📤 Uploading file to Supabase Storage: ${filePath}`);
+      logger.info('Uploading file to Supabase Storage', { filePath, folder });
 
       // Upload file to Supabase Storage
       const { data, error } = await supabase.storage
@@ -40,8 +41,7 @@ class StorageService {
         });
 
       if (error) {
-        console.error('❌ Supabase Storage upload error:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
+        logger.error('Supabase Storage upload error', { error: error.message, errorDetails: JSON.stringify(error) });
         
         // Check if it's a bucket not found error
         if (error.message?.includes('Bucket not found') || error.statusCode === '404') {
@@ -63,7 +63,7 @@ class StorageService {
 
       const publicUrl = publicUrlData.publicUrl;
 
-      console.log(`✅ File uploaded successfully: ${publicUrl}`);
+      logger.info('File uploaded successfully', { publicUrl, fileName: uniqueFileName });
 
       return {
         success: true,
@@ -76,7 +76,7 @@ class StorageService {
       };
 
     } catch (error) {
-      console.error('❌ Storage upload error:', error);
+      logger.error('Storage upload error', { error: error.message, stack: error.stack });
       throw error;
     }
   }
@@ -92,22 +92,22 @@ class StorageService {
         throw new Error('Supabase client not initialized');
       }
 
-      console.log(`🗑️ Deleting file from Supabase Storage: ${filePath}`);
+      logger.info('Deleting file from Supabase Storage', { filePath });
 
       const { error } = await supabase.storage
         .from(this.bucketName)
         .remove([filePath]);
 
       if (error) {
-        console.error('❌ Supabase Storage delete error:', error);
+        logger.error('Supabase Storage delete error', { error: error.message, filePath });
         throw new Error(`Delete failed: ${error.message}`);
       }
 
-      console.log(`✅ File deleted successfully: ${filePath}`);
+      logger.info('File deleted successfully', { filePath });
       return true;
 
     } catch (error) {
-      console.error('❌ Storage delete error:', error);
+      logger.error('Storage delete error', { error: error.message, filePath });
       return false;
     }
   }
@@ -136,7 +136,7 @@ class StorageService {
   async ensureBucketExists() {
     try {
       if (!supabase) {
-        console.warn('⚠️ Supabase client not initialized, skipping bucket check');
+        logger.warn('Supabase client not initialized, skipping bucket check');
         return false;
       }
 
@@ -144,14 +144,14 @@ class StorageService {
       const { data: buckets, error } = await supabase.storage.listBuckets();
 
       if (error) {
-        console.error('❌ Error checking buckets:', error);
+        logger.error('Error checking buckets', { error: error.message });
         return false;
       }
 
       const bucketExists = buckets.some(bucket => bucket.name === this.bucketName);
 
       if (!bucketExists) {
-        console.log(`📦 Creating Supabase Storage bucket: ${this.bucketName}`);
+        logger.info('Creating Supabase Storage bucket', { bucketName: this.bucketName });
         
         try {
           const { error: createError } = await supabase.storage.createBucket(this.bucketName, {
@@ -166,12 +166,12 @@ class StorageService {
             if (errorMessage.includes('row-level security') || 
                 errorMessage.includes('already exists') ||
                 errorMessage.includes('duplicate')) {
-              console.log('ℹ️ Bucket already exists — continuing...');
+              logger.info('Bucket already exists, continuing');
             } else {
-              console.error('❌ Error creating bucket:', createError);
+              logger.error('Error creating bucket', { error: createError.message });
             }
           } else {
-            console.log('✅ Bucket created or already exists');
+            logger.info('Bucket created successfully');
           }
         } catch (error) {
           // Handle any unexpected errors during bucket creation
@@ -179,19 +179,19 @@ class StorageService {
           if (errorMessage.includes('row-level security') || 
               errorMessage.includes('already exists') ||
               errorMessage.includes('duplicate')) {
-            console.log('ℹ️ Bucket already exists — continuing...');
+            logger.info('Bucket already exists, continuing');
           } else {
-            console.error('❌ Unexpected error creating bucket:', error);
+            logger.error('Unexpected error creating bucket', { error: error.message });
           }
         }
       } else {
-        console.log('✅ Bucket created or already exists');
+        logger.info('Bucket already exists');
       }
 
       return true;
 
     } catch (error) {
-      console.error('❌ Error ensuring bucket exists:', error);
+      logger.error('Error ensuring bucket exists', { error: error.message });
       return false;
     }
   }

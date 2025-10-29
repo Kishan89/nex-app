@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -6,6 +7,9 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 // Middleware
 app.use(express.json());
+
+// Serve static files from 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -135,6 +139,26 @@ app.get('/health', (req, res) => {
     message: 'Simple backend server is running',
     timestamp: new Date().toISOString()
   });
+});
+
+// Deep link redirect routes
+app.get('/post/:postId', (req, res) => {
+  const { postId } = req.params;
+  console.log('🔗 Post redirect requested for:', postId);
+  res.sendFile(path.join(__dirname, 'public', 'redirect.html'));
+});
+
+app.get('/profile/:userId', (req, res) => {
+  const { userId } = req.params;
+  console.log('🔗 Profile redirect requested for:', userId);
+  res.sendFile(path.join(__dirname, 'public', 'redirect.html'));
+});
+
+// Short URL format support
+app.get('/p/:postId', (req, res) => {
+  const { postId } = req.params;
+  console.log('🔗 Short post link requested for:', postId);
+  res.sendFile(path.join(__dirname, 'public', 'redirect.html'));
 });
 
 // Get all posts

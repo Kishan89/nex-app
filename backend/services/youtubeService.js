@@ -1,4 +1,7 @@
 const axios = require('axios');
+const { createLogger } = require('../utils/logger');
+
+const logger = createLogger('YouTubeService');
 
 class YouTubeService {
   /**
@@ -67,7 +70,7 @@ class YouTubeService {
         provider: 'YouTube'
       };
     } catch (error) {
-      console.error('Error fetching YouTube metadata:', error);
+      logger.error('Error fetching YouTube metadata:', error);
       
       // Fallback metadata if API fails
       const videoId = this.extractVideoId(url);
@@ -146,7 +149,7 @@ class YouTubeService {
         youtubeData: metadata
       };
     } catch (error) {
-      console.error('Error processing YouTube content:', error);
+      logger.error('Error processing YouTube content:', error);
       return { content, youtubeData: null };
     }
   }

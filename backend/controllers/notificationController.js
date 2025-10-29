@@ -1,5 +1,10 @@
 const { prisma } = require('../config/database'); 
-const { formatTimeAgo, getNotificationAction } = require('../utils/helpers'); 
+const { formatTimeAgo, getNotificationAction } = require('../utils/helpers');
+const { createLogger } = require('../utils/logger');
+const { HTTP_STATUS, ERROR_MESSAGES } = require('../constants');
+const { BadRequestError } = require('../utils/errors');
+
+const logger = createLogger('NotificationController');
 
 const getNotificationsByUserId = async (req, res) => {
     try {
@@ -8,11 +13,10 @@ const getNotificationsByUserId = async (req, res) => {
         const { limit = 20, offset = 0 } = req.query;
         
         if (!userId) {
-            console.error('❌ Missing userId in notification request');
-            return res.status(400).json({ message: 'User ID is required' });
+            throw new BadRequestError(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
         
-        console.log(`📋 Fetching notifications for user: ${userId}`);
+        logger.debug(`Fetching notifications for user: ${userId}`);
         
         // First check all notifications for this user
         const allNotifications = await prisma.notification.findMany({
@@ -27,10 +31,9 @@ const getNotificationsByUserId = async (req, res) => {
                 createdAt: true
             }
         });
-        console.log(`🔍 All notifications for user ${userId}:`, allNotifications);
+        logger.debug(`All notifications for user ${userId}:`, allNotifications);
         
         try {
-            // 🚀 OPTIMIZED QUERY: Get only like, comment, follow notifications
             const notifications = await prisma.notification.findMany({
                 where: { 
                     userId: userId,
@@ -69,9 +72,8 @@ const getNotificationsByUserId = async (req, res) => {
                 skip: parseInt(offset)
             });
             
-            console.log(`✅ Found ${notifications.length} notifications for user ${userId}`);
+            logger.debug(`Found ${notifications.length} notifications for user ${userId}`);
             
-            // 🚀 FAST TRANSFORMATION: Optimized processing
             const transformedNotifications = notifications.map(notification => ({
                 id: notification.id,
                 type: notification.type?.toLowerCase() || 'unknown',
@@ -88,21 +90,18 @@ const getNotificationsByUserId = async (req, res) => {
                 createdAt: notification.createdAt
             }));
 
-            // 🚀 INSTANT RESPONSE: Send notifications immediately
             res.set({
-                'Cache-Control': 'private, max-age=60', // Cache for 1 minute
+                'Cache-Control': 'private, max-age=60',
                 'ETag': `"notifications-${userId}-${notifications.length}"`,
             });
-            res.status(200).json(transformedNotifications);
+            res.status(HTTP_STATUS.OK).json(transformedNotifications);
 
-            // 🔄 BACKGROUND PROCESSING: Mark as read in background (only like, comment, follow)
             setImmediate(async () => {
                 try {
                     await prisma.notification.updateMany({
                         where: { 
                             userId: userId,
                             read: false,
-                            // Only mark like, comment, follow notifications as read
                             type: {
                                 in: ['LIKE', 'COMMENT', 'FOLLOW']
                             }
@@ -111,19 +110,19 @@ const getNotificationsByUserId = async (req, res) => {
                             read: true 
                         }
                     });
-                    console.log(`✅ Background: Marked like/comment/follow notifications as read for user ${userId}`);
+                    logger.debug(`Marked like/comment/follow notifications as read for user ${userId}`);
                 } catch (markError) {
-                    console.error('⚠️ Background error marking notifications as read:', markError);
+                    logger.error('Background error marking notifications as read:', markError);
                 }
             });
 
         } catch (dbError) {
-            console.error(`❌ Database error fetching notifications for user ${userId}:`, dbError);
-            return res.status(500).json({ message: 'Database error while fetching notifications' });
+            logger.error(`Database error fetching notifications for user ${userId}:`, dbError);
+            return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: 'Database error while fetching notifications' });
         }
     } catch (error) {
-        console.error('❌ Unexpected error in notification controller:', error);
-        return res.status(500).json({ message: 'Failed to fetch notifications' });
+        logger.error('Unexpected error in notification controller:', error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch notifications' });
     }
 };
 
@@ -133,12 +132,11 @@ const markNotificationsAsRead = async (req, res) => {
         const { userId } = req.params;
         
         if (!userId) {
-            return res.status(400).json({ message: 'User ID is required' });
+            throw new BadRequestError(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
-        console.log(`📝 Marking notifications as read for user: ${userId}`);
+        logger.debug(`Marking notifications as read for user: ${userId}`);
 
-        // First, let's check what notifications exist for this user
         const existingNotifications = await prisma.notification.findMany({
             where: {
                 userId: userId,
@@ -155,14 +153,12 @@ const markNotificationsAsRead = async (req, res) => {
             }
         });
 
-        console.log(`🔍 Found ${existingNotifications.length} unread notifications for user ${userId}:`, existingNotifications);
+        logger.debug(`Found ${existingNotifications.length} unread notifications for user ${userId}`);
 
-        // Mark only like, comment, follow notifications as read (exclude chat/message)
         const result = await prisma.notification.updateMany({
             where: {
                 userId: userId,
                 read: false,
-                // Only mark like, comment, follow notifications as read
                 type: {
                     in: ['LIKE', 'COMMENT', 'FOLLOW']
                 }
@@ -172,9 +168,8 @@ const markNotificationsAsRead = async (req, res) => {
             }
         });
 
-        console.log(`✅ Marked ${result.count} notifications as read for user ${userId}`);
+        logger.info(`Marked ${result.count} notifications as read for user ${userId}`);
 
-        // Verify the update worked
         const remainingUnread = await prisma.notification.count({
             where: {
                 userId: userId,
@@ -185,17 +180,17 @@ const markNotificationsAsRead = async (req, res) => {
             }
         });
 
-        console.log(`🔍 Remaining unread notifications for user ${userId}: ${remainingUnread}`);
+        logger.debug(`Remaining unread notifications for user ${userId}: ${remainingUnread}`);
 
-        return res.status(200).json({ 
+        return res.status(HTTP_STATUS.OK).json({
             message: 'Notifications marked as read successfully',
             count: result.count,
             remainingUnread: remainingUnread
         });
 
     } catch (error) {
-        console.error('❌ Error marking notifications as read:', error);
-        return res.status(500).json({ message: 'Failed to mark notifications as read' });
+        logger.error('Error marking notifications as read:', error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: 'Failed to mark notifications as read' });
     }
 };
 

@@ -1,6 +1,33 @@
-# Backend Setup with Prisma and Supabase
+# Nexeed Social Media API - Backend
 
-This backend uses Prisma as the ORM with Supabase (PostgreSQL) as the database.
+A scalable, production-ready Node.js backend for a social media platform with real-time chat functionality.
+
+## 🏗️ Architecture Overview
+
+### Technology Stack
+- **Runtime**: Node.js (v18+)
+- **Framework**: Express.js v5
+- **Database**: PostgreSQL (via Supabase) + Prisma ORM
+- **Real-time**: Socket.IO
+- **Storage**: Supabase Storage
+- **Caching**: Redis (via ioredis)
+- **Background Jobs**: Bull Queue
+- **Authentication**: JWT + Google OAuth
+
+### Project Structure
+```
+backend/
+├── config/           # Database and service configurations
+├── constants/        # Application constants and enums
+├── controllers/      # Request handlers (business logic entry points)
+├── middleware/       # Express middleware (auth, cors, error handling)
+├── routes/          # API route definitions
+├── services/        # Business logic layer
+├── utils/           # Helper functions and utilities
+├── lib/             # Third-party integrations (Firebase, Prisma)
+├── prisma/          # Database schema and migrations
+└── scripts/         # Utility scripts
+```
 
 ## Prerequisites
 

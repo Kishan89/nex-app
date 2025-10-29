@@ -4,6 +4,9 @@ const { transformComment } = require('../utils/helpers');
 const { createNotification } = require('./notificationService');
 const { sendCommentNotification } = require('./fcmService');
 const { awardCommentReceivedXP, removeCommentXP } = require('./xpService');
+const { createLogger } = require('../utils/logger');
+
+const logger = createLogger('CommentService');
 
 class CommentService {
 
@@ -60,7 +63,7 @@ class CommentService {
       return transformedParent;
     });
 
-    console.log('🔍 Backend: Nested comments structure:', {
+    logger.debug('Nested comments structure', {
       postId,
       totalComments: allComments.length,
       parentComments: parentComments.length,
@@ -79,7 +82,7 @@ class CommentService {
   async createComment(commentData) {
     const { text, postId, userId, parentId = null } = commentData;
 
-    console.log('💬 [CommentService] Creating comment:', {
+    logger.debug('Creating comment', {
       text: text?.substring(0, 50),
       postId,
       userId,
@@ -103,15 +106,15 @@ class CommentService {
         });
         
         if (!parentComment) {
-          console.error('❌ Parent comment not found:', parentId);
+          logger.error('Parent comment not found', { parentId });
           throw new Error('Parent comment not found');
         }
         
-        console.log('✅ Parent comment verified:', parentComment.id);
+        logger.debug('Parent comment verified', { parentId: parentComment.id });
         commentDataToCreate.parentId = parentId;
       }
       
-      console.log('📝 [CommentService] Comment data to create:', commentDataToCreate);
+      logger.debug('Comment data to create', commentDataToCreate);
       
       const result = await prisma.$transaction(async (tx) => {
         const comment = await tx.comment.create({
@@ -169,7 +172,7 @@ class CommentService {
         if (post && post.userId !== userId && commenter) {
           const message = `New comment on your post`;
           
-          console.log("🔔 Creating comment notification:", {
+          logger.debug('Creating comment notification', {
             postOwnerId: post.userId,
             commenterId: userId,
             postId,
@@ -196,7 +199,7 @@ class CommentService {
           );
         }
       } catch (notifError) {
-        console.error("❌ Error creating comment notification:", notifError);
+        logger.error('Error creating comment notification:', notifError);
         // Continue despite notification error
       }
 
@@ -210,7 +213,7 @@ class CommentService {
             payload: { postId, comment: transformedComment }
           });
       } catch (error) {
-        console.error('Failed to broadcast new comment:', error);
+        logger.error('Failed to broadcast new comment:', error);
       }
 
       // Add post owner ID to the response for XP calculation
@@ -223,9 +226,9 @@ class CommentService {
       if (postOwner?.userId && postOwner.userId !== userId) {
         try {
           await awardCommentReceivedXP(postOwner.userId);
-          console.log('✅ XP awarded to post owner for receiving comment');
+          logger.info('XP awarded to post owner for receiving comment');
         } catch (xpError) {
-          console.error('❌ Failed to award comment XP:', xpError);
+          logger.error('Failed to award comment XP:', xpError);
           // Don't fail comment creation if XP fails
         }
       }
@@ -236,7 +239,7 @@ class CommentService {
       };
 
     } catch (error) {
-      console.error('Failed to create comment and update count:', error);
+      logger.error('Failed to create comment and update count:', error);
       throw error;
     }
   }
@@ -278,7 +281,7 @@ class CommentService {
    * If deleting a parent comment with replies, cascade delete all replies
    */
   async deleteComment(commentId, userId) {
-    console.log('🗑️ Starting comment deletion for:', { commentId, userId });
+    logger.debug('Starting comment deletion', { commentId, userId });
 
     // First, get the comment with its relationships
     const comment = await prisma.comment.findUnique({
@@ -306,34 +309,28 @@ class CommentService {
       throw new NotFoundError('Comment not found.');
     }
 
-    console.log('🔍 Comment details:', {
+    logger.debug('Comment details', {
       commentId,
       commentAuthor: comment.userId,
-      commentAuthorType: typeof comment.userId,
       postOwner: comment.post?.userId,
-      postOwnerType: typeof comment.post?.userId,
       requestingUser: userId,
-      requestingUserType: typeof userId,
       hasParent: !!comment.parentId,
       hasReplies: comment.replies.length,
       isCommentAuthor: comment.userId === userId,
-      isPostOwner: comment.post?.userId === userId,
-      stringComparison: `'${comment.userId}' === '${userId}'`,
-      strictEquality: comment.userId === userId
+      isPostOwner: comment.post?.userId === userId
     });
 
     // Authorization check - user can delete ONLY their own comments
     if (comment.userId !== userId) {
-      console.error('❌ Authorization failed:', {
+      logger.warn('Authorization failed for comment deletion', {
         commentUserId: comment.userId,
         postOwnerId: comment.post?.userId,
-        requestingUserId: userId,
-        message: 'You can delete only your own comments'
+        requestingUserId: userId
       });
       throw new UnauthorizedError('You can delete only your own comments.');
     }
     
-    console.log('✅ Authorization passed for comment deletion');
+    logger.debug('Authorization passed for comment deletion');
 
     const isParentComment = !comment.parentId;
     const isCommentAuthor = comment.userId === userId;
@@ -342,7 +339,7 @@ class CommentService {
       if (isParentComment) {
         // If deleting a parent comment with replies, cascade delete all replies
         if (comment.replies.length > 0) {
-          console.log(`🗑️ Deleting parent comment with ${comment.replies.length} replies - cascading delete`);
+          logger.info('Deleting parent comment with replies', { repliesCount: comment.replies.length });
           await this.deleteCommentWithReplies(commentId, comment.postId, comment.replies.length + 1);
         } else {
           // Parent comment with no replies - simple delete

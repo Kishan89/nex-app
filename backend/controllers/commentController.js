@@ -1,6 +1,10 @@
 const commentService = require('../services/commentService');
 const { successResponse, errorResponse } = require('../utils/helpers');
-const { UnauthorizedError } = require('../utils/errors');
+const { createLogger } = require('../utils/logger');
+const { HTTP_STATUS, ERROR_MESSAGES } = require('../constants');
+const { BadRequestError, UnauthorizedError } = require('../utils/errors');
+
+const logger = createLogger('CommentController');
 
 class CommentController {
   /**
@@ -13,10 +17,10 @@ class CommentController {
 
       const comments = await commentService.getCommentsByPostId(postId, { page, limit });
       if (!Array.isArray(comments)) {
-        return res.json(successResponse([], 'Comments fetched successfully'));
+        return res.status(HTTP_STATUS.OK).json(successResponse([], 'Comments fetched successfully'));
       }
       
-      res.json(successResponse(comments, 'Comments fetched successfully'));
+      res.status(HTTP_STATUS.OK).json(successResponse(comments, 'Comments fetched successfully'));
     } catch (error) {
       next(error);
     }
@@ -32,14 +36,12 @@ class CommentController {
       const { userId } = req.user || {}; 
       
       if (!text || !userId) {
-        return res.status(400).json(errorResponse('Comment text and authentication are required.'));
+        throw new BadRequestError('Comment text and authentication are required.');
       }
       
       const comment = await commentService.createComment({ text, postId, userId, parentId });
       
-      // XP is handled in commentService to avoid duplication
-      
-      res.status(201).json(successResponse(comment, 'Comment created successfully.'));
+      res.status(HTTP_STATUS.CREATED).json(successResponse(comment, 'Comment created successfully.'));
     } catch (error) {
       next(error);
     }
@@ -55,12 +57,12 @@ class CommentController {
       const { userId } = req.user || {};
 
       if (!text || !userId) {
-          return res.status(400).json(errorResponse('Comment text and authentication are required for an update.'));
+          throw new BadRequestError('Comment text and authentication are required for an update.');
       }
 
       const updatedComment = await commentService.updateComment(commentId, userId, { text });
 
-      res.status(200).json(successResponse(updatedComment, 'Comment updated successfully.'));
+      res.status(HTTP_STATUS.OK).json(successResponse(updatedComment, 'Comment updated successfully.'));
     } catch (error) {
       next(error);
     }
@@ -74,31 +76,22 @@ class CommentController {
       const { commentId } = req.params;
       const { userId } = req.user || {}; 
       
-      console.log('🗑️ Comment deletion request:', {
-        commentId,
-        userId,
-        userAgent: req.headers['user-agent']
-      });
+      logger.debug('Comment deletion request:', { commentId, userId });
       
       if (!userId) {
-        return res.status(400).json(errorResponse('Authentication is required.'));
+        throw new UnauthorizedError(ERROR_MESSAGES.AUTH_REQUIRED);
       }
       
       if (!commentId) {
-        return res.status(400).json(errorResponse('Comment ID is required.'));
+        throw new BadRequestError('Comment ID is required.');
       }
       
       const result = await commentService.deleteComment(commentId, userId);
       
-      console.log('✅ Comment deleted successfully:', commentId);
-      res.status(200).json(successResponse(null, 'Comment deleted successfully.'));
+      logger.info('Comment deleted successfully:', commentId);
+      res.status(HTTP_STATUS.OK).json(successResponse(null, 'Comment deleted successfully.'));
     } catch (error) {
-      console.error('❌ Comment deletion controller error:', error);
-      console.error('❌ Controller error details:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      });
+      logger.error('Comment deletion error:', error);
       next(error);
     }
   }
@@ -112,9 +105,9 @@ class CommentController {
       
       const result = await commentService.reportComment(commentId);
       
-      res.json(successResponse(result, 'Comment reported successfully'));
+      res.status(HTTP_STATUS.OK).json(successResponse(result, 'Comment reported successfully'));
     } catch (error) {
-      console.error('❌ Error in reportComment:', error);
+      logger.error('Error in reportComment:', error);
       next(error);
     }
   }
