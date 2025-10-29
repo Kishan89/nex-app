@@ -1,6 +1,7 @@
 // controllers/xpController.js
 const xpService = require('../services/xpService');
-const logger = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('XPController');
 
 /**
  * Get XP rules for display in the app

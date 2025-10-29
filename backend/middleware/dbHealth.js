@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
-const logger = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('DBHealth');
 
 // Database health check middleware
 const dbHealthCheck = async (req, res, next) => {

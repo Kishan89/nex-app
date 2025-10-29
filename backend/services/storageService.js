@@ -1,7 +1,8 @@
 const { supabase } = require('../config/database');
 const path = require('path');
 const fs = require('fs');
-const logger = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('StorageService');
 
 class StorageService {
   constructor() {

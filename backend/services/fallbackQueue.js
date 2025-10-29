@@ -5,7 +5,8 @@ const notificationService = require('./notificationService');
 const { sendFollowNotification } = require('./fcmService');
 const xpService = require('./xpService');
 const socketService = require('./socketService');
-const logger = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('FallbackQueueService');
 
 class FallbackQueueService {
   constructor() {

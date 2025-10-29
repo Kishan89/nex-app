@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
-const logger = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('PushTokenController');
 
 const savePushToken = async (req, res) => {
   try {

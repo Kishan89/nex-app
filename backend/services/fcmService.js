@@ -1,7 +1,8 @@
 // services/fcmService.js
 const admin = require('../lib/firebaseAdmin');
 const { prisma } = require('../config/database');
-const logger = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('FCMService');
 
 /**
  * Send FCM push notification to specific users

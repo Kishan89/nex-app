@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const { UnauthorizedError } = require("../utils/errors");
-const logger = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('AuthMiddleware');
 
 const JWT_SECRET =
   process.env.JWT_SECRET ||

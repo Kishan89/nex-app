@@ -3,7 +3,8 @@ const jwt = require('jsonwebtoken');
 const chatService = require('./chatService');
 const notificationService = require('./notificationService');
 const { sendMessageNotification } = require('./fcmService');
-const logger = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('SocketService');
 
 class SocketService {
   constructor() {

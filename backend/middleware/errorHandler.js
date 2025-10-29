@@ -1,4 +1,5 @@
-const logger = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('ErrorHandler');
 
 /**
  * Global error handling middleware

@@ -1,7 +1,8 @@
 // controllers/fcmController.js
 const { saveFCMToken, removeFCMToken, getUserFCMTokens, sendMessageNotification } = require('../services/fcmService');
 const { successResponse, errorResponse } = require('../utils/helpers');
-const logger = require('../utils/logger');
+const { createLogger } = require('../utils/logger');
+const logger = createLogger('FCMController');
 
 class FCMController {
   /**
