@@ -140,7 +140,13 @@ export default function NotificationsScreen() {
   const handleNotificationPress = useCallback((notification: SimpleNotification) => {
     // Handle notification navigation manually (real-time service removed)
     if (notification.postId) {
-      router.push(`/post/${notification.postId}`);
+      // Add fromNotification parameter to ensure post is fetched even if not loaded on homepage
+      // Add scrollToComments for comment notifications to auto-open comments
+      const isCommentNotification = notification.type?.toLowerCase() === 'comment';
+      const params = isCommentNotification 
+        ? `?fromNotification=true&scrollToComments=true`
+        : `?fromNotification=true`;
+      router.push(`/post/${notification.postId}${params}`);
     } else if (notification.userId) {
       router.push(`/profile/${notification.userId}`);
     }

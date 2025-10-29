@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Modal, Alert, Share as RNShare } from 'react-native';
 import { Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, Pin } from 'lucide-react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
@@ -34,7 +34,7 @@ type Props = {
   onTextToggle?: () => void; // Callback for text expand/collapse
   refreshKey?: number; // Key to reset TruncatedText state on refresh
 };
-export default function PostCard({
+const PostCard = React.memo(function PostCard({
   post,
   isLiked,
   isBookmarked,
@@ -76,16 +76,16 @@ export default function PostCard({
     setLocalCommentsCount(post.commentsCount || post.comments || 0);
   }, [post.liked, isLiked, post.likesCount, post.likes, post.commentsCount, post.comments]);
 
-  // Optimize image when post changes
+  // Optimize image when post changes - memoized to prevent re-runs
   React.useEffect(() => {
-    if (post.image) {
+    if (post.image && !optimizedImageUri) {
       ImageOptimizer.optimizeImage(post.image, {
         quality: 0.8,
         maxWidth: 800,
         maxHeight: 600
       }).then(setOptimizedImageUri);
     }
-  }, [post.image]);
+  }, [post.image, optimizedImageUri]);
   // Throttle handlers to prevent rapid clicks
   const handleLike = useThrottledCallback(() => {
     // Animate heart
@@ -148,6 +148,7 @@ export default function PostCard({
     );
   };
   const isOwnPost = currentUserId === post.userId;
+  
   return (
     <View style={[styles.postCard, { backgroundColor: colors.background }]}>
       {/* Header with Avatar */}
@@ -327,7 +328,22 @@ export default function PostCard({
       </Modal>
     </View>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return (
+    prevProps.post.id === nextProps.post.id &&
+    prevProps.isLiked === nextProps.isLiked &&
+    prevProps.isBookmarked === nextProps.isBookmarked &&
+    prevProps.post.likesCount === nextProps.post.likesCount &&
+    prevProps.post.commentsCount === nextProps.post.commentsCount &&
+    prevProps.hasVotedOnPoll === nextProps.hasVotedOnPoll &&
+    prevProps.userPollVote === nextProps.userPollVote &&
+    prevProps.refreshKey === nextProps.refreshKey
+  );
+});
+
+export default PostCard;
+
 const styles = StyleSheet.create({
   postCard: { 
     paddingVertical: Spacing.sm,

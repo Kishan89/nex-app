@@ -367,7 +367,7 @@ export default function HomeScreen() {
         refreshKey={refreshKey}
       />
     );
-  }, [getPostById, postInteractions, toggleLike, openComments, toggleBookmark, votePoll, handleSharePost, handleReportPostFromFeed, handleDeletePost, user?.id, refreshKey]);
+  }, [getPostById, postInteractions, toggleLike, openComments, toggleBookmark, votePoll, user?.id, refreshKey]);
   
   // Render footer for loading more posts - ONLY show loading indicator
   const renderFooter = useCallback(() => {
@@ -434,7 +434,6 @@ export default function HomeScreen() {
           contentContainerStyle={{ paddingBottom: 80, paddingTop: 100 }}
           onEndReached={() => {
             if (item === 'Latest' && hasMorePosts && !loadingMore) {
-              console.log('🔄 onEndReached triggered - loading more posts');
               loadMorePosts();
             }
           }}
@@ -445,10 +444,10 @@ export default function HomeScreen() {
           bounces={true}
           alwaysBounceVertical={true}
           removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
-          initialNumToRender={10}
-          windowSize={21}
+          maxToRenderPerBatch={5}
+          updateCellsBatchingPeriod={100}
+          initialNumToRender={5}
+          windowSize={10}
         />
       </View>
     );
@@ -458,8 +457,8 @@ export default function HomeScreen() {
       loadMorePosts();
     }
   }, [activeTab, hasMorePosts, loadingMore, loadMorePosts]);
-  // Create dynamic styles inside component to access colors
-  const styles = createStyles(colors);
+  // Memoize styles to prevent recreation on every render
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* StatusBar is handled globally in main app layout */}

@@ -9,13 +9,6 @@ import {
   DeviceEventEmitter,
 } from 'react-native';
 import { BarChart3, Users } from 'lucide-react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withSpring,
-  withTiming,
-  interpolate
-} from 'react-native-reanimated';
 import { useTheme } from '@/context/ThemeContext';
 import { usePollVote } from '@/context/PollVoteContext';
 const { width } = Dimensions.get('window');
@@ -55,7 +48,7 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
   const [localUserVote, setLocalUserVote] = useState(globalUserVote || userVote);
   const [localOptions, setLocalOptions] = useState(poll.options);
   
-  // Single effect to sync all vote state changes - no setTimeout delays
+  // Single effect to sync vote state - ONLY poll.id dependency to prevent re-renders
   useEffect(() => {
     const storedHasVoted = hasVotedOnPoll(poll.id);
     const storedUserVote = getUserVoteForPoll(poll.id);
@@ -64,10 +57,7 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
       setLocalHasVoted(true);
       setLocalUserVote(storedUserVote);
     }
-    
-    // Update options if poll data changed
-    setLocalOptions(poll.options);
-  }, [poll.id, poll.options, hasVotedOnPoll, getUserVoteForPoll]);
+  }, [poll.id, hasVotedOnPoll, getUserVoteForPoll]);
   // Listen for poll vote sync events from other screens
   useEffect(() => {
     const handlePollVoteSync = (data: { pollId: string; optionId: string }) => {
@@ -92,22 +82,32 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
   // Handle vote submission
   const handleVote = async (optionId: string) => {
     if (localHasVoted || isVoting) return;
+    
+    // OPTIMISTIC UPDATE - Update UI immediately for instant feedback
+    setLocalHasVoted(true);
+    setLocalUserVote(optionId);
+    setLocalOptions(prev => prev.map(opt => 
+      opt.id === optionId 
+        ? { ...opt, votesCount: (opt.votesCount || 0) + 1 }
+        : opt
+    ));
+    
+    // Store vote in AsyncStorage for persistence
+    syncPollVoteAcrossScreens(poll.id, optionId);
+    
     try {
       setIsVoting(true);
-      // First submit to backend
+      // Submit to backend in background
       await onVote(poll.id, optionId);
-      // Only update local state after successful backend submission
-      setLocalHasVoted(true);
-      setLocalUserVote(optionId);
+    } catch (error: any) {
+      // Revert optimistic update on error
+      setLocalHasVoted(false);
+      setLocalUserVote(undefined);
       setLocalOptions(prev => prev.map(opt => 
         opt.id === optionId 
-          ? { ...opt, votesCount: (opt.votesCount || 0) + 1 }
+          ? { ...opt, votesCount: Math.max(0, (opt.votesCount || 0) - 1) }
           : opt
       ));
-      // Store vote in AsyncStorage for persistence
-      syncPollVoteAcrossScreens(poll.id, optionId);
-      } catch (error: any) {
-      // Don't update local state if backend submission fails
       Alert.alert('Error', error.message || 'Failed to cast vote');
     } finally {
       setIsVoting(false);
@@ -149,7 +149,7 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
           const isUserVote = localUserVote === option.id;
           const isWinning = winningOptions.includes(option.id) && totalVotes > 0;
           return (
-            <MemoizedPollOptionItem
+            <PollOptionItem
               key={option.id}
               option={option}
               percentage={percentage}
@@ -189,7 +189,7 @@ interface PollOptionItemProps {
   colors: any;
   isDark: boolean;
 }
-const PollOptionItem: React.FC<PollOptionItemProps> = React.memo(({
+const PollOptionItem: React.FC<PollOptionItemProps> = ({
   option,
   percentage,
   votes,
@@ -201,18 +201,8 @@ const PollOptionItem: React.FC<PollOptionItemProps> = React.memo(({
   colors,
   isDark,
 }) => {
-  const progressWidth = useSharedValue(0);
-  React.useEffect(() => {
-    if (hasVoted) {
-      progressWidth.value = withSpring(percentage);
-    }
-  }, [hasVoted, percentage]);
-  const progressStyle = useAnimatedStyle(() => {
-    'worklet';
-    return { 
-      width: `${progressWidth.value}%`
-    };
-  });
+  // Direct width calculation - no animation delays
+  const progressWidth = hasVoted ? percentage : 0;
 
   // Create dynamic styles inside component to access colors
   const styles = createStyles(colors, isDark);
@@ -243,7 +233,7 @@ const PollOptionItem: React.FC<PollOptionItemProps> = React.memo(({
     >
       {/* Progress Bar (only shown after voting) */}
       {hasVoted && (
-        <Animated.View style={[styles.progressBar, progressStyle]} />
+        <View style={[styles.progressBar, { width: `${progressWidth}%` }]} />
       )}
       {/* Option Content */}
       <View style={styles.optionContent}>
@@ -268,20 +258,7 @@ const PollOptionItem: React.FC<PollOptionItemProps> = React.memo(({
       </View>
     </TouchableOpacity>
   );
-});
-
-// Memoized version to prevent unnecessary re-renders
-const MemoizedPollOptionItem = React.memo(PollOptionItem, (prevProps, nextProps) => {
-  return (
-    prevProps.option.id === nextProps.option.id &&
-    prevProps.percentage === nextProps.percentage &&
-    prevProps.votes === nextProps.votes &&
-    prevProps.isUserVote === nextProps.isUserVote &&
-    prevProps.isWinning === nextProps.isWinning &&
-    prevProps.hasVoted === nextProps.hasVoted &&
-    prevProps.isVoting === nextProps.isVoting
-  );
-});
+};
 // Create dynamic styles function
 const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {

@@ -95,6 +95,7 @@ export default function CreatePostScreen() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
   const handlePost = async () => {
     if (!user?.id) return Alert.alert('Not logged in', 'Please log in to create a post.');
     if (!content.trim() && !imageUri && !isCreatingPoll) return Alert.alert('Empty post', 'Write something, choose an image, or create a poll.');
@@ -104,6 +105,13 @@ export default function CreatePostScreen() {
       if (!pollQuestion.trim()) return Alert.alert('Invalid Poll', 'Please enter a poll question.');
       const validOptions = pollOptions.map(o => o.trim()).filter(Boolean);
       if (validOptions.length < 2) return Alert.alert('Invalid Poll', 'A poll must have at least two options.');
+
+      // Check for duplicate options
+      const uniqueOptions = new Set(validOptions.map(opt => opt.toLowerCase()));
+      if (uniqueOptions.size !== validOptions.length) {
+        return Alert.alert('Duplicate Options', 'Poll options must be unique. Please remove duplicate options.');
+      }
+
       pollData = { question: pollQuestion.trim(), options: validOptions };
     }
     Keyboard.dismiss();

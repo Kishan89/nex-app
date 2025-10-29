@@ -695,11 +695,9 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
       await apiService.votePoll(pollId, optionId);
       // Save vote to local storage after successful API call
       await pollVoteStorage.savePollVote(pollId, optionId);
-      // Refresh posts to get updated poll vote counts from server
-      // This ensures all screens show the correct vote counts
-      setTimeout(() => {
-        loadPosts(1, false, true); // Force refresh to get latest poll data
-      }, 500);
+      // NO REFRESH - Optimistic update already handled the UI
+      // The vote count is already incremented in PollComponent
+      // No need to reload all posts just for poll counts
     } catch (error: any) {
       // Check if it's a 409 error (already voted)
       if (error.message?.includes('409') || error.message?.includes('already voted')) {

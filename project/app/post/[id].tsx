@@ -70,16 +70,18 @@ export default function PostScreen() {
           const response = await apiService.getPostById(id);
           if (response.success && response.data) {
             setFetchedPost(response.data);
-            } else {
+          } else {
+            Alert.alert('Error', 'Post not found or has been deleted.');
           }
         } catch (error) {
-          } finally {
+          Alert.alert('Error', 'Failed to load post. Please try again.');
+        } finally {
           setFetchingPost(false);
         }
       }
     };
     fetchPostIfNeeded();
-  }, [id, getPostById, fetchingPost]);
+  }, [id, getPostById]);
   // Load comments when screen opens
   useEffect(() => {
     if (id) {
