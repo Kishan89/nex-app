@@ -2,6 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const corsMiddleware = require('./middleware/cors');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { lightDbCheck } = require('./middleware/dbHealth');
@@ -20,6 +21,24 @@ const HOST = process.env.HOST || '0.0.0.0';
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(corsMiddleware);
+
+// Serve static files for deep link redirect page
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Deep link redirect routes for web -> app (MUST be before API routes)
+app.get('/post/:postId', (req, res) => {
+    console.log('📱 Redirect request for post:', req.params.postId);
+    res.sendFile(path.join(__dirname, 'public', 'redirect.html'));
+});
+app.get('/profile/:userId', (req, res) => {
+    console.log('📱 Redirect request for profile:', req.params.userId);
+    res.sendFile(path.join(__dirname, 'public', 'redirect.html'));
+});
+app.get('/p/:postId', (req, res) => {
+    console.log('📱 Redirect request for short post:', req.params.postId);
+    res.sendFile(path.join(__dirname, 'public', 'redirect.html'));
+});
+
 app.use('/api/push-tokens', pushTokenRoutes);
 // ⭐️ Using Supabase Storage for file uploads
 

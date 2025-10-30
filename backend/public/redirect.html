@@ -93,19 +93,24 @@
         
         if (urlPath.includes('/profile/')) {
             type = 'profile';
-            postId = urlPath.split('/profile/')[1].split('?')[0];
+            postId = urlPath.split('/profile/')[1].split('?')[0].split('/')[0];
         } else if (urlPath.includes('/post/')) {
             type = 'post';
-            postId = urlPath.split('/post/')[1].split('?')[0];
+            postId = urlPath.split('/post/')[1].split('?')[0].split('/')[0];
         } else if (urlPath.includes('/p/')) {
             type = 'post';
-            postId = urlPath.split('/p/')[1].split('?')[0];
+            postId = urlPath.split('/p/')[1].split('?')[0].split('/')[0];
         }
         
         // Fallback to URL parameters
         if (!postId) {
             postId = urlParams.get('post') || urlParams.get('id');
             type = urlParams.get('type') || 'post';
+        }
+        
+        // Clean the postId - remove any trailing slashes or extra characters
+        if (postId) {
+            postId = postId.trim().replace(/\/$/, '');
         }
         
         // Build deep link
