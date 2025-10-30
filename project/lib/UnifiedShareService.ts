@@ -77,7 +77,7 @@ export class UnifiedShareService {
     try {
       const { webLink } = this.generatePostLinks(postId);
       await Clipboard.setString(webLink);
-      Alert.alert('✅ Link Copied!', 'Post link copied to clipboard. Share it anywhere!');
+      Alert.alert('Link Copied', 'Post link copied to clipboard successfully');
       return true;
     } catch (error) {
       console.error('Copy error:', error);
@@ -87,26 +87,28 @@ export class UnifiedShareService {
   }
 
   /**
-   * Show share options dialog
+   * Show share options dialog - Beautiful and simple
    */
   static showShareOptions(postId: string, username: string, content?: string) {
     Alert.alert(
       'Share Post',
-      'Choose how to share this post:',
+      'Choose how you want to share this post',
       [
         {
-          text: '📤 Share to Apps',
-          onPress: () => this.sharePost(postId, username, content)
+          text: 'Share to Apps',
+          onPress: () => this.sharePost(postId, username, content),
+          style: 'default'
         },
         {
-          text: '📋 Copy Link',
-          onPress: () => this.copyPostLink(postId)
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel'
+          text: 'Copy Link',
+          onPress: () => this.copyPostLink(postId),
+          style: 'default'
         }
-      ]
+      ],
+      { 
+        cancelable: true,
+        userInterfaceStyle: 'light'
+      }
     );
   }
 
@@ -153,7 +155,7 @@ export class UnifiedShareService {
     try {
       const webLink = `${SHARE_BASE_URL}/profile/${userId}`;
       await Clipboard.setString(webLink);
-      Alert.alert('✅ Link Copied!', 'Profile link copied to clipboard.');
+      Alert.alert('Link Copied', 'Profile link copied to clipboard successfully');
       return true;
     } catch (error) {
       console.error('Copy profile link error:', error);
