@@ -27,7 +27,7 @@ export const loadImageCompression = () =>
   lazyLoadLibrary(() => import('expo-image-manipulator'));
 
 export const loadShareService = () => 
-  lazyLoadLibrary(() => import('@/lib/shareService'));
+  lazyLoadLibrary(() => import('@/lib/UnifiedShareService'));
 
 export const loadNotificationService = () => 
   lazyLoadLibrary(() => import('@/lib/fcmService'));

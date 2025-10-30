@@ -237,10 +237,11 @@ export default function PostScreen() {
         }}
         onShare={async () => {
           try {
-            const { ShareService } = await import('@/lib/shareService');
-            await ShareService.quickShare(post.id, post.username, post.content);
+            const { UnifiedShareService } = await import('@/lib/UnifiedShareService');
+            UnifiedShareService.showShareOptions(post.id, post.username, post.content);
           } catch (error) {
-            }
+            console.error('Share error:', error);
+          }
         }}
         onReport={async () => {
           try {

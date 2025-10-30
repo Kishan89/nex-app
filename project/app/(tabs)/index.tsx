@@ -155,10 +155,11 @@ export default function HomeScreen() {
   const handleSharePost = useCallback(async () => {
     if (selectedPost) {
       try {
-        const { ShareService } = await import('@/lib/shareService');
-        await ShareService.quickShare(selectedPost.id, selectedPost.username, selectedPost.content);
+        const { UnifiedShareService } = await import('@/lib/UnifiedShareService');
+        await UnifiedShareService.quickShare(selectedPost.id, selectedPost.username, selectedPost.content);
       } catch (error) {
-        }
+        console.error('Share error:', error);
+      }
     }
   }, [selectedPost]);
   const handleReportPost = useCallback(async () => {

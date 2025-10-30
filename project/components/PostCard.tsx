@@ -11,8 +11,6 @@ import ImageOptimizer from '@/lib/imageOptimizer';
 import { useTheme } from '@/context/ThemeContext';
 import { useThrottledCallback } from '@/hooks/useDebounce';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
-import { ShareService } from '@/lib/shareService';
-import { QuickShareService } from '@/lib/shareServiceQuick';
 const { width } = Dimensions.get('window');
 type Props = {
   post: NormalizedPost;
@@ -108,8 +106,9 @@ const PostCard = React.memo(function PostCard({
   const handleShare = async () => {
     setShowOptionsMenu(false);
     try {
-      // Use QuickShareService which gives users multiple options
-      await QuickShareService.sharePostWithOptions(post.id, post.username, post.content);
+      // Use UnifiedShareService - complete sharing with deep linking
+      const { UnifiedShareService } = await import('@/lib/UnifiedShareService');
+      UnifiedShareService.showShareOptions(post.id, post.username, post.content);
     } catch (error) {
       console.error('Share error:', error);
     }

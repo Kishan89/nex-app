@@ -26,6 +26,7 @@
     "url": "https://github.com/Kishan89/nex-app.git"
   },
   "dependencies": {
+    "@react-native-clipboard/clipboard": "^1.16.3",
     "node-fetch": "^3.3.2"
   }
 }
