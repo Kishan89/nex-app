@@ -116,7 +116,16 @@
       },
       "googleWebClientId": "775891172931-b6r8as807ahbuiclek3lvqmv2aqqolsa.apps.googleusercontent.com",
       "googleAndroidClientId": "775891172931-ncpt427eouiuf45eb918nfgdh73njcjn.apps.googleusercontent.com",
-      "googleIosClientId": "775891172931-b6r8as807ahbuiclek3lvqmv2aqqolsa.apps.googleusercontent.com"
-    }
+      "googleIosClientId": "775891172931-b6r8as807ahbuiclek3lvqmv2aqqolsa.apps.googleusercontent.com",
+      "oneSignalAppId": "3be4f14c-d8b5-4d0b-8ddf-f9e73f813215"
+    },
+    "plugins": [
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "production"
+        }
+      ]
+    ]
   }
 }

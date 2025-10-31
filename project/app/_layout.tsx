@@ -27,6 +27,7 @@ import { notificationNavigationService } from '@/lib/notificationNavigationServi
 import { fcmService } from '@/lib/fcmService';
 import { ultraFastChatCache } from '@/lib/ChatCache';
 import OptimizationManager from '@/lib/optimizationManager';
+import { oneSignalService } from '@/lib/onesignal';
 // Removed imports - initialization moved to SplashContext
 // Component to manage the status bar appearance
 const AppStatusBar = () => {
@@ -79,6 +80,20 @@ function AppWithNotifications() {
         });
       // Initialize main FCM service only (handles Firebase push notifications)
       fcmService.initialize();
+      
+      // Initialize OneSignal and set user ID
+      oneSignalService.initialize().then(() => {
+        // Set external user ID for targeting specific users
+        oneSignalService.setExternalUserId(user.id);
+        
+        // Add user tags for segmentation (optional)
+        oneSignalService.addTags({
+          userId: user.id,
+          username: user.username || '',
+          platform: Platform.OS,
+        });
+      });
+      
       // Disable other FCM services to prevent conflicts
       // cleanFCMService.initialize();
       // notificationNavigationService.initialize();
@@ -90,6 +105,8 @@ function AppWithNotifications() {
       }, 1500);
     } else {
       fcmService.cleanup();
+      // Remove OneSignal user ID on logout
+      oneSignalService.removeExternalUserId();
       // notificationNavigationService.setNavigationReady(false);
       // cleanFCMService.cleanup();
       // notificationNavigationService.cleanup();

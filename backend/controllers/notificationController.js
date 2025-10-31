@@ -3,6 +3,7 @@ const { formatTimeAgo, getNotificationAction } = require('../utils/helpers');
 const { createLogger } = require('../utils/logger');
 const { HTTP_STATUS, ERROR_MESSAGES } = require('../constants');
 const { BadRequestError } = require('../utils/errors');
+const oneSignalService = require('../services/oneSignalService');
 
 const logger = createLogger('NotificationController');
 
@@ -194,7 +195,145 @@ const markNotificationsAsRead = async (req, res) => {
     }
 };
 
+/**
+ * Send broadcast notification to all users
+ * Admin only endpoint
+ */
+const sendBroadcastNotification = async (req, res) => {
+    try {
+        const { title, message, data, imageUrl, url } = req.body;
+        
+        if (!title || !message) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: 'Title and message are required' 
+            });
+        }
+
+        logger.info('Sending broadcast notification:', { title, message });
+
+        const result = await oneSignalService.sendBroadcastNotification({
+            title,
+            message,
+            data,
+            imageUrl,
+            url
+        });
+
+        logger.info('Broadcast notification sent successfully:', result);
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: 'Broadcast notification sent successfully',
+            notificationId: result.notificationId,
+            recipients: result.recipients
+        });
+
+    } catch (error) {
+        logger.error('Error sending broadcast notification:', error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: 'Failed to send broadcast notification',
+            error: error.message 
+        });
+    }
+};
+
+/**
+ * Send notification to specific users
+ * Admin only endpoint
+ */
+const sendToSpecificUsers = async (req, res) => {
+    try {
+        const { userIds, title, message, data, imageUrl, url } = req.body;
+        
+        if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: 'userIds array is required' 
+            });
+        }
+
+        if (!title || !message) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: 'Title and message are required' 
+            });
+        }
+
+        logger.info('Sending notification to specific users:', { userIds, title, message });
+
+        const result = await oneSignalService.sendToSpecificUsers(userIds, {
+            title,
+            message,
+            data,
+            imageUrl,
+            url
+        });
+
+        logger.info('Notification sent to specific users successfully:', result);
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: 'Notification sent successfully',
+            notificationId: result.notificationId,
+            recipients: result.recipients
+        });
+
+    } catch (error) {
+        logger.error('Error sending notification to specific users:', error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: 'Failed to send notification',
+            error: error.message 
+        });
+    }
+};
+
+/**
+ * Send notification to users matching specific tags/filters
+ * Admin only endpoint
+ */
+const sendToSegment = async (req, res) => {
+    try {
+        const { filters, title, message, data, imageUrl, url } = req.body;
+        
+        if (!filters || !Array.isArray(filters) || filters.length === 0) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: 'filters array is required' 
+            });
+        }
+
+        if (!title || !message) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: 'Title and message are required' 
+            });
+        }
+
+        logger.info('Sending notification to segment:', { filters, title, message });
+
+        const result = await oneSignalService.sendToSegment(filters, {
+            title,
+            message,
+            data,
+            imageUrl,
+            url
+        });
+
+        logger.info('Notification sent to segment successfully:', result);
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: 'Notification sent successfully',
+            notificationId: result.notificationId,
+            recipients: result.recipients
+        });
+
+    } catch (error) {
+        logger.error('Error sending notification to segment:', error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: 'Failed to send notification',
+            error: error.message 
+        });
+    }
+};
+
 module.exports = {
     getNotificationsByUserId,
-    markNotificationsAsRead
+    markNotificationsAsRead,
+    sendBroadcastNotification,
+    sendToSpecificUsers,
+    sendToSegment
 };

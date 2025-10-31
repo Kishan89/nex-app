@@ -1,8 +1,6 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
-apply plugin: "com.google.gms.google-services"
-
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -94,30 +92,25 @@ android {
         applicationId 'com.mycompany.nexeed1'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 19
-        versionName "1.1.7"
+        versionCode 18
+        versionName "1.1.6"
     }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
-            keyAlias 'androiddebugkey'
             storePassword 'android'
+            keyAlias 'androiddebugkey'
             keyPassword 'android'
-        }
-        release {
-            storeFile file('upload-keystore.jks')
-            keyAlias 'upload'
-            storePassword project.hasProperty('NEXEED_UPLOAD_STORE_PASSWORD') ? NEXEED_UPLOAD_STORE_PASSWORD : 'ashishwwe123'
-            keyPassword project.hasProperty('NEXEED_UPLOAD_KEY_PASSWORD') ? NEXEED_UPLOAD_KEY_PASSWORD : 'ashishwwe123'
         }
     }
     buildTypes {
         debug {
-            // Use default debug signing config (no custom keystore needed)
+            signingConfig signingConfigs.debug
         }
         release {
-            // Using official upload keystore for production builds
-            signingConfig signingConfigs.release
+            // Caution! In production, you need to generate your own keystore file.
+            // see https://reactnative.dev/docs/signed-apk-android.
+            signingConfig signingConfigs.debug
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
@@ -157,23 +150,6 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-    // Import the Firebase BoM
-    implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
-    
-    // Firebase Analytics
-    implementation("com.google.firebase:firebase-analytics")
-    
-    // Firebase Authentication (for Google Sign-in)
-    implementation("com.google.firebase:firebase-auth")
-    
-    // Firebase Cloud Messaging (for push notifications)
-    implementation("com.google.firebase:firebase-messaging")
-    
-    // Firebase Firestore (if using Firestore database)
-    implementation("com.google.firebase:firebase-firestore")
-    
-    // Firebase Storage (if using Firebase Storage)
-    implementation("com.google.firebase:firebase-storage")
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
