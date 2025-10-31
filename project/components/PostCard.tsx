@@ -57,7 +57,7 @@ const PostCard = React.memo(function PostCard({
   const { colors } = useTheme();
   
   // Use post.liked as the source of truth, with isLiked as fallback
-  const [localIsLiked, setLocalIsLiked] = useState(post.liked ?? isLiked ?? false);
+  const [localIsLiked, setLocalIsLiked] = useState(isLiked ?? post.liked ?? false);
   const [localLikesCount, setLocalLikesCount] = useState(post.likesCount || post.likes || 0);
   const [localCommentsCount, setLocalCommentsCount] = useState(post.commentsCount || post.comments || 0);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
@@ -70,10 +70,10 @@ const PostCard = React.memo(function PostCard({
   }));
   // Update local state when post prop changes
   React.useEffect(() => {
-    setLocalIsLiked(post.liked ?? isLiked ?? false);
+    setLocalIsLiked(isLiked ?? post.liked ?? false);
     setLocalLikesCount(post.likesCount || post.likes || 0);
     setLocalCommentsCount(post.commentsCount || post.comments || 0);
-  }, [post.liked, isLiked, post.likesCount, post.likes, post.commentsCount, post.comments]);
+  }, [isLiked, post.liked, post.likesCount, post.likes, post.commentsCount, post.comments]);
 
   // Optimize image when post changes - memoized to prevent re-runs
   React.useEffect(() => {

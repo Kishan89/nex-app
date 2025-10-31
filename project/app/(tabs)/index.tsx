@@ -70,7 +70,7 @@ export default function HomeScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
   
   // Refs for horizontal and vertical FlatLists
-  const horizontalFlatListRef = useRef<FlatList>(null);
+  const horizontalFlatListRef = useRef<any>(null);
   const verticalFlatListRefs = useRef<{ [key: string]: FlatList | null }>({});
   
   // Animation values for scroll-to-hide
@@ -79,8 +79,9 @@ export default function HomeScreen() {
   const fabScale = useRef(new Animated.Value(1)).current;
   const lastScrollY = useRef(0);
   
-  // Animation value for tab indicator
-  const tabIndicatorPosition = useRef(new Animated.Value(0)).current;
+  // Animation values for horizontal scroll and tab indicator
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const tabIndicatorPosition = Animated.divide(scrollX, SCREEN_WIDTH);
   
   // Current tab index
   const currentTabIndex = useRef(0);
@@ -293,22 +294,6 @@ export default function HomeScreen() {
       });
     }, 0);
   }, [loadFollowingPosts, loadTrendingPosts, activeTab, headerTranslateY, fabScale, tabs, followingPosts.length, trendingPosts.length]);
-  // Handle horizontal scroll for tab indicator - 100% ANIMATION-DRIVEN (no setState)
-  const handleHorizontalScroll = useCallback((event: any) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const normalizedPosition = offsetX / SCREEN_WIDTH;
-    
-    // Update indicator position instantly using setValue (synchronous, native thread)
-    // This drives ALL animations: indicator position, text colors, scale - ZERO lag
-    tabIndicatorPosition.setValue(normalizedPosition);
-    
-    // Update current index for data loading logic (doesn't trigger re-render)
-    const activeIndex = Math.round(normalizedPosition);
-    if (activeIndex !== currentTabIndex.current && activeIndex >= 0 && activeIndex < tabsRef.current.length) {
-      currentTabIndex.current = activeIndex;
-    }
-  }, [tabIndicatorPosition]);
-  
   // Handle scroll end to ensure data is loaded and state is synced
   const handleHorizontalScrollEnd = useCallback((event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
@@ -341,8 +326,8 @@ export default function HomeScreen() {
     return (
       <PostCard
         post={post}
-        isLiked={post.liked ?? Boolean(postInteractions[post.id]?.liked)}
-        isBookmarked={post.bookmarked ?? Boolean(postInteractions[post.id]?.bookmarked)}
+        isLiked={postInteractions[post.id]?.liked ?? post.liked}
+        isBookmarked={postInteractions[post.id]?.bookmarked ?? post.bookmarked}
         hasVotedOnPoll={post.hasVotedOnPoll}
         userPollVote={post.userPollVote}
         onLike={() => toggleLike(post.id)}
@@ -573,27 +558,8 @@ export default function HomeScreen() {
                         }),
                       },
                     ],
-                    // Dynamic width - stretches during transition for fluid feel
-                    width: tabIndicatorPosition.interpolate({
-                      inputRange: [
-                        0, 0.05, 0.2, 0.8, 0.95,
-                        1, 1.05, 1.2, 1.8, 1.95, 2
-                      ],
-                      outputRange: [
-                        SCREEN_WIDTH / 3 * 0.6,  // Rest
-                        SCREEN_WIDTH / 3 * 0.62, // Start stretch
-                        SCREEN_WIDTH / 3 * 0.68, // Mid stretch
-                        SCREEN_WIDTH / 3 * 0.68, // Hold stretch
-                        SCREEN_WIDTH / 3 * 0.62, // End stretch
-                        SCREEN_WIDTH / 3 * 0.6,  // Rest
-                        SCREEN_WIDTH / 3 * 0.62, // Start stretch
-                        SCREEN_WIDTH / 3 * 0.68, // Mid stretch
-                        SCREEN_WIDTH / 3 * 0.68, // Hold stretch
-                        SCREEN_WIDTH / 3 * 0.62, // End stretch
-                        SCREEN_WIDTH / 3 * 0.6,  // Rest
-                      ],
-                      extrapolate: 'clamp',
-                    }),
+                    // Fixed width for smooth, jank-free performance
+                    width: SCREEN_WIDTH / 3 * 0.6,
                   },
                 ]}
               >
@@ -615,7 +581,7 @@ export default function HomeScreen() {
           ) : error ? (
             <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
           ) : (
-            <FlatList
+            <Animated.FlatList
               ref={horizontalFlatListRef}
               data={tabs}
               renderItem={renderTabContent}
@@ -623,9 +589,11 @@ export default function HomeScreen() {
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
-              onScroll={handleHorizontalScroll}
+              onScroll={Animated.event([
+                { nativeEvent: { contentOffset: { x: scrollX } } }
+              ], { useNativeDriver: true })}
               onMomentumScrollEnd={handleHorizontalScrollEnd}
-              scrollEventThrottle={1}
+              scrollEventThrottle={16}
               bounces={false}
               removeClippedSubviews={false}
               decelerationRate={0.9999}

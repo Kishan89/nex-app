@@ -377,8 +377,8 @@ export default function ProfileScreen() {
       <PostCard
         key={post.id}
         post={post}
-        isLiked={post.liked ?? Boolean(postInteractions[post.id]?.liked)}
-        isBookmarked={post.bookmarked ?? Boolean(postInteractions[post.id]?.bookmarked)}
+        isLiked={postInteractions[post.id]?.liked ?? post.liked}
+        isBookmarked={postInteractions[post.id]?.bookmarked ?? post.bookmarked}
         hasVotedOnPoll={post.hasVotedOnPoll}
         userPollVote={post.userPollVote}
         onLike={() => toggleLike(post.id)}
