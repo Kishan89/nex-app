@@ -2,21 +2,11 @@
   "expo": {
     "name": "Nexeed",
     "slug": "nexeed-social-app",
-    "scheme": ["boltnexeed", "nexeed"],
+    "scheme": "boltnexeed",
     "version": "1.1.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1a1a1a",
-      "dark": {
-        "image": "./assets/icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#1a1a1a"
-      }
-    },
     "updates": {
       "fallbackToCacheTimeout": 0
     },
@@ -27,23 +17,13 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.mycompany.nexeed1",
       "userInterfaceStyle": "automatic",
-      "splash": {
-        "image": "./assets/icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#1a1a1a",
-        "dark": {
-          "image": "./assets/icon.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#1a1a1a"
-        }
-      },
       "config": {},
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification", "background-fetch", "background-processing"]
       }
     },
     "notification": {
-      "icon": "./assets/notification-icon.png",
+      "icon": "./assets/notification_icon.png",
       "color": "#00d4ff",
       "androidMode": "default",
       "androidCollapsedTitle": "#{unread_notifications} new notifications"
@@ -85,16 +65,6 @@
       ],
       "package": "com.mycompany.nexeed1",
       "googleServicesFile": "./google-services.json",
-      "splash": {
-        "image": "./assets/icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#1a1a1a",
-        "dark": {
-          "image": "./assets/icon.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#1a1a1a"
-        }
-      },
       "softwareKeyboardLayoutMode": "resize",
       "userInterfaceStyle": "automatic",
       "permissions": [

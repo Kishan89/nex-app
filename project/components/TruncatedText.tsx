@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, UIManager } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { FontSizes, FontWeights, Spacing } from '@/constants/theme';
 import LinkDetector from './LinkDetector';
@@ -31,11 +31,6 @@ export default function TruncatedText({
     setIsExpanded(false);
     setShouldTruncate(false);
   }, [text, refreshKey]);
-  
-  // Enable LayoutAnimation on Android
-  if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
   
   const handleTextLayout = (event: any) => {
     const { lines } = event.nativeEvent;

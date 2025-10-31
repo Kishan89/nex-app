@@ -86,6 +86,10 @@ class OneSignalService {
    */
   async setExternalUserId(userId: string) {
     try {
+      if (!this.initialized) {
+        console.log('OneSignal not initialized, skipping setExternalUserId');
+        return;
+      }
       await OneSignal.login(userId);
       console.log('OneSignal external user ID set:', userId);
     } catch (error) {
@@ -99,6 +103,11 @@ class OneSignalService {
    */
   async removeExternalUserId() {
     try {
+      // Only logout if OneSignal is initialized
+      if (!this.initialized) {
+        console.log('OneSignal not initialized, skipping logout');
+        return;
+      }
       await OneSignal.logout();
       console.log('OneSignal external user ID removed');
     } catch (error) {
@@ -124,6 +133,10 @@ class OneSignalService {
    */
   async addTags(tags: Record<string, string>) {
     try {
+      if (!this.initialized) {
+        console.log('OneSignal not initialized, skipping addTags');
+        return;
+      }
       OneSignal.User.addTags(tags);
       console.log('OneSignal tags added:', tags);
     } catch (error) {

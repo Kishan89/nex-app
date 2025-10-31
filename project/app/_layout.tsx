@@ -72,6 +72,12 @@ function AppWithNotifications() {
   const { colors } = useTheme();
   const { isAppReady, isSplashVisible, splashTrigger, hideSplash, isInitialLoad } = useSplash();
   const insets = useSafeAreaInsets();
+  // Initialize OneSignal once on mount (before user authentication)
+  useEffect(() => {
+    // Initialize OneSignal early to prevent "Must call initWithContext before logout" error
+    oneSignalService.initialize();
+  }, []);
+
   // Initialize notification services and ultra-fast cache
   useEffect(() => {
     if (user) {
@@ -81,17 +87,14 @@ function AppWithNotifications() {
       // Initialize main FCM service only (handles Firebase push notifications)
       fcmService.initialize();
       
-      // Initialize OneSignal and set user ID
-      oneSignalService.initialize().then(() => {
-        // Set external user ID for targeting specific users
-        oneSignalService.setExternalUserId(user.id);
-        
-        // Add user tags for segmentation (optional)
-        oneSignalService.addTags({
-          userId: user.id,
-          username: user.username || '',
-          platform: Platform.OS,
-        });
+      // Set OneSignal user ID (OneSignal already initialized above)
+      oneSignalService.setExternalUserId(user.id);
+      
+      // Add user tags for segmentation (optional)
+      oneSignalService.addTags({
+        userId: user.id,
+        username: user.username || '',
+        platform: Platform.OS,
       });
       
       // Disable other FCM services to prevent conflicts
