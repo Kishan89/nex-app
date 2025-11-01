@@ -119,6 +119,7 @@ const googleLogin = async (req, res, next) => {
     const { idToken } = req.body; 
 
     if (!idToken) {
+        logger.error('No ID token provided in request');
         throw new BadRequestError('Google ID token is required.');
     }
 
@@ -126,6 +127,10 @@ const googleLogin = async (req, res, next) => {
         logger.error('Backend GOOGLE_CLIENT_ID is not configured.');
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Server configuration error. Google login is unavailable.' });
     }
+
+    // Log the first and last 10 characters of the token for debugging
+    logger.debug('ID Token preview:', `${idToken.substring(0, 10)}...${idToken.substring(idToken.length - 10)}`);
+    logger.debug('ID Token length:', idToken.length);
 
     logger.debug('Starting Google ID token verification...');
     logger.debug('Using Web Client ID:', GOOGLE_CLIENT_ID);

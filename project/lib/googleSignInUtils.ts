@@ -11,15 +11,22 @@ export const configureGoogleSignIn = async (): Promise<void> => {
     const androidClientId = extra.googleAndroidClientId;
     const iosClientId = extra.googleIosClientId;
     if (!webClientId) {
+      console.error('Google webClientId not found in app.json');
       throw new Error('Google webClientId not found in app.json');
     }
+    console.log('Configuring Google Sign-In with:', {
+      webClientId,
+      androidClientId,
+      iosClientId
+    });
     GoogleSignin.configure({
       webClientId: webClientId, // Web Client ID for server auth
-      iosClientId: iosClientId, // iOS Client ID (same as web for this project)
-      offlineAccess: false,
-      forceCodeForRefreshToken: false,
+      iosClientId: iosClientId, // iOS Client ID
+      offlineAccess: true, // Enable offline access
+      forceCodeForRefreshToken: true,
     });
     } catch (error) {
+    console.error('Google Sign-In configuration error:', error);
     throw error;
   }
 };
@@ -40,6 +47,7 @@ export const signInWithGoogle = async (): Promise<{ idToken: string; user: any }
       user: userInfo.data.user
     };
   } catch (error: any) {
+    console.error('Google Sign-In Error:', error);
     if (error.code === statusCodes.SIGN_IN_CANCELLED) {
       throw new Error('CANCELLED');
     } else if (error.code === statusCodes.IN_PROGRESS) {
@@ -47,6 +55,12 @@ export const signInWithGoogle = async (): Promise<{ idToken: string; user: any }
     } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
       throw new Error('Google Play Services is not available on this device');
     } else {
+      // Log detailed error information
+      console.error('Detailed error:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
       throw new Error(error.message || 'Google sign-in failed');
     }
   }
