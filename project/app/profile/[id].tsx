@@ -234,6 +234,30 @@ export default function ProfileScreen() {
     return activeTab === 'Posts' ? userPosts : bookmarkedPosts;
   }, [isMyProfile, activeTab, userPosts, bookmarkedPosts]);
 
+  // Keep local `userPosts` in sync with global post state and interactions.
+  // This ensures likes/bookmarks update immediately on profile screen when
+  // optimistic updates are performed in the global ListenContext.
+  useEffect(() => {
+    if (!userPosts || userPosts.length === 0) return;
+    setUserPosts(prev => prev.map(p => {
+      const interaction = postInteractions[p.id];
+      const globalPost = posts.find(gp => gp.id === p.id);
+      // If nothing changed, return original
+      if (!interaction && !globalPost) return p;
+      const liked = interaction?.liked ?? globalPost?.liked ?? p.liked ?? false;
+      const bookmarked = interaction?.bookmarked ?? globalPost?.bookmarked ?? p.bookmarked ?? false;
+      const likes = typeof globalPost?.likes !== 'undefined' ? globalPost!.likes : (p.likes ?? p.likesCount ?? 0);
+      const likesCount = typeof globalPost?.likesCount !== 'undefined' ? globalPost!.likesCount : (p.likesCount ?? likes);
+      return {
+        ...p,
+        liked,
+        bookmarked,
+        likes,
+        likesCount
+      };
+    }));
+  }, [postInteractions, posts]);
+
   const loadMoreUserPosts = useCallback(() => {
     if (isLoadingMoreRef.current || !hasMoreUserPosts || activeTab !== 'Posts') {
       return;

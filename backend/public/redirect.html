@@ -117,12 +117,17 @@
             postId = postId.trim().replace(/\/$/, '');
         }
         
-        // Build deep link
+        // Build deep link and forward any relevant query parameters (e.g., scrollToComments)
         let deepLink = '';
+        // Collect parameters we want to forward to the app
+        const forwardParams = [];
+        if (urlParams.get('scrollToComments') === 'true') forwardParams.push('scrollToComments=true');
+        const paramString = forwardParams.length ? `?${forwardParams.join('&')}` : '';
+
         if (type === 'profile') {
-            deepLink = `boltnexeed://profile/${postId}`;
+            deepLink = `boltnexeed://profile/${postId}${paramString}`;
         } else {
-            deepLink = `boltnexeed://post/${postId}`;
+            deepLink = `boltnexeed://post/${postId}${paramString}`;
         }
         
         // Display the deep link

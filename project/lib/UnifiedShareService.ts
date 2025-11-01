@@ -19,9 +19,11 @@ export class UnifiedShareService {
   private static generatePostLinks(postId: string) {
     return {
       // HTTPS link - clickable in all apps, triggers deep linking
-      webLink: `${SHARE_BASE_URL}/post/${postId}`,
+  // Add scrollToComments query so shared links open the comments view by default
+  webLink: `${SHARE_BASE_URL}/post/${postId}?scrollToComments=true`,
       // Direct app scheme for native sharing
-      appLink: `boltnexeed://post/${postId}`,
+  // Include parameter for app scheme as well for direct app links
+  appLink: `boltnexeed://post/${postId}?scrollToComments=true`,
       // Play Store link
       playStoreLink: 'https://play.google.com/store/apps/details?id=com.mycompany.nexeed1'
     };

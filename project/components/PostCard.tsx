@@ -192,13 +192,13 @@ const PostCard = React.memo(function PostCard({
             {post.createdAt?.includes('ago') || post.createdAt === 'now' ? post.createdAt : `${post.createdAt} ago`}
           </Text>
           {/* Content under username with more space */}
-          <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+          <TouchableOpacity onPress={() => (onPress ?? onComment)?.()} activeOpacity={0.9}>
             {post.content && (
               <TruncatedText 
                 text={post.content}
                 maxLines={6}
                 style={styles.postContent}
-                onPress={onPress}
+                onPress={onPress ?? onComment}
                 onToggle={onTextToggle}
                 refreshKey={refreshKey}
               />

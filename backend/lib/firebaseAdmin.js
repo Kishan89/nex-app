@@ -18,7 +18,36 @@ if (!admin.apps.length) {
     if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
       // Load from environment variable (recommended for production)
       console.log('🔧 Using FIREBASE_SERVICE_ACCOUNT_KEY (JSON format)');
-      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      // Try several parsing strategies because some hosting providers (Railway, Heroku)
+      // expose multiline JSON with unescaped newlines which breaks JSON.parse.
+      let parsed = null;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err1) {
+        console.warn('⚠️ FIREBASE_SERVICE_ACCOUNT_KEY JSON.parse failed, trying fallbacks');
+        // 1) Try base64 decode (if the secret was stored base64-encoded)
+        try {
+          const decoded = Buffer.from(raw, 'base64').toString('utf8');
+          parsed = JSON.parse(decoded);
+          console.log('🔧 Decoded FIREBASE_SERVICE_ACCOUNT_KEY from base64');
+        } catch (err2) {
+          // 2) Try escaping actual newline characters to literal "\\n" so JSON.parse can succeed
+          try {
+            const escaped = raw.replace(/\r?\n/g, '\\\\n');
+            parsed = JSON.parse(escaped);
+            console.log('🔧 Parsed FIREBASE_SERVICE_ACCOUNT_KEY after escaping newlines');
+          } catch (err3) {
+            // Give a helpful error with examples
+            console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. Please set the env var either as:\n' +
+              '- A single-line JSON string with escaped newlines (private_key uses \\n),\n' +
+              '- OR base64-encoded JSON,\n' +
+              '- OR provide FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL and FIREBASE_PROJECT_ID separately.');
+            throw err3; // allow outer try/catch to handle and create mock admin
+          }
+        }
+      }
+      serviceAccount = parsed;
       console.log('🔧 Parsed Project ID:', serviceAccount.project_id);
       console.log('🔧 Parsed Client Email:', serviceAccount.client_email);
     } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PROJECT_ID) {
