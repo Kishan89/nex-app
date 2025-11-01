@@ -55,8 +55,8 @@ class CommentService {
       replyMap[reply.parentId].push(reply);
     });
     
-    // Transform comments with nested replies and reverse parent order for latest first
-    const transformedComments = parentComments.reverse().map(parent => {
+    // Transform comments with nested replies - latest first
+    const transformedComments = parentComments.map(parent => {
       const transformedParent = transformComment(parent);
       const replies = replyMap[parent.id] || [];
       transformedParent.replies = replies.map(transformComment);

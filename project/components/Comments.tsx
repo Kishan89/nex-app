@@ -222,15 +222,14 @@ export default function CommentsModal({
         // Remove optimistic comment and let real comment load
         setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
         
-        // Cache the new comment for future instant loading
-        if (post?.id) {
-          // The real comment will be loaded by the parent component and cached
-          console.log('✅ Comment added successfully, cache will be updated by parent');
+        // Reload comments to get the latest order
+        if (post?.id && onLoadComments) {
+          await onLoadComments(post.id);
         }
       } catch (error) {
         // Remove optimistic comment on error
         setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
-        // Restore the comment text
+        // Restore the comment text and anonymous state
         setNewComment(text);
         setIsAnonymous(optimisticComment.isAnonymous);
         console.error('Error adding comment:', error);
@@ -437,16 +436,20 @@ export default function CommentsModal({
             isReply && styles.replyItem
           ]}
         >
-          <Image 
-            source={{ uri: comment.isAnonymous ? 'https://placehold.co/40' : (comment.avatar || 'https://placehold.co/40') }} 
-            style={isReply ? styles.replyAvatar : styles.commentAvatar} 
-          />
+          <TouchableOpacity onPress={comment.isAnonymous ? undefined : undefined} activeOpacity={comment.isAnonymous ? 1 : 0.7}>
+            <Image 
+              source={{ uri: comment.isAnonymous ? 'https://placehold.co/40' : (comment.avatar || 'https://placehold.co/40') }} 
+              style={isReply ? styles.replyAvatar : styles.commentAvatar} 
+            />
+          </TouchableOpacity>
           <View style={styles.commentContent}>
             <View style={styles.commentHeader}>
               <View style={styles.commentUserInfo}>
-                <Text style={styles.commentUsername}>
-                  {comment.isAnonymous ? 'Anonymous' : comment.username}
-                </Text>
+                <TouchableOpacity onPress={comment.isAnonymous ? undefined : undefined} activeOpacity={comment.isAnonymous ? 1 : 0.7}>
+                  <Text style={styles.commentUsername}>
+                    {comment.isAnonymous ? 'Anonymous' : comment.username}
+                  </Text>
+                </TouchableOpacity>
                 <Text style={styles.commentTime}>
                   {comment.time?.includes('ago') || comment.time === 'now' ? comment.time : `${comment.time} ago`}
                 </Text>

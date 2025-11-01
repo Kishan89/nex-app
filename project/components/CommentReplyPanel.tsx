@@ -343,14 +343,18 @@ export default function CommentReplyPanel({
     return (
       <View key={reply.id} style={styles.replyItem}>
         <View style={styles.replyItemRow}>
-          <Image 
-            source={reply.isAnonymous ? { uri: 'https://placehold.co/40' } : (reply.avatar && reply.avatar.trim() !== '' ? { uri: reply.avatar } : require('@/assets/images/default-avatar.png'))} 
-            style={styles.replyAvatar} 
-          />
+          <TouchableOpacity onPress={reply.isAnonymous ? undefined : undefined} activeOpacity={reply.isAnonymous ? 1 : 0.7}>
+            <Image 
+              source={reply.isAnonymous ? { uri: 'https://placehold.co/40' } : (reply.avatar && reply.avatar.trim() !== '' ? { uri: reply.avatar } : require('@/assets/images/default-avatar.png'))} 
+              style={styles.replyAvatar} 
+            />
+          </TouchableOpacity>
           <View style={styles.replyContent}>
           <View style={styles.replyHeader}>
             <View style={styles.replyUserInfo}>
-              <Text style={styles.replyUsername}>{reply.isAnonymous ? 'Anonymous' : reply.username}</Text>
+              <TouchableOpacity onPress={reply.isAnonymous ? undefined : undefined} activeOpacity={reply.isAnonymous ? 1 : 0.7}>
+                <Text style={styles.replyUsername}>{reply.isAnonymous ? 'Anonymous' : reply.username}</Text>
+              </TouchableOpacity>
               <Text style={styles.replyTime}>
                 {reply.time?.includes('ago') || reply.time === 'now' ? reply.time : `${reply.time} ago`}
               </Text>
@@ -443,14 +447,18 @@ export default function CommentReplyPanel({
               {/* Parent Comment */}
               <View style={styles.parentCommentContainer}>
                 <View style={styles.parentComment}>
-                  <Image 
-                    source={parentComment.avatar && parentComment.avatar.trim() !== '' ? { uri: parentComment.avatar } : require('@/assets/images/default-avatar.png')} 
-                    style={styles.parentAvatar} 
-                  />
+                  <TouchableOpacity onPress={parentComment.isAnonymous ? undefined : undefined} activeOpacity={parentComment.isAnonymous ? 1 : 0.7}>
+                    <Image 
+                      source={parentComment.isAnonymous ? { uri: 'https://placehold.co/40' } : (parentComment.avatar && parentComment.avatar.trim() !== '' ? { uri: parentComment.avatar } : require('@/assets/images/default-avatar.png'))} 
+                      style={styles.parentAvatar} 
+                    />
+                  </TouchableOpacity>
                   <View style={styles.parentContent}>
                     <View style={styles.parentHeader}>
                     <View style={styles.parentUserInfo}>
-                        <Text style={styles.parentUsername}>{parentComment.username}</Text>
+                        <TouchableOpacity onPress={parentComment.isAnonymous ? undefined : undefined} activeOpacity={parentComment.isAnonymous ? 1 : 0.7}>
+                          <Text style={styles.parentUsername}>{parentComment.isAnonymous ? 'Anonymous' : parentComment.username}</Text>
+                        </TouchableOpacity>
                         <Text style={styles.parentTime}>
                           {parentComment.time?.includes('ago') || parentComment.time === 'now' ? parentComment.time : `${parentComment.time} ago`}
                         </Text>
