@@ -99,13 +99,34 @@ function transformPost(post) {
  * @returns {Object} - Transformed comment
  */
 function transformComment(comment) {
-    // FORCE FIX: Ensure user object always exists
+    // Check if comment is anonymous first
+    const isAnonymous = Boolean(comment.isAnonymous ?? false);
+    
+    // For anonymous comments, use placeholder data
+    if (isAnonymous) {
+        return {
+            id: comment.id,
+            username: 'Anonymous',
+            avatar: 'https://placehold.co/40',
+            text: comment.text,
+            time: formatTimeAgo(comment.createdAt),
+            parentId: comment.parentId,
+            user: {
+                id: comment.userId, // Keep real userId for backend operations
+                username: 'Anonymous',
+                avatar: 'https://placehold.co/40'
+            },
+            userId: comment.userId, // Keep real userId for backend operations
+            isAnonymous: true
+        };
+    }
+    
+    // For non-anonymous comments, use real user data
     const userObj = comment.user || comment.author || {};
     let userId = userObj.id || comment.userId || comment.authorId;
     let username = userObj.username || comment.username || 'Unknown';
     const avatar = userObj.avatar || comment.avatar || 'https://placehold.co/40';
     
-    // Professional fix: Use comment's userId field if available
     if (!userId && comment.userId) {
         userId = comment.userId;
     }
@@ -113,19 +134,12 @@ function transformComment(comment) {
     const { createLogger } = require('./logger');
     const logger = createLogger('Helpers');
     
-    // Final fallback: If still no userId, log warning but don't hardcode
     if (!userId) {
         logger.warn('Comment missing userId', {
             commentId: comment.id,
             username: username
         });
     }
-    
-    logger.debug('Transform comment', {
-        commentId: comment.id,
-        extractedUserId: userId,
-        extractedUsername: username
-    });
     
     return {
         id: comment.id,
@@ -139,10 +153,8 @@ function transformComment(comment) {
             username: username,
             avatar: avatar
         },
-        // BACKUP: Also add userId at root level for fallback
         userId: userId,
-        // Include anonymous status
-        isAnonymous: Boolean(comment.isAnonymous ?? false)
+        isAnonymous: false
     };
 }
 

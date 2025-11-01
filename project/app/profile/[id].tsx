@@ -73,13 +73,17 @@ export default function ProfileScreen() {
     setLoadingPosts(true);
     try {
       const fetchedPosts = await apiService.getUserPosts(userId, page, 20);
-      const normalized = fetchedPosts.map((p: any) => ({
-        ...p,
-        liked: p.liked || false,
-        bookmarked: p.bookmarked || false,
-        hasVotedOnPoll: false,
-        userPollVote: undefined
-      }));
+      const normalized = fetchedPosts.map((p: any) => {
+        // Sync with global post interactions
+        const globalInteraction = postInteractions[p.id];
+        return {
+          ...p,
+          liked: globalInteraction?.liked ?? p.liked ?? false,
+          bookmarked: globalInteraction?.bookmarked ?? p.bookmarked ?? false,
+          hasVotedOnPoll: p.hasVotedOnPoll ?? false,
+          userPollVote: p.userPollVote
+        };
+      });
 
       setHasMoreUserPosts(normalized.length === 20);
 
@@ -94,7 +98,7 @@ export default function ProfileScreen() {
       setLoadingPosts(false);
       isLoadingMoreRef.current = false;
     }
-  }, [userId]);
+  }, [userId, postInteractions]);
 
   const fetchProfileData = useCallback(async (forceRefresh = false) => {
     if (!userId) {
@@ -131,6 +135,25 @@ export default function ProfileScreen() {
   useEffect(() => {
     fetchProfileData();
   }, [fetchProfileData]);
+
+  // Real-time sync with global posts - update userPosts when global posts change
+  useEffect(() => {
+    if (userPosts.length > 0) {
+      setUserPosts(prevPosts => 
+        prevPosts.map(post => {
+          const globalInteraction = postInteractions[post.id];
+          if (globalInteraction) {
+            return {
+              ...post,
+              liked: globalInteraction.liked,
+              bookmarked: globalInteraction.bookmarked
+            };
+          }
+          return post;
+        })
+      );
+    }
+  }, [postInteractions]);
 
   // Listen for follow state changes from other screens
   useEffect(() => {
@@ -223,16 +246,27 @@ export default function ProfileScreen() {
     }
   }, [userId, chatLoading]);
 
-  // Optimized post filtering with early returns
+  // Sync userPosts with global interactions in real-time
+  const syncedUserPosts = useMemo(() => {
+    return userPosts.map(post => {
+      const globalInteraction = postInteractions[post.id];
+      return {
+        ...post,
+        liked: globalInteraction?.liked ?? post.liked,
+        bookmarked: globalInteraction?.bookmarked ?? post.bookmarked
+      };
+    });
+  }, [userPosts, postInteractions]);
+
   const bookmarkedPosts = useMemo(() => {
     if (!isMyProfile) return [];
     return posts.filter(p => postInteractions[p.id]?.bookmarked);
   }, [posts, postInteractions, isMyProfile]);
 
   const displayedPosts = useMemo(() => {
-    if (!isMyProfile) return userPosts;
-    return activeTab === 'Posts' ? userPosts : bookmarkedPosts;
-  }, [isMyProfile, activeTab, userPosts, bookmarkedPosts]);
+    if (!isMyProfile) return syncedUserPosts;
+    return activeTab === 'Posts' ? syncedUserPosts : bookmarkedPosts;
+  }, [isMyProfile, activeTab, syncedUserPosts, bookmarkedPosts]);
 
   const loadMoreUserPosts = useCallback(() => {
     if (isLoadingMoreRef.current || !hasMoreUserPosts || activeTab !== 'Posts') {
@@ -377,8 +411,8 @@ export default function ProfileScreen() {
       <PostCard
         key={post.id}
         post={post}
-        isLiked={post.liked ?? Boolean(postInteractions[post.id]?.liked)}
-        isBookmarked={post.bookmarked ?? Boolean(postInteractions[post.id]?.bookmarked)}
+        isLiked={Boolean(postInteractions[post.id]?.liked ?? post.liked)}
+        isBookmarked={Boolean(postInteractions[post.id]?.bookmarked ?? post.bookmarked)}
         hasVotedOnPoll={post.hasVotedOnPoll}
         userPollVote={post.userPollVote}
         onLike={() => toggleLike(post.id)}
