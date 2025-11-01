@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "775891172931",
+    "project_id": "nexeed-af819",
+    "storage_bucket": "nexeed-af819.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:775891172931:android:cfef55abc675f95bb61ef6",
+        "android_client_info": {
+          "package_name": "com.mycompany.nexeed1"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "775891172931-ncpt427eouiuf45eb918nfgdh73njcjn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mycompany.nexeed1",
+            "certificate_hash": "5d57a3e6ffe671f48479cdfbdcea089dcc832f57"
+          }
+        },
+        {
+          "client_id": "775891172931-b6r8as807ahbuiclek3lvqmv2aqqolsa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSEldVyWJxteNGaPacmO_pvWbeKU62YqY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "775891172931-b6r8as807ahbuiclek3lvqmv2aqqolsa.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

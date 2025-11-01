@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "version": ">= 16.19.2",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "image": "latest"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "image": "latest",
+        "buildType": "apk"      
+      },
+      "ios": {
+        "simulator": true
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "image": "latest",
+        "buildType": "app-bundle"  
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
