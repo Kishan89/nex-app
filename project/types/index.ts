@@ -41,6 +41,7 @@ export interface Comment {
   time: string;
   user?: User;
   userId?: string; // Added for delete functionality
+  isAnonymous?: boolean;
   replies?: Comment[];
   parentId?: string;
   replyTo?: string; // Username being replied to
@@ -148,6 +149,7 @@ export interface NormalizedPost {
   liked: boolean;
   bookmarked: boolean;
   isPinned?: boolean;
+  isAnonymous?: boolean;
   // Poll data
   poll?: Poll | null;
   // Poll voting state

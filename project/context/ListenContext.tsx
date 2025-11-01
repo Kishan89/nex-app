@@ -59,6 +59,7 @@ const normalizePost = (p: any): NormalizedPost => {
   const bookmarked = Boolean(p.bookmarked ?? p.isBookmarked ?? false);
   const userId = String(p.userId ?? p.author?.id ?? p.user?.id ?? 'unknown');
   const isPinned = Boolean(p.isPinned ?? false);
+  const isAnonymous = Boolean(p.isAnonymous ?? false);
   return {
     id,
     avatar,
@@ -74,6 +75,7 @@ const normalizePost = (p: any): NormalizedPost => {
     liked,
     bookmarked,
     isPinned,
+    isAnonymous,
     // Include poll data
     poll: p.poll ? {
       id: p.poll.id,
@@ -113,6 +115,7 @@ const normalizeComment = (c: any): Comment => {
     replyTo: c.replyTo ?? undefined,
     user: userInfo.id ? userInfo : undefined, // Only include if we have a valid user object
     userId: userId, // Include userId for delete functionality
+    isAnonymous: Boolean(c.isAnonymous ?? false),
     replies: replies, // Preserve nested replies from backend
   };
 };
@@ -793,9 +796,9 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
     } catch (err) {
     }
   }, [saveComments]);
-  const addComment = useCallback(async (postId: string, commentText: string, parentId?: string) => {
+  const addComment = useCallback(async (postId: string, commentText: string, parentId?: string, isAnonymous = false) => {
     try {
-      const newCommentResponse = await apiService.addComment(postId, commentText, parentId);
+      const newCommentResponse = await apiService.addComment(postId, commentText, parentId, isAnonymous);
       // Refresh comments from server to ensure sync
       await loadComments(postId);
       // Update post comment count in all post arrays (both fields for consistency)

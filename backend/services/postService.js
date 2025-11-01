@@ -236,7 +236,7 @@ class PostService {
   }
 
   async createPost(postData) {
-    const { content, imageUrl, userId, pollData } = postData;
+    const { content, imageUrl, userId, pollData, isAnonymous } = postData;
 
     // Process content for YouTube links
     let processedContent = content || '';
@@ -257,7 +257,8 @@ class PostService {
       const postCreateData = { 
         content: processedContent, 
         imageUrl, 
-        userId 
+        userId,
+        isAnonymous: Boolean(isAnonymous)
       };
 
       // Add YouTube data if available

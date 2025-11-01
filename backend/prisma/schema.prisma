@@ -65,6 +65,7 @@ model Post {
   youtubeUrl       String?
   youtubeVideoId   String?
   isPinned         Boolean        @default(false)
+  isAnonymous      Boolean        @default(false)
   poll             Poll?
   bookmarks        Bookmark[]
   comments         Comment[]
@@ -84,6 +85,7 @@ model Comment {
   updatedAt    DateTime  @updatedAt
   parentId     String?
   reportsCount Int       @default(0)
+  isAnonymous  Boolean    @default(false)
   parent       Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies      Comment[] @relation("CommentReplies")
   post         Post      @relation(fields: [postId], references: [id], onDelete: Cascade)

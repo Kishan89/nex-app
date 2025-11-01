@@ -433,16 +433,16 @@ export default function CommentsModal({
             isReply && styles.replyItem
           ]}
         >
-          {comment.avatar && (
-            <Image 
-              source={{ uri: comment.avatar }} 
-              style={isReply ? styles.replyAvatar : styles.commentAvatar} 
-            />
-          )}
+          <Image 
+            source={{ uri: comment.isAnonymous ? 'https://placehold.co/40' : (comment.avatar || 'https://placehold.co/40') }} 
+            style={isReply ? styles.replyAvatar : styles.commentAvatar} 
+          />
           <View style={styles.commentContent}>
             <View style={styles.commentHeader}>
               <View style={styles.commentUserInfo}>
-                <Text style={styles.commentUsername}>{comment.username}</Text>
+                <Text style={styles.commentUsername}>
+                  {comment.isAnonymous ? 'Anonymous' : comment.username}
+                </Text>
                 <Text style={styles.commentTime}>
                   {comment.time?.includes('ago') || comment.time === 'now' ? comment.time : `${comment.time} ago`}
                 </Text>

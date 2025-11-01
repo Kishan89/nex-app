@@ -80,7 +80,7 @@ class CommentService {
 
 
   async createComment(commentData) {
-    const { text, postId, userId, parentId = null } = commentData;
+    const { text, postId, userId, parentId = null, isAnonymous = false } = commentData;
 
     logger.debug('Creating comment', {
       text: text?.substring(0, 50),
@@ -96,6 +96,7 @@ class CommentService {
         text,
         postId,
         userId,
+        isAnonymous: Boolean(isAnonymous),
       };
       
       // Only add parentId if it's not null/undefined/empty

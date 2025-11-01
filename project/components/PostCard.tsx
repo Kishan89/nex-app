@@ -151,9 +151,9 @@ const PostCard = React.memo(function PostCard({
     <View style={[styles.postCard, { backgroundColor: colors.background }]}>
       {/* Header with Avatar */}
       <View style={styles.postHeader}>
-        <TouchableOpacity onPress={onUserPress} activeOpacity={0.7}>
+        <TouchableOpacity onPress={post.isAnonymous ? undefined : onUserPress} activeOpacity={post.isAnonymous ? 1 : 0.7}>
           <Image 
-            source={{ uri: post.avatar || 'https://placehold.co/40' }} 
+            source={{ uri: post.isAnonymous ? 'https://placehold.co/40' : (post.avatar || 'https://placehold.co/40') }} 
             style={styles.userAvatar} 
           />
         </TouchableOpacity>
@@ -161,8 +161,10 @@ const PostCard = React.memo(function PostCard({
           {/* Username and more button */}
           <View style={styles.userInfoHeader}>
             <View style={styles.usernameRow}>
-              <TouchableOpacity onPress={onUserPress} activeOpacity={0.7} style={styles.usernameContainer}>
-                <Text style={[styles.username, { color: colors.text }]} numberOfLines={1}>{post.username}</Text>
+              <TouchableOpacity onPress={post.isAnonymous ? undefined : onUserPress} activeOpacity={post.isAnonymous ? 1 : 0.7} style={styles.usernameContainer}>
+                <Text style={[styles.username, { color: colors.text }]} numberOfLines={1}>
+                  {post.isAnonymous ? 'Anonymous' : post.username}
+                </Text>
               </TouchableOpacity>
               {post.isPinned && (
                 <View style={[styles.pinnedBadge, { backgroundColor: '#004aad15', borderColor: '#004aad30' }]}>

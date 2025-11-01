@@ -32,14 +32,14 @@ class CommentController {
   async createComment(req, res, next) {
     try {
       const { postId } = req.params;
-      const { text, parentId } = req.body;
+      const { text, parentId, isAnonymous } = req.body;
       const { userId } = req.user || {}; 
       
       if (!text || !userId) {
         throw new BadRequestError('Comment text and authentication are required.');
       }
       
-      const comment = await commentService.createComment({ text, postId, userId, parentId });
+      const comment = await commentService.createComment({ text, postId, userId, parentId, isAnonymous });
       
       res.status(HTTP_STATUS.CREATED).json(successResponse(comment, 'Comment created successfully.'));
     } catch (error) {

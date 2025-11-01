@@ -54,7 +54,7 @@ class PostController {
    */
   async createPost(req, res, next) {
     try {
-      const { content, imageUrl, pollData } = req.body;
+      const { content, imageUrl, pollData, isAnonymous } = req.body;
       const userId = req.user?.userId;
       
       if (!content && !imageUrl && !pollData) {
@@ -65,7 +65,7 @@ class PostController {
         throw new UnauthorizedError(ERROR_MESSAGES.AUTH_REQUIRED);
       }
       
-      const post = await postService.createPost({ content, imageUrl, userId, pollData });
+      const post = await postService.createPost({ content, imageUrl, userId, pollData, isAnonymous });
       
       res.status(HTTP_STATUS.CREATED).json(successResponse(post, 'Post created successfully'));
       

@@ -20,7 +20,7 @@ import {
   Linking,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Image as ImageIcon, XCircle, BarChart2 } from 'lucide-react-native';
+import { ArrowLeft, Image as ImageIcon, XCircle, BarChart2, UserX } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useAuth } from '../context/AuthContext';
@@ -38,6 +38,7 @@ export default function CreatePostScreen() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [compressionResult, setCompressionResult] = useState<CompressionResult | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   
   // Word count validation
   const MAX_WORDS = 500;
@@ -126,6 +127,7 @@ export default function CreatePostScreen() {
       const payload: any = {
         content: content.trim(),
         userId: user.id,
+        isAnonymous,
         ...(imageUrl ? { imageUrl } : {}),
         ...(pollData ? { pollData } : {}),
       };
@@ -217,6 +219,16 @@ export default function CreatePostScreen() {
                     <BarChart2 size={22} color={isCreatingPoll ? colors.error : colors.textSecondary} />
                     <Text style={[styles.actionButtonText, { color: isCreatingPoll ? colors.error : colors.textSecondary }]}>
                       Poll
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.actionButton, { backgroundColor: isAnonymous ? colors.primaryAlpha : 'transparent' }]} 
+                    onPress={() => setIsAnonymous(!isAnonymous)} 
+                    disabled={isPosting || isCompressing}
+                  >
+                    <UserX size={22} color={isAnonymous ? colors.primary : colors.textSecondary} />
+                    <Text style={[styles.actionButtonText, { color: isAnonymous ? colors.primary : colors.textSecondary }]}>
+                      Anonymous
                     </Text>
                   </TouchableOpacity>
                 </View>

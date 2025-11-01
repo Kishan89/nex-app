@@ -88,6 +88,8 @@ function transformPost(post) {
         bookmarked: post.isBookmarked || false,
         // Include pinned status
         isPinned: post.isPinned || false,
+        // Include anonymous status
+        isAnonymous: post.isAnonymous || false,
     };
 }
 
@@ -138,7 +140,9 @@ function transformComment(comment) {
             avatar: avatar
         },
         // BACKUP: Also add userId at root level for fallback
-        userId: userId
+        userId: userId,
+        // Include anonymous status
+        isAnonymous: Boolean(comment.isAnonymous ?? false)
     };
 }
 

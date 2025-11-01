@@ -313,10 +313,10 @@ class ApiService {
         }
         return [];
     }
-    async addComment(postId: string, text: string, parentId?: string) {
+    async addComment(postId: string, text: string, parentId?: string, isAnonymous = false) {
         return this.post<Comment>(
             API_ENDPOINTS.POST_COMMENTS(postId),
-            { text, parentId }
+            { text, parentId, isAnonymous }
         );
     }
     async getUserChats(userId: string): Promise<Chat[]> {
