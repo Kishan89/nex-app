@@ -33,7 +33,7 @@ class CommentService {
         }
       },
       orderBy: {
-        createdAt: 'asc'
+        createdAt: 'desc'
       },
       skip,
       take: limit,
@@ -55,8 +55,8 @@ class CommentService {
       replyMap[reply.parentId].push(reply);
     });
     
-    // Transform comments with nested replies
-    const transformedComments = parentComments.map(parent => {
+    // Transform comments with nested replies and reverse parent order for latest first
+    const transformedComments = parentComments.reverse().map(parent => {
       const transformedParent = transformComment(parent);
       const replies = replyMap[parent.id] || [];
       transformedParent.replies = replies.map(transformComment);

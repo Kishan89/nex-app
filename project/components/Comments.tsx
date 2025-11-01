@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
-import { X, Send, Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, ChevronDown, ChevronRight } from 'lucide-react-native';
+import { X, Send, Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, ChevronDown, ChevronRight, UserX } from 'lucide-react-native';
 // Assuming the following types and constants are defined correctly in your project
 import { NormalizedPost, Comment } from '@/types'; 
 import { supabase } from '@/lib/supabase';
@@ -33,7 +33,7 @@ interface CommentsModalProps {
   onClose: () => void;
   post: NormalizedPost | null;
   comments: Comment[];
-  onAddComment: (text: string, parentId?: string) => void;
+  onAddComment: (text: string, parentId?: string, isAnonymous?: boolean) => void;
   onLoadComments: (postId: string) => void;
   onDeleteComment?: (commentId: string) => void;
   currentUserId?: string;
@@ -82,6 +82,7 @@ export default function CommentsModal({
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentRefs, setCommentRefs] = useState<{[key: string]: React.RefObject<View>}>({});
   const [showMenuForComment, setShowMenuForComment] = useState<string | null>(null);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const insets = useSafeAreaInsets();
   const { openCommentReplies } = useCommentReply();
   // Get real-time post data and interactions from ListenContext
@@ -200,22 +201,24 @@ export default function CommentsModal({
         id: `temp-${Date.now()}`, // Temporary ID
         text: text,
         userId: currentUserId || '',
-        username: 'You', // Will be replaced with actual username
+        username: isAnonymous ? 'Anonymous' : 'You', // Will be replaced with actual username
         avatar: '', // Will be replaced with actual avatar
         time: 'now', // Time display
         createdAt: new Date().toISOString(),
         parentId: undefined,
         replies: [],
         isOptimistic: true, // Flag to identify optimistic comments
+        isAnonymous: isAnonymous,
       };
 
-      // Add optimistic comment immediately to UI
+      // Add optimistic comment immediately to UI at the top
       setLocalComments(prev => [optimisticComment, ...prev]);
       setNewComment('');
+      setIsAnonymous(false);
 
       // Call the actual API
       try {
-        await onAddComment(text);
+        await onAddComment(text, undefined, isAnonymous);
         // Remove optimistic comment and let real comment load
         setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
         
@@ -229,6 +232,7 @@ export default function CommentsModal({
         setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
         // Restore the comment text
         setNewComment(text);
+        setIsAnonymous(optimisticComment.isAnonymous);
         console.error('Error adding comment:', error);
       }
     }
@@ -581,29 +585,37 @@ export default function CommentsModal({
                   { paddingBottom: insets.bottom > 0 ? insets.bottom : 8 }
               ]}
           >
-            <TextInput
-              style={[
-                styles.commentInput, 
-                { 
-                  backgroundColor: isDark ? colors.backgroundTertiary : colors.background,
-                  borderWidth: isDark ? 0 : 1,
-                  borderColor: isDark ? 'transparent' : colors.border,
-                }
-              ]}
-              placeholder="Add a comment..."
-              placeholderTextColor={colors.textMuted}
-              value={newComment}
-              onChangeText={setNewComment}
-              multiline
-              keyboardAppearance={isDark ? "dark" : "light"}
-            />
-            <TouchableOpacity
-              onPress={handleSendComment}
-              style={[styles.sendButton, { opacity: newComment.trim() ? 1 : 0.5 }]}
-              disabled={!newComment.trim()}
-            >
-              <Send size={20} color={colors.primary} />
-            </TouchableOpacity>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[
+                  styles.commentInput, 
+                  { 
+                    backgroundColor: isDark ? colors.backgroundTertiary : colors.background,
+                    borderWidth: isDark ? 0 : 1,
+                    borderColor: isDark ? 'transparent' : colors.border,
+                  }
+                ]}
+                placeholder="Add a comment..."
+                placeholderTextColor={colors.textMuted}
+                value={newComment}
+                onChangeText={setNewComment}
+                multiline
+                keyboardAppearance={isDark ? "dark" : "light"}
+              />
+              <TouchableOpacity
+                style={[styles.anonymousToggle, { backgroundColor: isAnonymous ? colors.primaryAlpha : 'transparent' }]}
+                onPress={() => setIsAnonymous(!isAnonymous)}
+              >
+                <UserX size={18} color={isAnonymous ? colors.primary : colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSendComment}
+                style={[styles.sendButton, { opacity: newComment.trim() ? 1 : 0.5 }]}
+                disabled={!newComment.trim()}
+              >
+                <Send size={20} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
         </KeyboardAvoidingView>
@@ -865,8 +877,6 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   // Input Container - positioned at bottom to cover grey area
   commentInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
     paddingBottom: 0, // Base padding, will be overridden by insets
@@ -874,6 +884,17 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.background, // Ensure the container matches theme
     minHeight: 60,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Spacing.sm,
+  },
+  anonymousToggle: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.round,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // 3. Input field style (background is set inline using DARK_INPUT_BACKGROUND)
   commentInput: {

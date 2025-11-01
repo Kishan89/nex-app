@@ -42,7 +42,10 @@ export default function ProfileCompletionBanner({
   const checkBannerStatus = async () => {
     try {
       const dismissedData = await AsyncStorage.getItem(`${BANNER_DISMISSED_KEY}_${userId}`);
-      if (!dismissedData && isProfileIncomplete) {
+      const hasShownBefore = await AsyncStorage.getItem(`${BANNER_DISMISSED_KEY}_shown_${userId}`);
+      
+      if (!dismissedData && !hasShownBefore && isProfileIncomplete) {
+        await AsyncStorage.setItem(`${BANNER_DISMISSED_KEY}_shown_${userId}`, 'true');
         setVisible(true);
         // Animate in
         Animated.parallel([

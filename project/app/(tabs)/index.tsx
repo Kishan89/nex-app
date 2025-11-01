@@ -573,24 +573,13 @@ export default function HomeScreen() {
                         }),
                       },
                     ],
-                    // Dynamic width - stretches during transition for fluid feel
+                    // Smooth width transition
                     width: tabIndicatorPosition.interpolate({
-                      inputRange: [
-                        0, 0.05, 0.2, 0.8, 0.95,
-                        1, 1.05, 1.2, 1.8, 1.95, 2
-                      ],
+                      inputRange: [0, 1, 2],
                       outputRange: [
-                        SCREEN_WIDTH / 3 * 0.6,  // Rest
-                        SCREEN_WIDTH / 3 * 0.62, // Start stretch
-                        SCREEN_WIDTH / 3 * 0.68, // Mid stretch
-                        SCREEN_WIDTH / 3 * 0.68, // Hold stretch
-                        SCREEN_WIDTH / 3 * 0.62, // End stretch
-                        SCREEN_WIDTH / 3 * 0.6,  // Rest
-                        SCREEN_WIDTH / 3 * 0.62, // Start stretch
-                        SCREEN_WIDTH / 3 * 0.68, // Mid stretch
-                        SCREEN_WIDTH / 3 * 0.68, // Hold stretch
-                        SCREEN_WIDTH / 3 * 0.62, // End stretch
-                        SCREEN_WIDTH / 3 * 0.6,  // Rest
+                        SCREEN_WIDTH / 3 * 0.6,
+                        SCREEN_WIDTH / 3 * 0.6,
+                        SCREEN_WIDTH / 3 * 0.6
                       ],
                       extrapolate: 'clamp',
                     }),

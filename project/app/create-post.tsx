@@ -221,14 +221,21 @@ export default function CreatePostScreen() {
                       Poll
                     </Text>
                   </TouchableOpacity>
+                </View>
+                <View style={styles.anonymousSection}>
                   <TouchableOpacity 
-                    style={[styles.actionButton, { backgroundColor: isAnonymous ? colors.primaryAlpha : 'transparent' }]} 
+                    style={[styles.anonymousButton, { 
+                      backgroundColor: isAnonymous ? colors.primary : colors.backgroundTertiary,
+                      borderColor: isAnonymous ? colors.primary : colors.border
+                    }]} 
                     onPress={() => setIsAnonymous(!isAnonymous)} 
                     disabled={isPosting || isCompressing}
                   >
-                    <UserX size={22} color={isAnonymous ? colors.primary : colors.textSecondary} />
-                    <Text style={[styles.actionButtonText, { color: isAnonymous ? colors.primary : colors.textSecondary }]}>
-                      Anonymous
+                    <UserX size={18} color={isAnonymous ? colors.background : colors.textSecondary} />
+                    <Text style={[styles.anonymousButtonText, { 
+                      color: isAnonymous ? colors.background : colors.textSecondary 
+                    }]}>
+                      Post Anonymously
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -450,7 +457,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center', 
     gap: Spacing.md,
-    justifyContent: 'flex-start',
+    marginBottom: Spacing.md,
   },
   actionButton: {
     flexDirection: 'row',
@@ -459,7 +466,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.lg,
     gap: Spacing.xs,
-    // Removed border and shadow for clean look
+    flex: 1,
+    justifyContent: 'center',
+  },
+  anonymousSection: {
+    marginTop: Spacing.xs,
+  },
+  anonymousButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    gap: Spacing.sm,
+    justifyContent: 'center',
+    borderWidth: 1,
+    ...Shadows.small,
+  },
+  anonymousButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
   },
   actionButtonText: {
     fontSize: FontSizes.sm,

@@ -140,7 +140,7 @@ export default function CommentsScreen() {
         }}
         post={post}
         comments={comments[post.id] || []}
-        onAddComment={(txt, parentId) => addComment(post.id, txt, parentId)}
+        onAddComment={(txt, parentId, isAnonymous) => addComment(post.id, txt, parentId, isAnonymous)}
         onLoadComments={loadComments}
         onDeleteComment={async (commentId) => {
           try {

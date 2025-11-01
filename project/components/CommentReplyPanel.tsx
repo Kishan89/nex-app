@@ -32,7 +32,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
-import { X, Send, ArrowLeft, Trash2, MoreVertical, Flag } from 'lucide-react-native';
+import { X, Send, ArrowLeft, Trash2, MoreVertical, Flag, UserX } from 'lucide-react-native';
 import { Comment } from '@/types';
 import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -72,6 +72,7 @@ export default function CommentReplyPanel({
   const [isOperating, setIsOperating] = useState(false); // Prevent auto-close during operations
   const [showMenuForReply, setShowMenuForReply] = useState<string | null>(null);
   const [replyingToReply, setReplyingToReply] = useState<Comment | null>(null);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   // Animation values
@@ -204,6 +205,7 @@ export default function CommentReplyPanel({
     const finalText = replyingToReply ? `@${replyingToReply.username} ${replyText}` : replyText;
     setNewReply('');
     setReplyingToReply(null);
+    setIsAnonymous(false);
     setSending(true);
     setIsOperating(true);
 
@@ -211,11 +213,12 @@ export default function CommentReplyPanel({
     const optimisticReply: Comment = {
       id: `temp-reply-${Date.now()}`,
       text: finalText,
-      username: 'You',
-      avatar: currentUserAvatar || '',
+      username: isAnonymous ? 'Anonymous' : 'You',
+      avatar: isAnonymous ? '' : (currentUserAvatar || ''),
       time: 'now',
       userId: currentUserId || '',
       isOptimistic: true,
+      isAnonymous: isAnonymous,
       createdAt: new Date().toISOString(),
     };
 
@@ -236,7 +239,7 @@ export default function CommentReplyPanel({
         replyText: finalText.substring(0, 50)
       });
       
-      const response = await apiService.addComment(postId, finalText, parentComment.id);
+      const response = await apiService.addComment(postId, finalText, parentComment.id, isAnonymous);
       // Remove optimistic reply and reload to get real data
       setReplies(prev => prev.filter(reply => reply.id !== optimisticReply.id));
       await loadReplies();
@@ -341,13 +344,13 @@ export default function CommentReplyPanel({
       <View key={reply.id} style={styles.replyItem}>
         <View style={styles.replyItemRow}>
           <Image 
-            source={reply.avatar && reply.avatar.trim() !== '' ? { uri: reply.avatar } : require('@/assets/images/default-avatar.png')} 
+            source={reply.isAnonymous ? { uri: 'https://placehold.co/40' } : (reply.avatar && reply.avatar.trim() !== '' ? { uri: reply.avatar } : require('@/assets/images/default-avatar.png'))} 
             style={styles.replyAvatar} 
           />
           <View style={styles.replyContent}>
           <View style={styles.replyHeader}>
             <View style={styles.replyUserInfo}>
-              <Text style={styles.replyUsername}>{reply.username}</Text>
+              <Text style={styles.replyUsername}>{reply.isAnonymous ? 'Anonymous' : reply.username}</Text>
               <Text style={styles.replyTime}>
                 {reply.time?.includes('ago') || reply.time === 'now' ? reply.time : `${reply.time} ago`}
               </Text>
@@ -502,6 +505,12 @@ export default function CommentReplyPanel({
                   multiline
                   keyboardAppearance={isDark ? "dark" : "light"} 
                 />
+                <TouchableOpacity
+                  style={[styles.anonymousToggle, { backgroundColor: isAnonymous ? colors.primaryAlpha : 'transparent' }]}
+                  onPress={() => setIsAnonymous(!isAnonymous)}
+                >
+                  <UserX size={18} color={isAnonymous ? colors.primary : colors.textMuted} />
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={sendReply}
                   style={[styles.sendButton, { opacity: newReply.trim() ? 1 : 0.5 }]}
@@ -793,6 +802,13 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+    gap: Spacing.sm,
+  },
+  anonymousToggle: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.round,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   replyingIndicator: {
     flexDirection: 'row',
