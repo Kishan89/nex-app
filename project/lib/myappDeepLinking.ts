@@ -78,9 +78,9 @@ export class MyAppDeepLinkingService {
       const { path } = parsed;
       // Handle boltnexeed:// scheme
       if (parsed.scheme === 'boltnexeed') {
-        // Handle boltnexeed://post/123
-        if (path && path.startsWith('post/')) {
-          const postId = path.replace('post/', '').split('?')[0];
+        // Handle boltnexeed://post/123 and boltnexeed://comments/123
+        if (path && (path.startsWith('post/') || path.startsWith('comments/'))) {
+          const postId = path.replace(/^(post|comments)\//, '').split('?')[0];
           if (postId && postId.trim()) {
             this.navigateToPost(postId);
             return true;
@@ -102,9 +102,9 @@ export class MyAppDeepLinkingService {
         parsed.hostname === 'mynexeedapp.com' ||
         parsed.hostname === 'nexeed-app.vercel.app'
       )) {
-        // Handle https://nex-app-production.up.railway.app/post/123
-        if (path && path.startsWith('/post/')) {
-          const postId = path.replace('/post/', '').split('?')[0];
+        // Handle https://nex-app-production.up.railway.app/post/123 and /comments/123
+        if (path && (path.startsWith('/post/') || path.startsWith('/comments/'))) {
+          const postId = path.replace(/^\/(post|comments)\//, '').split('?')[0];
           if (postId && postId.trim()) {
             this.navigateToPost(postId);
             return true;
