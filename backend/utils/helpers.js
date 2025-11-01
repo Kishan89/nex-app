@@ -58,7 +58,7 @@ function transformPost(post) {
         content: post.content,
         image: post.imageUrl,
         likes: post.likesCount || 0, // Use persistent likesCount field
-        comments: post.commentsCount || post._count?.comments || 0,
+        comments: post._count?.comments || post.commentsCount || 0,
         bookmarks: post.bookmarksCount || post._count?.bookmarks || 0,
         reposts: 0,
         time: formatTimeAgo(post.createdAt),

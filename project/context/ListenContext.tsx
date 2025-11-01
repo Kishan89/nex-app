@@ -53,7 +53,7 @@ const normalizePost = (p: any): NormalizedPost => {
   const content = p.content ?? p.body ?? '';
   const image = p.image ?? p.imageUrl ?? null;
   const likes = Number(p.likes ?? 0);
-  const commentsCount = Number(p.commentsCount || p.comments || p._count?.comments || 0);
+  const commentsCount = Number(p._count?.comments || p.commentsCount || p.comments || 0);
   const bookmarksCount = Number(p.bookmarks ?? 0);
   const liked = Boolean(p.liked ?? p.isLiked ?? false);
   const bookmarked = Boolean(p.bookmarked ?? p.isBookmarked ?? false);
