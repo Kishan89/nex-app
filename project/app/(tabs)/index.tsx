@@ -349,7 +349,7 @@ export default function HomeScreen() {
         onComment={() => openComments(post)}
         onBookmark={() => toggleBookmark(post.id)}
         onPollVote={votePoll}
-        onPress={() => router.push(`/post/${post.id}`)}
+        onPress={() => router.push(`/comments/${post.id}`)}
         onUserPress={() => {
           if (post.userId && post.userId !== 'unknown' && post.userId !== 'undefined' && post.userId.trim() !== '') {
             router.push(`/profile/${post.userId}`);

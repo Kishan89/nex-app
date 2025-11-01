@@ -229,8 +229,9 @@ function AppWithNotifications() {
             contentStyle: { backgroundColor: colors.background },
           }}
         />
+
         <Stack.Screen
-          name="post/[id]"
+          name="comments/[id]"
           options={{
             contentStyle: { backgroundColor: colors.background },
           }}

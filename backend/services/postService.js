@@ -25,6 +25,13 @@ class PostService {
               verified: true,
             },
           },
+          _count: {
+            select: {
+              likes: true,
+              comments: true,
+              bookmarks: true
+            }
+          },
           poll: {
             select: {
               id: true,
@@ -66,6 +73,13 @@ class PostService {
               avatar: true,
               verified: true,
             },
+          },
+          _count: {
+            select: {
+              likes: true,
+              comments: true,
+              bookmarks: true
+            }
           },
           poll: {
             select: {
@@ -122,6 +136,13 @@ class PostService {
             avatar: true,
             verified: true,
           },
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+            bookmarks: true
+          }
         },
         poll: {
           select: {

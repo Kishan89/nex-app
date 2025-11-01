@@ -9,7 +9,7 @@ export const LazySearchScreen = lazy(() => import('@/app/(tabs)/search'));
 
 // Lazy load screens
 export const LazyProfileScreen = lazy(() => import('@/app/profile/[id]'));
-export const LazyPostScreen = lazy(() => import('@/app/post/[id]'));
+
 export const LazyCreatePostScreen = lazy(() => import('@/app/create-post'));
 
 // Lazy load heavy libraries

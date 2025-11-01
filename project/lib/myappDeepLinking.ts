@@ -126,10 +126,10 @@ export class MyAppDeepLinkingService {
   }
 
   /**
-   * Navigate to post detail screen
+   * Navigate to comments screen
    */
   private navigateToPost(postId: string) {
-    const targetRoute = `/post/${postId}`;
+    const targetRoute = `/comments/${postId}`;
     // Store pending navigation in case we need to retry after auth
     this.pendingNavigation = targetRoute;
     // Function to attempt navigation - ONLY navigate, don't do anything else

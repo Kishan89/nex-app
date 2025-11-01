@@ -53,7 +53,7 @@ const normalizePost = (p: any): NormalizedPost => {
   const content = p.content ?? p.body ?? '';
   const image = p.image ?? p.imageUrl ?? null;
   const likes = Number(p.likes ?? 0);
-  const commentsCount = Number(p.comments ?? 0);
+  const commentsCount = Number(p.commentsCount || p.comments || p._count?.comments || 0);
   const bookmarksCount = Number(p.bookmarks ?? 0);
   const liked = Boolean(p.liked ?? p.isLiked ?? false);
   const bookmarked = Boolean(p.bookmarked ?? p.isBookmarked ?? false);
@@ -798,12 +798,16 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
       const newCommentResponse = await apiService.addComment(postId, commentText, parentId);
       // Refresh comments from server to ensure sync
       await loadComments(postId);
-      // Update post comment count (both fields for consistency)
-      setPosts(prev => prev.map(p => p.id === postId ? { 
+      // Update post comment count in all post arrays (both fields for consistency)
+      const updateCommentCount = (p: NormalizedPost) => p.id === postId ? { 
         ...p, 
         comments: p.comments + 1,
         commentsCount: (p.commentsCount || p.comments) + 1
-      } : p));
+      } : p;
+      
+      setPosts(prev => prev.map(updateCommentCount));
+      setFollowingPosts(prev => prev.map(updateCommentCount));
+      setTrendingPosts(prev => prev.map(updateCommentCount));
       
       // Cache will be updated by loadComments function
       console.log('✅ Comment added successfully, cache updated');

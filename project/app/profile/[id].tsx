@@ -290,10 +290,10 @@ export default function ProfileScreen() {
       return s;
     }
   }, []);
-  // Handle post press - navigate to post detail
+  // Handle post press - navigate to comments page
   const handlePostPress = useCallback((post: NormalizedPost) => {
-    router.push(`/post/${post.id}`);
-  }, []);
+    router.push(`/comments/${post.id}`);
+  }, []); 
   // Handle comment button press - open comments modal
   const handleCommentPress = useCallback(async (post: NormalizedPost) => {
     setSelectedPost(post);

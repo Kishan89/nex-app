@@ -146,7 +146,7 @@ export default function NotificationsScreen() {
       const params = isCommentNotification 
         ? `?fromNotification=true&scrollToComments=true`
         : `?fromNotification=true`;
-      router.push(`/post/${notification.postId}${params}`);
+      router.push(`/comments/${notification.postId}${params}`);
     } else if (notification.userId) {
       router.push(`/profile/${notification.userId}`);
     }
