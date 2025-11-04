@@ -422,17 +422,11 @@ class FCMService {
         // Use replace to prevent stacking multiple screens
         router.replace(`/chat/${targetChatId}`);
       } else if ((type === 'like' || type === 'comment') && postId) {
-        const params: Record<string, string> = { 
-          fromNotification: 'true'
-        };
-        // For comment notifications, auto-open comments modal
-        if (type === 'comment') {
-          params.scrollToComments = 'true';
-          }
+        // Navigate to comments screen for both like and comment notifications
         // Use replace to prevent stacking multiple screens
         router.replace({
-          pathname: `/post/${postId}`,
-          params
+          pathname: `/comments/${postId}`,
+          params: { fromNotification: 'true' }
         });
       } else if (type === 'follow' && (userId || senderId)) {
         const targetUserId = userId || senderId;
