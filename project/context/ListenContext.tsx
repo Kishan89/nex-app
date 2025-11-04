@@ -35,7 +35,7 @@ interface ListenContextType {
   loadFollowingPosts: () => Promise<void>;
   loadTrendingPosts: () => Promise<void>;
   onRefresh: () => Promise<void>;
-  loadComments: (postId: string) => Promise<void>;
+  loadComments: (postId: string, forceRefresh?: boolean) => Promise<void>;
   getPostById: (postId: string) => NormalizedPost | undefined;
 }
 const ListenContext = createContext<ListenContextType | undefined>(undefined);
@@ -746,11 +746,11 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
       throw error; // Re-throw to let the component handle the error
     }
   }, [pollVotes, savePollVotes, hasVotedOnPoll, getUserVoteForPoll, syncPollVoteAcrossScreens, loadPosts]);
-  const loadComments = useCallback(async (postId: string) => {
+  const loadComments = useCallback(async (postId: string, forceRefresh: boolean = false) => {
     try {
-      // Show cached comments immediately if available
+      // Show cached comments immediately if available (unless force refresh)
       const cachedComments = comments[postId];
-      if (cachedComments && cachedComments.length > 0) {
+      if (cachedComments && cachedComments.length > 0 && !forceRefresh) {
         // Comments already loaded, return early for instant display
         return;
       }

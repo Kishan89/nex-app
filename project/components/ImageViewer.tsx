@@ -16,8 +16,8 @@ import { X, Download, Share2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
 import * as FileSystem from 'expo-file-system';
-// import * as MediaLibrary from 'expo-media-library';
-// import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 interface ImageViewerProps {
   visible: boolean;
@@ -37,10 +37,72 @@ export default function ImageViewer({ visible, imageUri, onClose }: ImageViewerP
     Alert.alert('Error', 'Failed to load image');
   };
   const downloadImage = async () => {
-    Alert.alert('Coming Soon', 'Download functionality will be available in a future update!');
+    try {
+      setDownloading(true);
+      
+      // Request media library permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant permission to save images to your gallery.');
+        setDownloading(false);
+        return;
+      }
+
+      // Download the image to cache directory
+      const filename = imageUri.split('/').pop() || `image_${Date.now()}.jpg`;
+      const fileUri = FileSystem.cacheDirectory + filename;
+      
+      const downloadResult = await FileSystem.downloadAsync(imageUri, fileUri);
+      
+      if (downloadResult.status !== 200) {
+        throw new Error('Failed to download image');
+      }
+
+      // Save to media library
+      const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
+      await MediaLibrary.createAlbumAsync('Nex', asset, false);
+      
+      Alert.alert('Success', 'Image saved to gallery!');
+    } catch (error) {
+      console.error('Download error:', error);
+      Alert.alert('Error', 'Failed to download image. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
   };
   const shareImage = async () => {
-    Alert.alert('Coming Soon', 'Share functionality will be available in a future update!');
+    try {
+      setDownloading(true);
+      
+      // Check if sharing is available
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Error', 'Sharing is not available on this device.');
+        setDownloading(false);
+        return;
+      }
+
+      // Download the image to cache directory first
+      const filename = imageUri.split('/').pop() || `image_${Date.now()}.jpg`;
+      const fileUri = FileSystem.cacheDirectory + filename;
+      
+      const downloadResult = await FileSystem.downloadAsync(imageUri, fileUri);
+      
+      if (downloadResult.status !== 200) {
+        throw new Error('Failed to download image');
+      }
+
+      // Share the image file (not a link)
+      await Sharing.shareAsync(downloadResult.uri, {
+        mimeType: 'image/jpeg',
+        dialogTitle: 'Share Image',
+      });
+    } catch (error) {
+      console.error('Share error:', error);
+      Alert.alert('Error', 'Failed to share image. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
   };
   return (
     <Modal

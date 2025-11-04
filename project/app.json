@@ -19,7 +19,9 @@
       "userInterfaceStyle": "automatic",
       "config": {},
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification", "background-fetch", "background-processing"]
+        "UIBackgroundModes": ["remote-notification", "background-fetch", "background-processing"],
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to save images.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs permission to save images to your photo library."
       }
     },
     "notification": {
@@ -72,7 +74,10 @@
         "android.permission.VIBRATE",
         "android.permission.WAKE_LOCK",
         "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.USE_FULL_SCREEN_INTENT"
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
       ],
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.mycompany.nexeed1",
       "versionCode": 18

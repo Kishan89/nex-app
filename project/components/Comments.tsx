@@ -35,8 +35,9 @@ interface CommentsModalProps {
   post: NormalizedPost | null;
   comments: Comment[];
   onAddComment: (text: string, parentId?: string, isAnonymous?: boolean) => void;
-  onLoadComments: (postId: string) => void;
+  onLoadComments: (postId: string, forceRefresh?: boolean) => void;
   onDeleteComment?: (commentId: string) => void;
+  forceRefresh?: boolean;
   currentUserId?: string;
   onLike?: () => void;
   onBookmark?: () => void;
@@ -74,6 +75,7 @@ export default function CommentsModal({
   isBookmarked,
   hasVotedOnPoll,
   userPollVote,
+  forceRefresh = false,
 }: CommentsModalProps): React.ReactElement | null {
   const { user: currentUser } = useAuth(); // Move useAuth hook to top level
   const { colors, isDark } = useTheme();
@@ -181,11 +183,11 @@ export default function CommentsModal({
   useEffect(() => {
     if (visible && post?.id && onLoadComments) {
       setCommentsLoading(true);
-      onLoadComments(post.id);
+      onLoadComments(post.id, forceRefresh);
       // Reset loading after a delay (comments should load quickly)
       setTimeout(() => setCommentsLoading(false), 1500);
     }
-  }, [visible, post?.id, onLoadComments]);
+  }, [visible, post?.id, onLoadComments, forceRefresh]);
   // Real-time comment sync with nested structure support
   useEffect(() => {
     if (!post?.id || !visible) return;

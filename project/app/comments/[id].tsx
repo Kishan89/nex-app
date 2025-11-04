@@ -148,7 +148,7 @@ export default function CommentsScreen() {
         onDeleteComment={async (commentId) => {
           try {
             await apiService.deleteComment(post.id, commentId);
-            await loadComments(post.id);
+            await loadComments(post.id, true);
           } catch (error) {
           }
         }}
@@ -158,6 +158,7 @@ export default function CommentsScreen() {
         hasVotedOnPoll={post.hasVotedOnPoll}
         userPollVote={post.userPollVote}
         allowImageClick={true}
+        forceRefresh={fromNotification === 'true'}
         onLike={() => toggleLike(post.id)}
         onBookmark={() => toggleBookmark(post.id)}
         onPollVote={handlePollVote}
