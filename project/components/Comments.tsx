@@ -28,6 +28,7 @@ import { useCommentReply } from '@/context/CommentReplyContext';
 import PostCard from './PostCard';
 import { CommentsSkeleton } from './skeletons';
 import { commentCache } from '@/store/commentCache';
+import { getDisplayUser, ANONYMOUS_AVATAR } from '@/lib/commentUtils';
 interface CommentsModalProps {
   visible: boolean;
   onClose: () => void;
@@ -98,7 +99,22 @@ export default function CommentsModal({
       comments.forEach((c, i) => {
         console.log(`  Comment ${i + 1}: id=${c.id.substring(0, 8)}, replies=${c.replies?.length || 0}`);
       });
-      setLocalComments(comments);
+      
+      // Apply display masking to all comments and replies
+      const processedComments = comments.map(comment => ({
+        ...comment,
+        username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
+        avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
+        user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous),
+        replies: comment.replies?.map(reply => ({
+          ...reply,
+          username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
+          avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
+          user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
+        })) || []
+      }));
+      
+      setLocalComments(processedComments);
       setCommentsLoading(false);
       // Clear old refs when comments change
       setCommentRefs({});
@@ -111,8 +127,22 @@ export default function CommentsModal({
     try {
       const cachedComments = await commentCache.getCachedComments(post.id);
       if (cachedComments.length > 0) {
-        setLocalComments(cachedComments);
-        console.log(`📦 Loaded ${cachedComments.length} cached comments for instant display`);
+        // Apply display masking to cached comments
+        const processedCachedComments = cachedComments.map(comment => ({
+          ...comment,
+          username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
+          avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
+          user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous),
+          replies: comment.replies?.map(reply => ({
+            ...reply,
+            username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
+            avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
+            user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
+          })) || []
+        }));
+        
+        setLocalComments(processedCachedComments);
+        console.log(`📦 Loaded ${processedCachedComments.length} cached comments for instant display`);
       }
     } catch (error) {
       console.error('Error loading cached comments:', error);
@@ -164,10 +194,23 @@ export default function CommentsModal({
       .on('broadcast', { event: 'comment_added' }, (payload) => {
         const { postId, comment } = payload.payload;
         if (postId === post.id) {
-          // Reload comments to maintain proper nested structure
-          if (onLoadComments) {
-            onLoadComments(post.id);
-          }
+          // Apply display masking to the new comment
+          const processedComment = {
+            ...comment,
+            username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
+            avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
+            user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous)
+          };
+          
+          // Remove any optimistic comment first, then add real comment
+          setLocalComments(prev => {
+            // Remove optimistic comments (temp IDs)
+            const withoutOptimistic = prev.filter(c => !c.isOptimistic);
+            // Check if this comment already exists
+            const exists = withoutOptimistic.some(c => c.id === processedComment.id);
+            if (exists) return prev; // Already added, skip
+            return [processedComment, ...withoutOptimistic];
+          });
         }
       })
       .on('broadcast', { event: 'comment_deleted' }, (payload) => {
@@ -193,6 +236,43 @@ export default function CommentsModal({
       supabase.removeChannel(channel);
     };
   }, [post?.id, visible, onLoadComments]);
+  const addComment = React.useCallback((newComment: Comment) => {
+    setLocalComments(prev => {
+      // Check if comment already exists (prevent duplicates from broadcast)
+      const exists = prev.some(c => c.id === newComment.id);
+      if (exists && !newComment.isOptimistic) {
+        // Comment already exists, don't add duplicate
+        return prev;
+      }
+      
+      if (!newComment.parentId) {
+        // Top-level comment - check for duplicates
+        if (exists) {
+          // Replace existing (optimistic -> real)
+          return prev.map(c => c.id === newComment.id ? newComment : c);
+        }
+        return [newComment, ...prev];
+      }
+      
+      // Reply - find parent and add to its replies
+      return prev.map(comment => {
+        if (comment.id === newComment.parentId) {
+          // Check if reply already exists in this parent's replies
+          const replyExists = comment.replies.some(r => r.id === newComment.id);
+          if (replyExists) {
+            // Replace existing reply
+            return {
+              ...comment,
+              replies: comment.replies.map(r => r.id === newComment.id ? newComment : r)
+            };
+          }
+          return { ...comment, replies: [newComment, ...comment.replies] };
+        }
+        return comment;
+      });
+    });
+  }, []);
+
   const handleSendComment = async () => {
     const text = newComment.trim();
     if (text) {
@@ -201,8 +281,8 @@ export default function CommentsModal({
         id: `temp-${Date.now()}`, // Temporary ID
         text: text,
         userId: currentUserId || '',
-        username: isAnonymous ? 'Anonymous' : 'You', // Will be replaced with actual username
-        avatar: '', // Will be replaced with actual avatar
+        username: getDisplayUser({ username: 'You' }, isAnonymous).username,
+        avatar: getDisplayUser({ avatar: '' }, isAnonymous).avatar,
         time: 'now', // Time display
         createdAt: new Date().toISOString(),
         parentId: undefined,
@@ -211,21 +291,20 @@ export default function CommentsModal({
         isAnonymous: isAnonymous,
       };
 
-      // Add optimistic comment immediately to UI at the top
-      setLocalComments(prev => [optimisticComment, ...prev]);
+      // Add optimistic comment immediately using the new function
+      addComment(optimisticComment);
       setNewComment('');
-      setIsAnonymous(false);
+      // Don't reset anonymous state - let user control it
 
       // Call the actual API
       try {
-        await onAddComment(text, undefined, isAnonymous);
-        // Remove optimistic comment and let real comment load
-        setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
+        console.log('🔥 [Comments] Sending comment with isAnonymous:', isAnonymous);
+        console.log('🔥 [Comments] onAddComment parameters:', { text, parentId: undefined, isAnonymous });
+        const result = await onAddComment(text, undefined, isAnonymous);
+        console.log('🔥 [Comments] API result:', result);
         
-        // Reload comments to get the latest order
-        if (post?.id && onLoadComments) {
-          await onLoadComments(post.id);
-        }
+        // Remove optimistic comment - real-time broadcast will add the server version
+        setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
       } catch (error) {
         // Remove optimistic comment on error
         setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
@@ -437,14 +516,14 @@ export default function CommentsModal({
           ]}
         >
           <Image 
-            source={{ uri: comment.isAnonymous ? 'https://placehold.co/40' : (comment.avatar || 'https://placehold.co/40') }} 
+            source={comment.isAnonymous ? ANONYMOUS_AVATAR : { uri: getDisplayUser(comment, comment.isAnonymous).avatar || 'https://placehold.co/40' }} 
             style={isReply ? styles.replyAvatar : styles.commentAvatar} 
           />
           <View style={styles.commentContent}>
             <View style={styles.commentHeader}>
               <View style={styles.commentUserInfo}>
                 <Text style={styles.commentUsername}>
-                  {comment.isAnonymous ? 'Anonymous' : comment.username}
+                  {getDisplayUser(comment, comment.isAnonymous).username}
                 </Text>
                 <Text style={styles.commentTime}>
                   {comment.time?.includes('ago') || comment.time === 'now' ? comment.time : `${comment.time} ago`}

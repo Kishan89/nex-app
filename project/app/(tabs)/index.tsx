@@ -12,9 +12,10 @@ import {
   Alert,
   ActivityIndicator,
   Share as RNShare,
-  Animated,
+  Animated as RNAnimated,
   Dimensions,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, Extrapolate, interpolateColor, runOnUI } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PenTool, Bell } from 'lucide-react-native';
@@ -74,13 +75,13 @@ export default function HomeScreen() {
   const verticalFlatListRefs = useRef<{ [key: string]: FlatList | null }>({});
   
   // Animation values for scroll-to-hide
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const headerTranslateY = useRef(new Animated.Value(0)).current;
-  const fabScale = useRef(new Animated.Value(1)).current;
+  const scrollY = useRef(new RNAnimated.Value(0)).current;
+  const headerTranslateY = useRef(new RNAnimated.Value(0)).current;
+  const fabScale = useRef(new RNAnimated.Value(1)).current;
   const lastScrollY = useRef(0);
   
-  // Animation value for tab indicator
-  const tabIndicatorPosition = useRef(new Animated.Value(0)).current;
+  // Animation value for tab indicator - using reanimated for 60fps
+  const tabIndicatorPosition = useSharedValue(0);
   
   // Current tab index
   const currentTabIndex = useRef(0);
@@ -94,7 +95,7 @@ export default function HomeScreen() {
     trackScreenView('home_screen');
     
     // INSTANT prefetch - start immediately for fastest tab switching
-    setTimeout(() => {
+    const prefetchTimer = setTimeout(() => {
       if (trendingPosts.length === 0) {
         loadTrendingPosts();
       }
@@ -102,47 +103,46 @@ export default function HomeScreen() {
         loadFollowingPosts();
       }
     }, 100); // Start prefetch after just 100ms
-  }, []);
+    
+    return () => clearTimeout(prefetchTimer);
+  }, []); // Empty dependency array to run only once
   // Notification count is now handled by NotificationCountContext
   // Real-time notifications removed - clean FCM handles this now
   // Notification counting is handled by NotificationCountContext
-  // Handle scroll for hiding/showing header and FAB
+  // Handle scroll - optimized to prevent flicker
   const handleScroll = useCallback((event: any) => {
     const currentScrollY = event.nativeEvent.contentOffset.y;
     const scrollDiff = currentScrollY - lastScrollY.current;
-    // Lower threshold for faster response
-    if (Math.abs(scrollDiff) > 2) {
-      if (scrollDiff > 0 && currentScrollY > 50) {
-        // Scrolling down - hide header and FAB faster
-        Animated.parallel([
-          Animated.timing(headerTranslateY, {
-            toValue: -120, // Hide header (topBar + tabs height)
-            duration: 150, // Faster animation
-            useNativeDriver: true,
-          }),
-          Animated.timing(fabScale, {
-            toValue: 0,
-            duration: 150, // Faster animation
-            useNativeDriver: true,
-          }),
-        ]).start();
-      } else if (scrollDiff < 0 || currentScrollY < 30) {
-        // Scrolling up or near top - show header and FAB
-        Animated.parallel([
-          Animated.timing(headerTranslateY, {
-            toValue: 0,
-            duration: 150, // Faster animation
-            useNativeDriver: true,
-          }),
-          Animated.timing(fabScale, {
-            toValue: 1,
-            duration: 150, // Faster animation
-            useNativeDriver: true,
-          }),
-        ]).start();
+    
+    // Increase threshold to prevent flicker
+    if (Math.abs(scrollDiff) > 15) {
+      if (scrollDiff > 0 && currentScrollY > 100) {
+        // Scrolling down
+        RNAnimated.timing(headerTranslateY, {
+          toValue: -120,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+        RNAnimated.timing(fabScale, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      } else if (scrollDiff < -10 || currentScrollY < 50) {
+        // Scrolling up
+        RNAnimated.timing(headerTranslateY, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+        RNAnimated.timing(fabScale, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
       }
+      lastScrollY.current = currentScrollY;
     }
-    lastScrollY.current = currentScrollY;
   }, [headerTranslateY, fabScale]);
   const openComments = useCallback(
     async (post: NormalizedPost) => {
@@ -258,27 +258,10 @@ export default function HomeScreen() {
     // Scroll horizontal FlatList to the selected tab - INSTANT (no animation)
     horizontalFlatListRef.current?.scrollToIndex({
       index,
-      animated: false, // Instant scroll for ultra-fast response
+      animated: false, // No animation for instant switching
     });
     
-    // Reset header and FAB visibility when changing tabs
-    Animated.parallel([
-      Animated.timing(headerTranslateY, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fabScale, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    
-    // Reset scroll position tracking
-    lastScrollY.current = 0;
-    
-    // Load data in background (non-blocking) - only if not already loaded
+    // Load data in background - non-blocking
     setTimeout(() => {
       if (tab === 'Following' && followingPosts.length === 0) {
         loadFollowingPosts();
@@ -292,22 +275,37 @@ export default function HomeScreen() {
         previous_tab: activeTab.toLowerCase()
       });
     }, 0);
-  }, [loadFollowingPosts, loadTrendingPosts, activeTab, headerTranslateY, fabScale, tabs, followingPosts.length, trendingPosts.length]);
-  // Handle horizontal scroll for tab indicator - 100% ANIMATION-DRIVEN (no setState)
+  }, [loadFollowingPosts, loadTrendingPosts, activeTab, tabs, followingPosts.length, trendingPosts.length]);
+  // Animated style for tab indicator - runs on UI thread for 60fps
+  const tabIndicatorStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      transform: [{
+        translateX: interpolate(
+          tabIndicatorPosition.value,
+          [0, 1, 2],
+          [0, SCREEN_WIDTH / 3, (SCREEN_WIDTH / 3) * 2],
+          Extrapolate.CLAMP
+        )
+      }]
+    };
+  });
+
+  // Handle horizontal scroll for tab indicator - INSTANT response with reanimated
   const handleHorizontalScroll = useCallback((event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const normalizedPosition = offsetX / SCREEN_WIDTH;
     
-    // Update indicator position instantly using setValue (synchronous, native thread)
-    // This drives ALL animations: indicator position, text colors, scale - ZERO lag
-    tabIndicatorPosition.setValue(normalizedPosition);
+    // INSTANT indicator position update - runs on UI thread
+    tabIndicatorPosition.value = normalizedPosition;
     
-    // Update current index for data loading logic (doesn't trigger re-render)
+    // INSTANT tab state update
     const activeIndex = Math.round(normalizedPosition);
-    if (activeIndex !== currentTabIndex.current && activeIndex >= 0 && activeIndex < tabsRef.current.length) {
+    if (activeIndex !== currentTabIndex.current && activeIndex >= 0 && activeIndex < tabs.length) {
       currentTabIndex.current = activeIndex;
+      setActiveTab(tabs[activeIndex]);
     }
-  }, [tabIndicatorPosition]);
+  }, [tabIndicatorPosition, tabs]);
   
   // Handle scroll end to ensure data is loaded and state is synced
   const handleHorizontalScrollEnd = useCallback((event: any) => {
@@ -408,7 +406,7 @@ export default function HomeScreen() {
           renderItem={renderPostItem}
           keyExtractor={(post) => `${item}-${post.id}`}
           ListHeaderComponent={
-            item === 'Latest' && user ? (
+            item === 'Latest' && user && (!user.avatar_url || !user.bio || !user.name || !user.banner_url) ? (
               <ProfileCompletionBanner
                 userId={user.id}
                 hasAvatar={!!user.avatar_url}
@@ -441,7 +439,7 @@ export default function HomeScreen() {
           onEndReachedThreshold={0.5}
           ListFooterComponent={item === 'Latest' ? renderFooter : null}
           onScroll={handleScroll}
-          scrollEventThrottle={16}
+          scrollEventThrottle={100}
           bounces={true}
           alwaysBounceVertical={true}
           removeClippedSubviews={true}
@@ -466,7 +464,7 @@ export default function HomeScreen() {
       
       {/* Always show header and UI elements */}
       {/* Animated Header Container */}
-      <Animated.View 
+      <RNAnimated.View 
         style={[
           styles.headerContainer,
           {
@@ -510,50 +508,10 @@ export default function HomeScreen() {
             <View style={[styles.tabContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
               <View style={styles.tabWrapper}>
                 {tabs.map((tab, index) => {
-                  // NATIVE-FAST color transition with overlapping ranges for smooth blending
-                  // Build valid monotonic inputRange based on tab index
-                  let colorInputRange: number[];
-                  let colorOutputRange: string[];
-                  
-                  if (index === 0) {
-                    // First tab: [0, 0.1, 0.5]
-                    colorInputRange = [0, 0.1, 0.5];
-                    colorOutputRange = [colors.primary, colors.textMuted, colors.textMuted];
-                  } else if (index === 1) {
-                    // Middle tab: [0.5, 0.9, 1, 1.1, 1.5]
-                    colorInputRange = [0.5, 0.9, 1, 1.1, 1.5];
-                    colorOutputRange = [colors.textMuted, colors.textMuted, colors.primary, colors.textMuted, colors.textMuted];
-                  } else {
-                    // Last tab: [1.5, 1.9, 2]
-                    colorInputRange = [1.5, 1.9, 2];
-                    colorOutputRange = [colors.textMuted, colors.textMuted, colors.primary];
-                  }
-                  
-                  const textColor = tabIndicatorPosition.interpolate({
-                    inputRange: colorInputRange,
-                    outputRange: colorOutputRange,
-                    extrapolate: 'clamp',
-                  });
-                  
-                  // Subtle scale with tight sync to scroll
-                  let scaleInputRange: number[];
-                  if (index === 0) {
-                    scaleInputRange = [0, 0.3];
-                  } else if (index === 1) {
-                    scaleInputRange = [0.7, 1, 1.3];
-                  } else {
-                    scaleInputRange = [1.7, 2];
-                  }
-                  
-                  const scale = tabIndicatorPosition.interpolate({
-                    inputRange: scaleInputRange,
-                    outputRange: index === 1 ? [0.96, 1.04, 0.96] : [1.04, 0.96],
-                    extrapolate: 'clamp',
-                  });
-                  
+                  const isActive = activeTab === tab;
                   return (
                     <TouchableOpacity key={tab} style={styles.tab} onPress={() => handleTabChange(tab, index)}>
-                      <Animated.Text style={[styles.tabText, { color: textColor, transform: [{ scale }] }]}>{tab}</Animated.Text>
+                      <Text style={[styles.tabText, isActive && { color: colors.primary, fontWeight: FontWeights.bold }]}>{tab}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -562,27 +520,9 @@ export default function HomeScreen() {
               <Animated.View
                 style={[
                   styles.tabIndicator,
+                  tabIndicatorStyle,
                   {
-                    transform: [
-                      {
-                        // Locked to scroll position - moves with finger
-                        translateX: tabIndicatorPosition.interpolate({
-                          inputRange: [0, 1, 2],
-                          outputRange: [0, SCREEN_WIDTH / 3, (SCREEN_WIDTH / 3) * 2],
-                          extrapolate: 'clamp',
-                        }),
-                      },
-                    ],
-                    // Smooth width transition
-                    width: tabIndicatorPosition.interpolate({
-                      inputRange: [0, 1, 2],
-                      outputRange: [
-                        SCREEN_WIDTH / 3 * 0.6,
-                        SCREEN_WIDTH / 3 * 0.6,
-                        SCREEN_WIDTH / 3 * 0.6
-                      ],
-                      extrapolate: 'clamp',
-                    }),
+                    width: SCREEN_WIDTH / 3 * 0.6,
                   },
                 ]}
               >
@@ -594,7 +534,7 @@ export default function HomeScreen() {
                 />
               </Animated.View>
             </View>
-          </Animated.View>
+          </RNAnimated.View>
           
           {/* Content Area - Show loading skeleton only in content area */}
           {loading && posts.length === 0 ? (
@@ -614,10 +554,10 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               onScroll={handleHorizontalScroll}
               onMomentumScrollEnd={handleHorizontalScrollEnd}
-              scrollEventThrottle={1}
+              scrollEventThrottle={16}
+              decelerationRate={0.98}
               bounces={false}
               removeClippedSubviews={false}
-              decelerationRate={0.9999}
               snapToInterval={SCREEN_WIDTH}
               snapToAlignment="center"
               disableIntervalMomentum={true}
@@ -630,7 +570,7 @@ export default function HomeScreen() {
           )}
           
       {/* Animated Floating Action Button - Always show */}
-      <Animated.View
+      <RNAnimated.View
         style={[
           styles.fab, 
           { 
@@ -647,14 +587,14 @@ export default function HomeScreen() {
             <PenTool size={24} color="#ffffff" />
           </View>
         </TouchableOpacity>
-      </Animated.View>
+      </RNAnimated.View>
       {/* Comments Modal */}
       <CommentsModal
         visible={showCommentsModal}
         onClose={() => setShowCommentsModal(false)}
         post={selectedPost}
         comments={currentComments}
-        onAddComment={(txt: string, parentId?: string) => selectedPost && addComment(selectedPost.id, txt, parentId)}
+        onAddComment={(txt: string, parentId?: string, isAnonymous?: boolean) => selectedPost && addComment(selectedPost.id, txt, parentId, isAnonymous)}
         onLoadComments={loadComments}
         onDeleteComment={handleDeleteComment}
         currentUserId={user?.id}

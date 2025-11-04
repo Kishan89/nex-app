@@ -73,17 +73,20 @@ export default function ProfileScreen() {
     setLoadingPosts(true);
     try {
       const fetchedPosts = await apiService.getUserPosts(userId, page, 20);
-      const normalized = fetchedPosts.map((p: any) => {
-        // Sync with global post interactions
-        const globalInteraction = postInteractions[p.id];
-        return {
-          ...p,
-          liked: globalInteraction?.liked ?? p.liked ?? false,
-          bookmarked: globalInteraction?.bookmarked ?? p.bookmarked ?? false,
-          hasVotedOnPoll: p.hasVotedOnPoll ?? false,
-          userPollVote: p.userPollVote
-        };
-      });
+      const normalized = fetchedPosts
+        // Filter out anonymous posts - they should not appear on user profiles
+        .filter((p: any) => !p.isAnonymous)
+        .map((p: any) => {
+          // Sync with global post interactions
+          const globalInteraction = postInteractions[p.id];
+          return {
+            ...p,
+            liked: globalInteraction?.liked ?? p.liked ?? false,
+            bookmarked: globalInteraction?.bookmarked ?? p.bookmarked ?? false,
+            hasVotedOnPoll: p.hasVotedOnPoll ?? false,
+            userPollVote: p.userPollVote
+          };
+        });
 
       setHasMoreUserPosts(normalized.length === 20);
 
@@ -107,7 +110,7 @@ export default function ProfileScreen() {
       return;
     }
     setError(null);
-    setLoading(true);
+    if (forceRefresh) setLoading(true);
     try {
       const cachedProfile = await profileStore.getProfile(userId, forceRefresh, user?.id);
       if (cachedProfile) {
@@ -116,8 +119,10 @@ export default function ProfileScreen() {
         if (!isMyProfile) {
           setIsFollowing(cachedProfile.isFollowing);
         }
-        // Fetch user posts after profile loads
-        await fetchUserPosts(1, false);
+        // Only fetch posts if not already loaded or force refresh
+        if (forceRefresh || userPosts.length === 0) {
+          await fetchUserPosts(1, false);
+        }
       } else {
         setError('Profile not found.');
       }
@@ -130,30 +135,36 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [userId, isMyProfile, fetchUserPosts]);
+  }, [userId, isMyProfile, fetchUserPosts, userPosts.length]);
 
   useEffect(() => {
     fetchProfileData();
-  }, [fetchProfileData]);
+  }, [userId]); // Only depend on userId, not the entire function
 
-  // Real-time sync with global posts - update userPosts when global posts change
+  // Real-time sync with global posts - immediate updates for likes
   useEffect(() => {
     if (userPosts.length > 0) {
       setUserPosts(prevPosts => 
         prevPosts.map(post => {
+          const globalPost = posts.find(p => p.id === post.id);
           const globalInteraction = postInteractions[post.id];
-          if (globalInteraction) {
+          
+          if (globalPost || globalInteraction) {
             return {
               ...post,
-              liked: globalInteraction.liked,
-              bookmarked: globalInteraction.bookmarked
+              liked: globalInteraction?.liked ?? globalPost?.liked ?? post.liked,
+              bookmarked: globalInteraction?.bookmarked ?? globalPost?.bookmarked ?? post.bookmarked,
+              likes: globalPost?.likes ?? post.likes,
+              likesCount: globalPost?.likesCount ?? post.likesCount,
+              // Force update to trigger re-render
+              _syncTimestamp: Date.now()
             };
           }
           return post;
         })
       );
     }
-  }, [postInteractions]);
+  }, [postInteractions, posts]);
 
   // Listen for follow state changes from other screens
   useEffect(() => {
@@ -175,7 +186,7 @@ export default function ProfileScreen() {
     onRefresh();
     setPostsPage(1);
     fetchProfileData(true); // Force refresh on manual pull
-  }, [onRefresh, fetchProfileData]);
+  }, [onRefresh, userId]); // Remove fetchProfileData dependency
 
   // Remove frequent auto-refresh to improve performance
   // Only refresh on manual pull-to-refresh or when returning from background
@@ -246,17 +257,20 @@ export default function ProfileScreen() {
     }
   }, [userId, chatLoading]);
 
-  // Sync userPosts with global interactions in real-time
+  // Sync userPosts with global interactions and like counts in real-time
   const syncedUserPosts = useMemo(() => {
     return userPosts.map(post => {
+      const globalPost = posts.find(p => p.id === post.id);
       const globalInteraction = postInteractions[post.id];
       return {
         ...post,
-        liked: globalInteraction?.liked ?? post.liked,
-        bookmarked: globalInteraction?.bookmarked ?? post.bookmarked
+        liked: globalInteraction?.liked ?? globalPost?.liked ?? post.liked,
+        bookmarked: globalInteraction?.bookmarked ?? globalPost?.bookmarked ?? post.bookmarked,
+        likes: globalPost?.likes ?? post.likes,
+        likesCount: globalPost?.likesCount ?? post.likesCount
       };
     });
-  }, [userPosts, postInteractions]);
+  }, [userPosts, postInteractions, posts]);
 
   const bookmarkedPosts = useMemo(() => {
     if (!isMyProfile) return [];
@@ -407,31 +421,38 @@ export default function ProfileScreen() {
     }
   }, [user?.id, votePoll]);
   const renderPost = useCallback(
-    (post: NormalizedPost) => (
-      <PostCard
-        key={post.id}
-        post={post}
-        isLiked={Boolean(postInteractions[post.id]?.liked ?? post.liked)}
-        isBookmarked={Boolean(postInteractions[post.id]?.bookmarked ?? post.bookmarked)}
-        hasVotedOnPoll={post.hasVotedOnPoll}
-        userPollVote={post.userPollVote}
-        onLike={() => toggleLike(post.id)}
-        onComment={() => handleCommentPress(post)}
-        onBookmark={() => toggleBookmark(post.id)}
-        onPollVote={handlePollVote}
-        onPress={() => handlePostPress(post)}
-        onUserPress={() => {
-          if (post.userId && post.userId !== userId) {
-            router.push(`/profile/${post.userId}`);
-          }
-        }}
-        onShare={handleSharePost}
-        onReport={() => handleReportPost(post.id)}
-        onDelete={() => handleDeletePost(post.id)}
-        currentUserId={user?.id}
-      />
-    ),
-    [postInteractions, toggleLike, toggleBookmark, handlePostPress, handleCommentPress, handleSharePost, handleReportPost, handleDeletePost, user?.id, userId]
+    (post: NormalizedPost) => {
+      // Get the most up-to-date interaction state
+      const currentInteraction = postInteractions[post.id];
+      const isLiked = currentInteraction?.liked ?? post.liked ?? false;
+      const isBookmarked = currentInteraction?.bookmarked ?? post.bookmarked ?? false;
+      
+      return (
+        <PostCard
+          key={`${post.id}-${isLiked}-${post.likesCount || post.likes}`}
+          post={post}
+          isLiked={isLiked}
+          isBookmarked={isBookmarked}
+          hasVotedOnPoll={post.hasVotedOnPoll}
+          userPollVote={post.userPollVote}
+          onLike={() => toggleLike(post.id)}
+          onComment={() => handleCommentPress(post)}
+          onBookmark={() => toggleBookmark(post.id)}
+          onPollVote={handlePollVote}
+          onPress={() => handlePostPress(post)}
+          onUserPress={() => {
+            if (post.userId && post.userId !== userId) {
+              router.push(`/profile/${post.userId}`);
+            }
+          }}
+          onShare={handleSharePost}
+          onReport={() => handleReportPost(post.id)}
+          onDelete={() => handleDeletePost(post.id)}
+          currentUserId={user?.id}
+        />
+      );
+    },
+    [postInteractions, toggleLike, toggleBookmark, handlePostPress, handleCommentPress, handleSharePost, handleReportPost, handleDeletePost, handlePollVote, user?.id, userId]
   );
   if (loading) return <ProfileSkeleton />;
   // Create dynamic styles inside component to access colors
@@ -599,7 +620,7 @@ export default function ProfileScreen() {
         onClose={() => setShowCommentsModal(false)}
         post={selectedPost}
         comments={currentComments}
-        onAddComment={(txt: string, parentId?: string) => selectedPost && addComment(selectedPost.id, txt, parentId)}
+        onAddComment={(txt: string, parentId?: string, isAnonymous?: boolean) => selectedPost && addComment(selectedPost.id, txt, parentId, isAnonymous)}
         onLoadComments={loadComments}
         onDeleteComment={handleDeleteComment}
         currentUserId={user?.id}

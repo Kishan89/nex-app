@@ -52,7 +52,7 @@ Open `project/app.json` and replace `YOUR_ONESIGNAL_APP_ID` with your actual One
 {
   "expo": {
     "extra": {
-      "oneSignalAppId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+      "oneSignalAppId": "969b571c-b5af-475d-941d-58fe3879ffa0"
     }
   }
 }
@@ -93,8 +93,8 @@ Add these to your backend `.env` file:
 
 ```env
 # OneSignal configuration
-ONESIGNAL_APP_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-ONESIGNAL_REST_API_KEY="your-rest-api-key-here"
+ONESIGNAL_APP_ID="969b571c-b5af-475d-941d-58fe3879ffa0"
+ONESIGNAL_REST_API_KEY="os_v2_app_s2nvohfvv5dv3fa5ld7dq6p7uaq5pbzmr2mu2bfmg7w6srna5upfcryxaxhm6gaitmbjf2632llmaj7e2ti5nvs2vd2l7wfiwne44fq"
 ```
 
 ### Step 3.2: Deploy Backend (if using Railway)

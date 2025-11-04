@@ -314,10 +314,15 @@ class ApiService {
         return [];
     }
     async addComment(postId: string, text: string, parentId?: string, isAnonymous = false) {
-        return this.post<Comment>(
+        console.log('API addComment called with:', { postId, text: text.substring(0, 20), parentId, isAnonymous });
+        const payload = { text, parentId, isAnonymous };
+        console.log('API payload:', payload);
+        const result = await this.post<Comment>(
             API_ENDPOINTS.POST_COMMENTS(postId),
-            { text, parentId, isAnonymous }
+            payload
         );
+        console.log('API response:', result);
+        return result;
     }
     async getUserChats(userId: string): Promise<Chat[]> {
         try {

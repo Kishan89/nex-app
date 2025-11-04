@@ -11,6 +11,7 @@ import ImageOptimizer from '@/lib/imageOptimizer';
 import { useTheme } from '@/context/ThemeContext';
 import { useThrottledCallback } from '@/hooks/useDebounce';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
+import { ANONYMOUS_AVATAR } from '@/lib/commentUtils';
 const { width } = Dimensions.get('window');
 type Props = {
   post: NormalizedPost;
@@ -68,12 +69,12 @@ const PostCard = React.memo(function PostCard({
   const likeAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeScale.value }],
   }));
-  // Update local state when post prop changes
+  // Update local state when post prop changes - immediate sync
   React.useEffect(() => {
     setLocalIsLiked(post.liked ?? isLiked ?? false);
     setLocalLikesCount(post.likesCount || post.likes || 0);
     setLocalCommentsCount(post.commentsCount || post.comments || 0);
-  }, [post.liked, isLiked, post.likesCount, post.likes, post.commentsCount, post.comments]);
+  }, [post.liked, isLiked, post.likesCount, post.likes, post.commentsCount, post.comments, post.id]);
 
   // Optimize image when post changes - memoized to prevent re-runs
   React.useEffect(() => {
@@ -153,7 +154,7 @@ const PostCard = React.memo(function PostCard({
       <View style={styles.postHeader}>
         <TouchableOpacity onPress={post.isAnonymous ? undefined : onUserPress} activeOpacity={post.isAnonymous ? 1 : 0.7}>
           <Image 
-            source={{ uri: post.isAnonymous ? 'https://placehold.co/40' : (post.avatar || 'https://placehold.co/40') }} 
+            source={post.isAnonymous ? ANONYMOUS_AVATAR : { uri: post.avatar || 'https://placehold.co/40' }} 
             style={styles.userAvatar} 
           />
         </TouchableOpacity>

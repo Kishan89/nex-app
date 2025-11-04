@@ -38,6 +38,7 @@ import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles } from '
 import { useTheme } from '@/context/ThemeContext';
 import { apiService } from '@/lib/api';
 import { ReplySkeleton } from './skeletons';
+import { getDisplayUser, ANONYMOUS_AVATAR } from '@/lib/commentUtils';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PANEL_WIDTH = SCREEN_WIDTH; // Full width like YouTube
 const PANEL_HEIGHT = SCREEN_HEIGHT; // Full height like YouTube
@@ -154,7 +155,14 @@ export default function CommentReplyPanel({
       // Check if replies are already in the parent comment (nested structure)
       if (parentComment.replies && Array.isArray(parentComment.replies) && parentComment.replies.length > 0) {
         console.log('✅ [ReplyPanel] Using nested replies from parent comment:', parentComment.replies.length);
-        setReplies(parentComment.replies);
+        // Apply display masking to existing replies
+        const processedReplies = parentComment.replies.map(reply => ({
+          ...reply,
+          username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
+          avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
+          user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
+        }));
+        setReplies(processedReplies);
         setLoading(false);
         return;
       }
@@ -170,7 +178,14 @@ export default function CommentReplyPanel({
       
       if (parentWithReplies && parentWithReplies.replies && parentWithReplies.replies.length > 0) {
         console.log('✅ [ReplyPanel] Found parent comment with nested replies:', parentWithReplies.replies.length);
-        setReplies(parentWithReplies.replies);
+        // Apply display masking to fetched replies
+        const processedReplies = parentWithReplies.replies.map(reply => ({
+          ...reply,
+          username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
+          avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
+          user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
+        }));
+        setReplies(processedReplies);
       } else {
         console.log('⚠️ [ReplyPanel] No nested replies found for parent comment');
         setReplies([]);
@@ -205,7 +220,7 @@ export default function CommentReplyPanel({
     const finalText = replyingToReply ? `@${replyingToReply.username} ${replyText}` : replyText;
     setNewReply('');
     setReplyingToReply(null);
-    setIsAnonymous(false);
+    // Don't reset anonymous state - let user control it
     setSending(true);
     setIsOperating(true);
 
@@ -213,8 +228,8 @@ export default function CommentReplyPanel({
     const optimisticReply: Comment = {
       id: `temp-reply-${Date.now()}`,
       text: finalText,
-      username: isAnonymous ? 'Anonymous' : 'You',
-      avatar: isAnonymous ? '' : (currentUserAvatar || ''),
+      username: getDisplayUser({ username: 'You' }, isAnonymous).username,
+      avatar: getDisplayUser({ avatar: currentUserAvatar || '' }, isAnonymous).avatar,
       time: 'now',
       userId: currentUserId || '',
       isOptimistic: true,
@@ -222,12 +237,12 @@ export default function CommentReplyPanel({
       createdAt: new Date().toISOString(),
     };
 
-    // Add optimistic reply immediately
-    setReplies(prev => [...prev, optimisticReply]);
+    // Add optimistic reply at the top for latest first
+    setReplies(prev => [optimisticReply, ...prev]);
     
-    // Scroll to show the new reply
+    // Scroll to top to show the new reply
     setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }, 100);
 
     try {
@@ -240,13 +255,34 @@ export default function CommentReplyPanel({
       });
       
       const response = await apiService.addComment(postId, finalText, parentComment.id, isAnonymous);
-      // Remove optimistic reply and reload to get real data
-      setReplies(prev => prev.filter(reply => reply.id !== optimisticReply.id));
-      await loadReplies();
-      // Scroll to bottom to show new reply
+      console.log('Reply sent, response:', response);
+      
+      // Replace optimistic reply with real server response
+      if (response && response.data) {
+        const serverReply: Comment = {
+          id: response.data.id,
+          text: response.data.text,
+          userId: response.data.userId,
+          username: getDisplayUser(response.data.user || response.data, response.data.isAnonymous).username,
+          avatar: getDisplayUser(response.data.user || response.data, response.data.isAnonymous).avatar,
+          time: response.data.time,
+          createdAt: response.data.createdAt || new Date().toISOString(),
+          parentId: response.data.parentId,
+          replies: [],
+          isAnonymous: response.data.isAnonymous,
+          user: getDisplayUser(response.data.user || { id: response.data.userId, username: response.data.username, avatar: response.data.avatar }, response.data.isAnonymous)
+        };
+        
+        // Replace optimistic reply with server data
+        setReplies(prev => prev.map(reply => 
+          reply.id === optimisticReply.id ? serverReply : reply
+        ));
+      }
+      
+      // Scroll to top to show new reply
       setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      }, 50);
     } catch (error) {
       // Remove optimistic reply on error and restore text
       setReplies(prev => prev.filter(reply => reply.id !== optimisticReply.id));
@@ -345,7 +381,7 @@ export default function CommentReplyPanel({
         <View style={styles.replyItemRow}>
           <TouchableOpacity onPress={reply.isAnonymous ? undefined : undefined} activeOpacity={reply.isAnonymous ? 1 : 0.7}>
             <Image 
-              source={reply.isAnonymous ? { uri: 'https://placehold.co/40' } : (reply.avatar && reply.avatar.trim() !== '' ? { uri: reply.avatar } : require('@/assets/images/default-avatar.png'))} 
+              source={reply.isAnonymous ? ANONYMOUS_AVATAR : { uri: getDisplayUser(reply, reply.isAnonymous).avatar || 'https://placehold.co/40' }} 
               style={styles.replyAvatar} 
             />
           </TouchableOpacity>
@@ -353,7 +389,7 @@ export default function CommentReplyPanel({
           <View style={styles.replyHeader}>
             <View style={styles.replyUserInfo}>
               <TouchableOpacity onPress={reply.isAnonymous ? undefined : undefined} activeOpacity={reply.isAnonymous ? 1 : 0.7}>
-                <Text style={styles.replyUsername}>{reply.isAnonymous ? 'Anonymous' : reply.username}</Text>
+                <Text style={styles.replyUsername}>{getDisplayUser(reply, reply.isAnonymous).username}</Text>
               </TouchableOpacity>
               <Text style={styles.replyTime}>
                 {reply.time?.includes('ago') || reply.time === 'now' ? reply.time : `${reply.time} ago`}
@@ -449,7 +485,7 @@ export default function CommentReplyPanel({
                 <View style={styles.parentComment}>
                   <TouchableOpacity onPress={parentComment.isAnonymous ? undefined : undefined} activeOpacity={parentComment.isAnonymous ? 1 : 0.7}>
                     <Image 
-                      source={parentComment.isAnonymous ? { uri: 'https://placehold.co/40' } : (parentComment.avatar && parentComment.avatar.trim() !== '' ? { uri: parentComment.avatar } : require('@/assets/images/default-avatar.png'))} 
+                      source={parentComment.isAnonymous ? ANONYMOUS_AVATAR : { uri: getDisplayUser(parentComment, parentComment.isAnonymous).avatar || 'https://placehold.co/40' }} 
                       style={styles.parentAvatar} 
                     />
                   </TouchableOpacity>
@@ -457,7 +493,7 @@ export default function CommentReplyPanel({
                     <View style={styles.parentHeader}>
                     <View style={styles.parentUserInfo}>
                         <TouchableOpacity onPress={parentComment.isAnonymous ? undefined : undefined} activeOpacity={parentComment.isAnonymous ? 1 : 0.7}>
-                          <Text style={styles.parentUsername}>{parentComment.isAnonymous ? 'Anonymous' : parentComment.username}</Text>
+                          <Text style={styles.parentUsername}>{getDisplayUser(parentComment, parentComment.isAnonymous).username}</Text>
                         </TouchableOpacity>
                         <Text style={styles.parentTime}>
                           {parentComment.time?.includes('ago') || parentComment.time === 'now' ? parentComment.time : `${parentComment.time} ago`}

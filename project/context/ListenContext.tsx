@@ -11,6 +11,7 @@ import { NormalizedPost, Comment } from '@/types';
 import { useAuth } from './AuthContext';
 import { pollVoteStorage } from '@/lib/pollVoteStorage';
 import { usePollVote } from './PollVoteContext';
+import { ANONYMOUS_AVATAR } from '@/lib/commentUtils';
 interface ListenContextType {
   posts: NormalizedPost[];
   followingPosts: NormalizedPost[];
@@ -28,7 +29,7 @@ interface ListenContextType {
   toggleLike: (postId: string) => void;
   toggleBookmark: (postId: string) => void;
   votePoll: (pollId: string, optionId: string) => Promise<void>;
-  addComment: (postId: string, commentText: string, parentId?: string) => Promise<void>;
+  addComment: (postId: string, commentText: string, parentId?: string, isAnonymous?: boolean) => Promise<void>;
   loadPosts: () => Promise<void>;
   loadMorePosts: () => Promise<void>;
   loadFollowingPosts: () => Promise<void>;
@@ -96,11 +97,34 @@ const normalizePost = (p: any): NormalizedPost => {
   };
 };
 const normalizeComment = (c: any): Comment => {
-  // Extract user information from the comment data
+  // Check if comment is anonymous first
+  const isAnonymous = Boolean(c.isAnonymous ?? false);
+  
+  // For anonymous comments, use placeholder data
+  if (isAnonymous) {
+    const replies = c.replies && Array.isArray(c.replies) 
+      ? c.replies.map(normalizeComment) 
+      : [];
+    
+    return {
+      id: String(c.id ?? c._id ?? Date.now()),
+      username: 'Anonymous',
+      avatar: 'https://placehold.co/40',
+      text: c.text ?? c.body ?? '',
+      time: c.createdAt ?? c.time ?? 'now',
+      parentId: c.parentId ? String(c.parentId) : undefined,
+      replyTo: c.replyTo ?? undefined,
+      user: { id: c.userId, username: 'Anonymous', avatar: 'https://placehold.co/40' },
+      userId: c.userId, // Keep real userId for backend operations
+      isAnonymous: true,
+      replies: replies,
+    };
+  }
+  
+  // For non-anonymous comments, use real user data
   const userInfo = c.user || {};
   const userId = userInfo.id || c.userId;
   
-  // Recursively normalize replies if they exist (preserve backend nested structure)
   const replies = c.replies && Array.isArray(c.replies) 
     ? c.replies.map(normalizeComment) 
     : [];
@@ -113,10 +137,10 @@ const normalizeComment = (c: any): Comment => {
     time: c.createdAt ?? c.time ?? 'now',
     parentId: c.parentId ? String(c.parentId) : undefined,
     replyTo: c.replyTo ?? undefined,
-    user: userInfo.id ? userInfo : undefined, // Only include if we have a valid user object
-    userId: userId, // Include userId for delete functionality
-    isAnonymous: Boolean(c.isAnonymous ?? false),
-    replies: replies, // Preserve nested replies from backend
+    user: userInfo.id ? userInfo : undefined,
+    userId: userId,
+    isAnonymous: false,
+    replies: replies,
   };
 };
 // Function to build nested comment structure from flat array
@@ -796,10 +820,53 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
     } catch (err) {
     }
   }, [saveComments]);
-  const addComment = useCallback(async (postId: string, commentText: string, parentId?: string, isAnonymous = false) => {
+  const addComment = useCallback(async (postId: string, commentText: string, parentId?: string, isAnonymous?: boolean) => {
     try {
-      const newCommentResponse = await apiService.addComment(postId, commentText, parentId, isAnonymous);
-      // Refresh comments from server to ensure sync
+      console.log('🔥 [ListenContext] addComment called with:', { postId, commentText: commentText.substring(0, 20), parentId, isAnonymous });
+      const newCommentResponse = await apiService.addComment(postId, commentText, parentId, isAnonymous ?? false);
+      console.log('🔥 [ListenContext] API response:', newCommentResponse);
+      
+      // Instant local update - add comment/reply to nested structure
+      if (newCommentResponse && newCommentResponse.data) {
+        const newComment: Comment = {
+          id: newCommentResponse.data.id,
+          text: newCommentResponse.data.text,
+          userId: newCommentResponse.data.userId,
+          username: newCommentResponse.data.isAnonymous ? 'Anonymous' : newCommentResponse.data.user?.username || newCommentResponse.data.username,
+          avatar: newCommentResponse.data.isAnonymous ? ANONYMOUS_AVATAR : newCommentResponse.data.user?.avatar || newCommentResponse.data.avatar,
+          time: newCommentResponse.data.time,
+          createdAt: newCommentResponse.data.createdAt || new Date().toISOString(),
+          parentId: newCommentResponse.data.parentId,
+          replies: [],
+          isAnonymous: newCommentResponse.data.isAnonymous,
+          user: newCommentResponse.data.isAnonymous ? 
+            { id: newCommentResponse.data.userId, username: 'Anonymous', avatar: ANONYMOUS_AVATAR } :
+            newCommentResponse.data.user
+        };
+        
+        setComments(prev => {
+          const currentComments = prev[postId] || [];
+          
+          if (parentId) {
+            // This is a reply - add to parent's replies array
+            const updatedComments = currentComments.map(comment => {
+              if (comment.id === parentId) {
+                return {
+                  ...comment,
+                  replies: [newComment, ...(comment.replies || [])]
+                };
+              }
+              return comment;
+            });
+            return { ...prev, [postId]: updatedComments };
+          } else {
+            // This is a top-level comment - add to main array
+            return { ...prev, [postId]: [newComment, ...currentComments] };
+          }
+        });
+      }
+      
+      // Also refresh from server to ensure sync
       await loadComments(postId);
       // Update post comment count in all post arrays (both fields for consistency)
       const updateCommentCount = (p: NormalizedPost) => p.id === postId ? { 
@@ -814,9 +881,11 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
       
       // Cache will be updated by loadComments function
       console.log('✅ Comment added successfully, cache updated');
+      return newCommentResponse; // Return server response for instant updates
     } catch (err) {
       const errorMessage = err?.response?.data?.message || err?.message || 'Failed to add comment.';
       Alert.alert('Error', errorMessage);
+      throw err; // Re-throw for error handling
     }
   }, [loadComments]);
   const getPostById = useCallback((postId: string) => {

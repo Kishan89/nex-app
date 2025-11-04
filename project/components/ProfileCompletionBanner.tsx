@@ -36,15 +36,19 @@ export default function ProfileCompletionBanner({
   const isProfileIncomplete = !hasAvatar || !hasBio || !hasName || !hasBanner;
 
   useEffect(() => {
-    checkBannerStatus();
-  }, [userId, hasAvatar, hasBio, hasName, hasBanner]);
+    if (isProfileIncomplete) {
+      checkBannerStatus();
+    }
+  }, [userId, isProfileIncomplete]); // Only check when userId changes or profile becomes incomplete
 
   const checkBannerStatus = async () => {
+    if (!isProfileIncomplete) return;
+    
     try {
       const dismissedData = await AsyncStorage.getItem(`${BANNER_DISMISSED_KEY}_${userId}`);
       const hasShownBefore = await AsyncStorage.getItem(`${BANNER_DISMISSED_KEY}_shown_${userId}`);
       
-      if (!dismissedData && !hasShownBefore && isProfileIncomplete) {
+      if (!dismissedData && !hasShownBefore) {
         await AsyncStorage.setItem(`${BANNER_DISMISSED_KEY}_shown_${userId}`, 'true');
         setVisible(true);
         // Animate in
