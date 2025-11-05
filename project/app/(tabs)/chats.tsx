@@ -54,7 +54,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       setRefreshing(false);
       return;
     }
-    // Try to load from cache first for instant display
+    // Try to load from cache first for instant display (only if not force refreshing)
     if (!forceRefresh) {
       const cachedData = await chatCache.getCachedChats();
       if (cachedData && cachedData.chats.length > 0) {
@@ -67,6 +67,8 @@ const ChatsScreen = React.memo(function ChatsScreen() {
         }, 500);
         return;
       }
+      // If cache is empty but we're not force refreshing, still fetch from server
+      // This handles the case where user has 0 chats initially
     }
     try {
       setError(null);

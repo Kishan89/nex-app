@@ -239,25 +239,41 @@ export default function ProfileScreen() {
     }
   }, [userId, isFollowing, followLoading]);
 
-  // Handle start chat - INSTANT NAVIGATION
+  // Handle start chat - Check for existing chat first
   const [chatLoading, setChatLoading] = useState(false);
   const handleStartChat = useCallback(async () => {
-    if (!userId || chatLoading) return;
+    if (!userId || chatLoading || !user) return;
     try {
       setChatLoading(true);
-      const chat = await apiService.createChatWithUser(String(userId));
-      const chatId = (chat as any)?.id || (chat as any)?.data?.id;
-      if (chatId) {
-        router.push(`/chat/${chatId}`);
+      
+      // First, check if a chat already exists with this user
+      const userChats = await apiService.getUserChats(user.id);
+      const chatsArray = Array.isArray(userChats) ? userChats : ((userChats as any)?.data || (userChats as any)?.chats || []);
+      const existingChat = chatsArray.find((chat: any) => chat.userId === String(userId));
+      
+      if (existingChat) {
+        // Chat exists, navigate to it
+        router.push(`/chat/${existingChat.id}`);
       } else {
-        Alert.alert('Error', 'Failed to start chat. Please try again.');
+        // No existing chat - navigate to new chat with user data in params
+        // Chat will be created when first message is sent
+        router.push({
+          pathname: '/chat/new',
+          params: {
+            userId: String(userId),
+            username: profileData?.username || 'User',
+            avatar: profileData?.avatar_url || '',
+            isOnline: 'false',
+          }
+        });
       }
     } catch (error: any) {
+      console.error('Error checking for existing chat:', error);
       Alert.alert('Error', error.message || 'Failed to start chat. Please try again.');
     } finally {
       setChatLoading(false);
     }
-  }, [userId, chatLoading]);
+  }, [userId, chatLoading, user, profileData]);
 
   // Sync userPosts with global interactions and like counts in real-time
   const syncedUserPosts = useMemo(() => {

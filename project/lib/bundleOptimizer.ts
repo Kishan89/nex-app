@@ -4,7 +4,7 @@ import { lazy, ComponentType } from 'react';
 // Lazy load heavy components
 export const LazyCommentsModal = lazy(() => import('@/components/Comments'));
 export const LazyImageViewer = lazy(() => import('@/components/ImageViewer'));
-export const LazyChatScreen = lazy(() => import('@/components/chat/FastChatScreen'));
+export const LazyChatScreen = lazy(() => import('@/components/chat/ChatScreen'));
 export const LazySearchScreen = lazy(() => import('@/app/(tabs)/search'));
 
 // Lazy load screens
@@ -37,7 +37,7 @@ export const preloadComponents = async () => {
   const preloadPromises = [
     import('@/components/Comments'),
     import('@/components/ImageViewer'),
-    import('@/components/chat/FastChatScreen'),
+    import('@/components/chat/ChatScreen'),
   ];
   
   try {

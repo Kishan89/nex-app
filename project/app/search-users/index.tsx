@@ -177,17 +177,37 @@ export default function SearchUsersScreen() {
     if (chatLoadingId) return;
     // Save to recent searches
     saveRecentSearch(targetUser);
+    
     try {
       setChatLoadingId(targetUser.id);
-      // Create chat then navigate once with real ID
-      const chat = await apiService.createChatWithUser(targetUser.id);
-      const chatId = (chat as any)?.id || (chat as any)?.data?.id;
-      if (chatId) {
-        router.push(`/chat/${chatId}`);
-      } else {
-        Alert.alert('Error', 'Failed to start chat. Please try again.');
+      
+      // First, check if a chat already exists with this user
+      if (user) {
+        const userChats = await apiService.getUserChats(user.id);
+        const chatsArray = Array.isArray(userChats) ? userChats : ((userChats as any)?.data || (userChats as any)?.chats || []);
+        const existingChat = chatsArray.find((chat: any) => chat.userId === targetUser.id);
+        
+        if (existingChat) {
+          // Chat exists, navigate to it
+          router.push(`/chat/${existingChat.id}`);
+          setChatLoadingId(null);
+          return;
+        }
       }
+      
+      // No existing chat - navigate to new chat with user data in params
+      // Chat will be created when first message is sent
+      router.push({
+        pathname: '/chat/new',
+        params: {
+          userId: targetUser.id,
+          username: targetUser.username,
+          avatar: targetUser.avatar || '',
+          isOnline: targetUser.isOnline ? 'true' : 'false',
+        }
+      });
     } catch (error: any) {
+      console.error('Error checking for existing chat:', error);
       Alert.alert('Error', error.message || 'Failed to start chat. Please try again.');
     } finally {
       setChatLoadingId(null);

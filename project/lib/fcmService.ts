@@ -622,7 +622,7 @@ class FCMService {
    * Check if user is sending a message (to suppress notifications)
    */
   private isUserSendingMessage(chatId: string): boolean {
-    // This will be set by FastChatScreen when user is sending a message
+    // This will be set by ChatScreen when user is sending a message
     return globalState.__isUserSendingMessage === chatId;
   }
   /**

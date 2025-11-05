@@ -342,7 +342,7 @@ class ApiService {
             return [];
         }
     }
-    getChatById(chatId: string) { return this.get<Chat>(`/chats/${chatId}`); }
+    getChatById(chatId: string) { return this.get<Chat>(`/chats/chat/${chatId}`); }
     getChatMessages(chatId: string) { return this.get<Message[]>(API_ENDPOINTS.CHAT_MESSAGES(chatId)); }
     sendMessage(chatId: string, messageData: MessageData) { return this.post<Message>(API_ENDPOINTS.SEND_MESSAGE(chatId), messageData); }
     deleteChat(chatId: string) { return this.delete(`/chats/${chatId}`); }

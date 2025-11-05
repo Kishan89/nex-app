@@ -84,6 +84,26 @@ class ChatController {
   }
 
   /**
+   * Get a single chat by ID
+   */
+  async getChatById(req, res, next) {
+    try {
+      const { chatId } = req.params;
+      const userId = req.user?.userId || req.query.userId;
+      
+      if (!userId) {
+        throw new BadRequestError(ERROR_MESSAGES.USER_ID_REQUIRED);
+      }
+      
+      const chat = await chatService.getChatById(chatId, userId);
+      
+      res.status(HTTP_STATUS.OK).json(successResponse(chat, SUCCESS_MESSAGES.CHAT_RETRIEVED));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Get chat messages (OPTIMIZED for instant loading)
    */
   async getChatMessages(req, res, next) {

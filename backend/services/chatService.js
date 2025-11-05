@@ -120,6 +120,75 @@ class ChatService {
   }
 
   /**
+   * Get a single chat by ID with participant details
+   * @param {string} chatId - Chat ID
+   * @param {string} userId - Current user ID
+   * @returns {Promise<Object>} - Chat object with participant details
+   */
+  async getChatById(chatId, userId) {
+    try {
+      const chat = await prisma.chat.findFirst({
+        where: {
+          id: chatId,
+          participants: {
+            some: {
+              userId: userId
+            }
+          }
+        },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  avatar: true,
+                  isOnline: true,
+                  lastSeen: true,
+                }
+              }
+            }
+          },
+          messages: {
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          }
+        }
+      });
+
+      if (!chat) {
+        throw new NotFoundError('Chat not found');
+      }
+
+      // Find the other participant
+      const otherParticipant = chat.participants.find(p => p.userId !== userId);
+      const lastMessage = chat.messages[0];
+
+      return {
+        id: chat.id,
+        name: otherParticipant?.user?.username || 'Unknown',
+        username: otherParticipant?.user?.username || 'Unknown',
+        userId: otherParticipant?.user?.id || 'unknown',
+        avatar: otherParticipant?.user?.avatar || null,
+        isOnline: otherParticipant?.user?.isOnline || false,
+        lastSeen: otherParticipant?.user?.lastSeen,
+        lastSeenText: otherParticipant?.user?.isOnline ? 'Online' : 'Last seen recently',
+        lastMessage: lastMessage?.content || 'No messages yet',
+        time: lastMessage ? formatTimeAgo(lastMessage.createdAt) : '',
+        participants: chat.participants
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
    * Get chat messages
    * @param {string} chatId - Chat ID
    * @param {Object} options - Query options
