@@ -125,7 +125,9 @@ const FastChatScreen = React.memo(function FastChatScreen({
     if (!forceRefresh) {
       const instantMessages = ultraFastChatCache.getInstantMessages(chatId);
       if (instantMessages.length > 0) {
-        setMessages(instantMessages);
+        // Filter out temp messages to prevent showing duplicates with stuck "sending" status
+        const filteredMessages = instantMessages.filter(msg => !msg.id.startsWith('temp-'));
+        setMessages(filteredMessages);
         setLoading(false);
         // Auto scroll immediately
         safeSetTimeout(() => scrollToBottom(false), 0);
@@ -143,10 +145,12 @@ const FastChatScreen = React.memo(function FastChatScreen({
     // PRIORITY 1: Check ChatContext global messages
     const globalMessages = getChatMessages(chatId);
     if (globalMessages.length > 0 && !forceRefresh) {
-      setMessages(globalMessages);
+      // Filter out temp messages to prevent showing duplicates with stuck "sending" status
+      const filteredMessages = globalMessages.filter(msg => !msg.id.startsWith('temp-'));
+      setMessages(filteredMessages);
       setLoading(false);
-      // Cache for future instant access
-      ultraFastChatCache.cacheMessages(chatId, globalMessages, chatData);
+      // Cache for future instant access (without temp messages)
+      ultraFastChatCache.cacheMessages(chatId, filteredMessages, chatData);
       // Background refresh
       setTimeout(() => {
         if (!isSending) {
@@ -160,10 +164,12 @@ const FastChatScreen = React.memo(function FastChatScreen({
       try {
         const persistedMessages = await messagePersistence.getPersistedMessages(chatId);
         if (persistedMessages.length > 0) {
-          setMessages(persistedMessages);
+          // Filter out temp messages to prevent showing duplicates with stuck "sending" status
+          const filteredMessages = persistedMessages.filter(msg => !msg.id.startsWith('temp-'));
+          setMessages(filteredMessages);
           setLoading(false);
-          // Cache for instant future access
-          ultraFastChatCache.cacheMessages(chatId, persistedMessages, chatData);
+          // Cache for instant future access (without temp messages)
+          ultraFastChatCache.cacheMessages(chatId, filteredMessages, chatData);
           // Background refresh
           setTimeout(() => {
             if (!isSending) {
@@ -177,10 +183,12 @@ const FastChatScreen = React.memo(function FastChatScreen({
       // PRIORITY 3: Fallback to old cache
       const cachedMessages = chatMessageCache.getCachedMessages(chatId);
       if (cachedMessages && cachedMessages.messages.length > 0) {
-        setMessages(cachedMessages.messages);
+        // Filter out temp messages to prevent showing duplicates with stuck "sending" status
+        const filteredMessages = cachedMessages.messages.filter(msg => !msg.id.startsWith('temp-'));
+        setMessages(filteredMessages);
         setLoading(false);
-        // Upgrade to ultra-fast cache
-        ultraFastChatCache.cacheMessages(chatId, cachedMessages.messages, chatData);
+        // Upgrade to ultra-fast cache (without temp messages)
+        ultraFastChatCache.cacheMessages(chatId, filteredMessages, chatData);
         // Background refresh
         setTimeout(() => {
           if (!isSending) {
@@ -346,17 +354,35 @@ const FastChatScreen = React.memo(function FastChatScreen({
           });
           console.log('✅ [API] API response:', serverResponse);
           }
-        // Don't replace temp message here - socket broadcast already handles it!
+        // Don't do anything here - socket broadcast handles everything!
         // The socket broadcast listener will replace the temp message with the real one
         if (serverResponse && (serverResponse.messageId || serverResponse.id)) {
+          const realMessageId = serverResponse.messageId || serverResponse.id;
           console.log('✅ [SUCCESS] Message sent successfully, socket broadcast will handle replacement:', {
             tempId,
-            realMessageId: serverResponse.messageId || serverResponse.id
+            realMessageId
           });
-          // Just update status to 'sent' if temp message still exists (fallback)
-          setMessages(prev => prev.map(msg => 
-            msg.id === tempId ? { ...msg, status: 'sent' as const } : msg
-          ));
+          
+          // Fallback: If socket broadcast doesn't arrive within 3 seconds, replace manually
+          setTimeout(() => {
+            setMessages(prev => {
+              // Check if temp message still exists (socket broadcast didn't replace it)
+              const tempStillExists = prev.some(msg => msg.id === tempId);
+              if (tempStillExists) {
+                console.log('⏰ [FALLBACK] Socket broadcast timeout, replacing temp message manually');
+                const serverTimestamp = serverResponse.timestamp ? 
+                  fixServerTimestamp(serverResponse.timestamp) : tempMessage.timestamp;
+                const finalMessage = {
+                  ...tempMessage,
+                  id: realMessageId,
+                  status: 'sent' as const,
+                  timestamp: serverTimestamp
+                };
+                return prev.map(msg => msg.id === tempId ? finalMessage : msg);
+              }
+              return prev;
+            });
+          }, 3000);
         } else {
           throw new Error('Invalid server response');
         }
