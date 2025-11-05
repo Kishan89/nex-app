@@ -272,6 +272,26 @@ class ChatController {
       const chat = await chatService.createChat({ name, isGroup, participantIds });
       
       res.status(HTTP_STATUS.CREATED).json(successResponse(chat, SUCCESS_MESSAGES.CHAT_CREATED));
+      
+      // 🚀 REAL-TIME: Emit socket event to all participants
+      setImmediate(() => {
+        try {
+          const socketService = require('../services/socketService');
+          if (socketService.io) {
+            // Notify each participant about the new chat
+            participantIds.forEach(userId => {
+              socketService.emitToUser(userId, 'chat_created', {
+                chat: chat,
+                chatId: chat.id,
+                timestamp: new Date().toISOString()
+              });
+            });
+            logger.info('Chat created event emitted to participants', { chatId: chat.id, participantCount: participantIds.length });
+          }
+        } catch (socketError) {
+          logger.error('Failed to emit chat_created event:', socketError);
+        }
+      });
     } catch (error) {
       next(error);
     }
@@ -284,9 +304,40 @@ class ChatController {
     try {
       const { chatId } = req.params;
       
+      // Get chat participants before deletion
+      const chat = await prisma.chat.findUnique({
+        where: { id: chatId },
+        include: {
+          participants: {
+            select: { userId: true }
+          }
+        }
+      });
+      
+      const participantIds = chat?.participants.map(p => p.userId) || [];
+      
       await chatService.deleteChat(chatId);
       
       res.status(HTTP_STATUS.OK).json(successResponse(null, SUCCESS_MESSAGES.CHAT_DELETED));
+      
+      // 🚀 REAL-TIME: Emit socket event to all participants
+      setImmediate(() => {
+        try {
+          const socketService = require('../services/socketService');
+          if (socketService.io) {
+            // Notify each participant about the deleted chat
+            participantIds.forEach(userId => {
+              socketService.emitToUser(userId, 'chat_deleted', {
+                chatId: chatId,
+                timestamp: new Date().toISOString()
+              });
+            });
+            logger.info('Chat deleted event emitted to participants', { chatId, participantCount: participantIds.length });
+          }
+        } catch (socketError) {
+          logger.error('Failed to emit chat_deleted event:', socketError);
+        }
+      });
     } catch (error) {
       next(error);
     }
