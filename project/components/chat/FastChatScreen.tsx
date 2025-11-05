@@ -278,6 +278,14 @@ const FastChatScreen = React.memo(function FastChatScreen({
     const messageText = message.trim();
     const chatId = String(chatData.id);
     const tempId = `temp-${Date.now()}`;
+    
+    console.log('📤 [SEND] Sending message:', {
+      tempId,
+      text: messageText.substring(0, 20) + '...',
+      chatId,
+      userId: user.id
+    });
+    
     // Create temporary message for INSTANT UI display
     const tempMessage: Message = {
       id: tempId,
@@ -291,6 +299,9 @@ const FastChatScreen = React.memo(function FastChatScreen({
       status: 'sending', // Gray clock icon 🕓
       sender: { id: user.id, username: user.username || 'You' }
     };
+    
+    console.log('✅ [OPTIMISTIC] Adding temp message to UI:', tempId);
+    
     // 🚀 INSTANT UI UPDATE - Message appears immediately
     setMessages(prev => {
       return [...prev, tempMessage];
@@ -318,44 +329,34 @@ const FastChatScreen = React.memo(function FastChatScreen({
         // Try Socket.io first (real-time)
         if (socketService.isSocketConnected()) {
           try {
+            console.log('🔌 [SOCKET] Sending via socket...');
             serverResponse = await socketService.sendMessage(chatId, messageText, tempId);
+            console.log('✅ [SOCKET] Socket response:', serverResponse);
             } catch (socketError) {
+              console.log('❌ [SOCKET] Socket error:', socketError);
             }
         }
         // Fallback to API if socket failed or not connected
         if (!serverResponse || !serverResponse.success) {
+          console.log('🌐 [API] Falling back to HTTP API...');
           serverResponse = await apiService.sendMessage(chatId, { 
             content: messageText, 
             chatId: chatId, 
             senderId: user.id
           });
+          console.log('✅ [API] API response:', serverResponse);
           }
-        // Replace temp message with real server message
+        // Don't replace temp message here - socket broadcast already handles it!
+        // The socket broadcast listener will replace the temp message with the real one
         if (serverResponse && (serverResponse.messageId || serverResponse.id)) {
-          const realMessageId = serverResponse.messageId || serverResponse.id;
-          const serverTimestamp = serverResponse.timestamp ? 
-            fixServerTimestamp(serverResponse.timestamp) : tempMessage.timestamp;
-          const finalMessage = {
-            ...tempMessage,
-            id: realMessageId,
-            status: 'sent' as const,
-            timestamp: serverTimestamp
-          };
+          console.log('✅ [SUCCESS] Message sent successfully, socket broadcast will handle replacement:', {
+            tempId,
+            realMessageId: serverResponse.messageId || serverResponse.id
+          });
+          // Just update status to 'sent' if temp message still exists (fallback)
           setMessages(prev => prev.map(msg => 
-            msg.id === tempId ? finalMessage : msg
+            msg.id === tempId ? { ...msg, status: 'sent' as const } : msg
           ));
-          // 🚀 AUTO-SCROLL: Ensure scroll after message replacement
-          setTimeout(() => scrollToBottom(true), 50);
-          // ⚡ ULTRA-FAST: Replace in ultra-fast cache instantly
-          ultraFastChatCache.replaceMessageInstantly(chatId, tempId, finalMessage);
-          // Update global state immediately
-          addMessageToChat(chatId, finalMessage, true);
-          // Background cache/persistence (non-blocking)
-          setTimeout(() => {
-            chatMessageCache.addMessageToCache(chatId, finalMessage);
-            messagePersistence.addMessage(chatId, finalMessage, true)
-              .catch((error) => console.error('Error adding message:', error));
-          }, 0);
         } else {
           throw new Error('Invalid server response');
         }
@@ -546,6 +547,16 @@ const FastChatScreen = React.memo(function FastChatScreen({
     socketService.joinChat(chatId);
     // Listen for new messages
     const handleNewMessage = (socketMessage: any) => {
+      console.log('📨 [SOCKET] Received message:', {
+        id: socketMessage.id,
+        tempMessageId: socketMessage.tempMessageId,
+        senderId: socketMessage.sender?.id,
+        currentUserId: user.id,
+        isFromCurrentUser: socketMessage.sender?.id === user.id,
+        text: socketMessage.text?.substring(0, 20) + '...',
+        chatId: socketMessage.chatId
+      });
+      
       // Only add message if it's for this chat
       if (socketMessage.chatId === chatId) {
         const newMessage: Message = {
@@ -558,17 +569,24 @@ const FastChatScreen = React.memo(function FastChatScreen({
         };
         // IMPROVED: Better duplicate check with temp message replacement
         setMessages(prev => {
+          console.log('🔍 [CHECK] Current messages count:', prev.length);
+          
           // Check if this exact message ID already exists (prevent duplicates)
           if (prev.some(msg => msg.id === newMessage.id)) {
+            console.log('❌ [SKIP] Message ID already exists:', newMessage.id);
             return prev;
           }
           
           // If this is from the current user, check if we already have a temp message
           if (socketMessage.sender?.id === user.id) {
+            console.log('👤 [CURRENT USER] Message from current user, checking for temp message');
+            
             // Check if a temp message exists with same tempMessageId (replace it)
             if (socketMessage.tempMessageId) {
+              console.log('🔍 [TEMP ID] Looking for temp message:', socketMessage.tempMessageId);
               const tempMsgIndex = prev.findIndex(msg => msg.id === socketMessage.tempMessageId);
               if (tempMsgIndex !== -1) {
+                console.log('✅ [REPLACE] Found temp message, replacing with real message');
                 const updated = [...prev];
                 updated[tempMsgIndex] = newMessage;
                 // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
@@ -576,6 +594,8 @@ const FastChatScreen = React.memo(function FastChatScreen({
                 // Also update global state
                 addMessageToChat(chatId, newMessage, true);
                 return updated;
+              } else {
+                console.log('⚠️ [NOT FOUND] Temp message not found with ID:', socketMessage.tempMessageId);
               }
             }
             
@@ -587,6 +607,7 @@ const FastChatScreen = React.memo(function FastChatScreen({
             );
             
             if (recentTempMsg) {
+              console.log('✅ [REPLACE FALLBACK] Found temp message by content, replacing');
               // Replace the temp message with the real one
               const updated = prev.map(msg => 
                 msg.id === recentTempMsg.id ? newMessage : msg
@@ -609,9 +630,12 @@ const FastChatScreen = React.memo(function FastChatScreen({
             );
             
             if (hasSimilarRecentMessage) {
+              console.log('❌ [SKIP DUPLICATE] Found similar recent message, skipping');
               // Skip this duplicate message
               return prev;
             }
+            
+            console.log('⚠️ [WARNING] No temp message found, but message is from current user - might be duplicate!');
           }
           
           // New message from another user - add it

@@ -29,7 +29,7 @@ import { NormalizedPost } from '@/types';
 import CommentsModal from '../../components/Comments';
 import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
 
-const DEFAULT_BANNER = require('@/assets/images/banner-image.png');
+const DEFAULT_BANNER = require('../../assets/images/banner-image.png');
 import { useTheme } from '@/context/ThemeContext';
 import XPRulesModal from '@/components/XPRulesModal';
 import { useThrottledCallback } from '@/hooks/useDebounce';
@@ -469,7 +469,7 @@ export default function ProfileScreen() {
       </View>
     );
   }
-  const bannerSource = profile.banner_url ? { uri: profile.banner_url } : DEFAULT_BANNER;
+  const bannerSource = profile.banner_url && profile.banner_url.trim() && !profile.banner_url.includes('placeholder') ? { uri: profile.banner_url } : DEFAULT_BANNER;
   const avatarUri = profile.avatar_url ?? 'https://via.placeholder.com/150';
   return (
     <SafeAreaView style={styles.safeArea}>

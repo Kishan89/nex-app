@@ -23,7 +23,7 @@ import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows
 import { useTheme } from '@/context/ThemeContext';
 import KeyboardWrapper from '@/components/ui/KeyboardWrapper';
 
-const DEFAULT_BANNER = require('@/assets/images/banner-image.png');
+const DEFAULT_BANNER = require('../assets/images/banner-image.png');
 
 export default function EditProfileScreen() {
   const { user, setUser } = useAuth();
@@ -41,6 +41,7 @@ export default function EditProfileScreen() {
       setBio(user.bio || '');
       setAvatarUrl(user.avatar_url || 'https://via.placeholder.com/150');
       setBannerUrl(user.banner_url || '');
+      console.log('Banner URL:', user.banner_url, 'Will use default:', !user.banner_url || !user.banner_url.trim());
       setInitialLoading(false);
     }
   }, [user]);
@@ -178,7 +179,12 @@ export default function EditProfileScreen() {
             </View>
             {/* Banner */}
             <View style={styles.bannerContainer}>
-              <Image source={bannerUrl ? { uri: bannerUrl } : DEFAULT_BANNER} style={styles.bannerImage} />
+              <Image 
+                source={bannerUrl && bannerUrl.trim() && !bannerUrl.includes('placeholder') ? { uri: bannerUrl } : DEFAULT_BANNER} 
+                style={styles.bannerImage}
+                onError={(e) => console.log('Banner image error:', e.nativeEvent.error)}
+                onLoad={() => console.log('Banner image loaded successfully')}
+              />
               <TouchableOpacity onPress={() => pickImage('banner')} style={[styles.bannerIcon, { borderColor: '#004aad' }]} disabled={loading}>
                 <View style={[styles.iconGradient, { backgroundColor: '#004aad' }]}>
                   <ImageIcon size={20} color="#ffffff" />
