@@ -23,13 +23,15 @@ import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows
 import { useTheme } from '@/context/ThemeContext';
 import KeyboardWrapper from '@/components/ui/KeyboardWrapper';
 
+const DEFAULT_BANNER = require('@/assets/images/banner-image.png');
+
 export default function EditProfileScreen() {
   const { user, setUser } = useAuth();
   const { colors, isDark } = useTheme();
   const [username, setUsername] = useState(user?.username || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || 'https://via.placeholder.com/150');
-  const [bannerUrl, setBannerUrl] = useState(user?.banner_url || 'https://via.placeholder.com/600x200');
+  const [bannerUrl, setBannerUrl] = useState(user?.banner_url || '');
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -38,7 +40,7 @@ export default function EditProfileScreen() {
       setUsername(user.username || '');
       setBio(user.bio || '');
       setAvatarUrl(user.avatar_url || 'https://via.placeholder.com/150');
-      setBannerUrl(user.banner_url || 'https://via.placeholder.com/600x200');
+      setBannerUrl(user.banner_url || '');
       setInitialLoading(false);
     }
   }, [user]);
@@ -176,7 +178,7 @@ export default function EditProfileScreen() {
             </View>
             {/* Banner */}
             <View style={styles.bannerContainer}>
-              <Image source={{ uri: bannerUrl }} style={styles.bannerImage} />
+              <Image source={bannerUrl ? { uri: bannerUrl } : DEFAULT_BANNER} style={styles.bannerImage} />
               <TouchableOpacity onPress={() => pickImage('banner')} style={[styles.bannerIcon, { borderColor: '#004aad' }]} disabled={loading}>
                 <View style={[styles.iconGradient, { backgroundColor: '#004aad' }]}>
                   <ImageIcon size={20} color="#ffffff" />

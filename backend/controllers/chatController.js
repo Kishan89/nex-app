@@ -154,7 +154,16 @@ class ChatController {
               chatId
             };
             
-            socketService.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
+            // Broadcast to other users in the chat (excluding sender to prevent duplicates)
+            // Get sender's socket ID to exclude them
+            const senderSocketId = socketService.connectedUsers.get(senderId);
+            if (senderSocketId) {
+              // Exclude sender from broadcast
+              socketService.io.to(`chat:${chatId}`).except(senderSocketId).emit('new_message', socketMessage);
+            } else {
+              // If sender not connected via socket, broadcast to all (they're using HTTP only)
+              socketService.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
+            }
           }
           
           await this.sendMessageNotification(chatId, senderId, content);

@@ -28,6 +28,8 @@ import { useListen } from '@/context/ListenContext';
 import { NormalizedPost } from '@/types';
 import CommentsModal from '../../components/Comments';
 import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
+
+const DEFAULT_BANNER = require('@/assets/images/banner-image.png');
 import { useTheme } from '@/context/ThemeContext';
 import XPRulesModal from '@/components/XPRulesModal';
 import { useThrottledCallback } from '@/hooks/useDebounce';
@@ -467,7 +469,7 @@ export default function ProfileScreen() {
       </View>
     );
   }
-  const bannerUri = profile.banner_url ?? 'https://via.placeholder.com/600x200';
+  const bannerSource = profile.banner_url ? { uri: profile.banner_url } : DEFAULT_BANNER;
   const avatarUri = profile.avatar_url ?? 'https://via.placeholder.com/150';
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -487,7 +489,7 @@ export default function ProfileScreen() {
         scrollEventThrottle={200}
       >
         <View style={styles.bannerSection}>
-          <Image source={{ uri: bannerUri }} style={styles.banner} />
+          <Image source={bannerSource} style={styles.banner} />
           {/* Floating Back Button */}
           <TouchableOpacity style={styles.floatingBackButton} onPress={handleBackPress}>
             <ArrowLeft size={24} color="#ffffff" />

@@ -558,39 +558,63 @@ const FastChatScreen = React.memo(function FastChatScreen({
         };
         // IMPROVED: Better duplicate check with temp message replacement
         setMessages(prev => {
-          // Check if this exact message ID already exists
+          // Check if this exact message ID already exists (prevent duplicates)
           if (prev.some(msg => msg.id === newMessage.id)) {
             return prev;
           }
-          // Check if a temp message exists with same tempMessageId (replace it)
-          if (socketMessage.tempMessageId) {
-            const tempMsgIndex = prev.findIndex(msg => msg.id === socketMessage.tempMessageId);
-            if (tempMsgIndex !== -1) {
-              const updated = [...prev];
-              updated[tempMsgIndex] = newMessage;
+          
+          // If this is from the current user, check if we already have a temp message
+          if (socketMessage.sender?.id === user.id) {
+            // Check if a temp message exists with same tempMessageId (replace it)
+            if (socketMessage.tempMessageId) {
+              const tempMsgIndex = prev.findIndex(msg => msg.id === socketMessage.tempMessageId);
+              if (tempMsgIndex !== -1) {
+                const updated = [...prev];
+                updated[tempMsgIndex] = newMessage;
+                // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
+                ultraFastChatCache.addMessageInstantly(chatId, newMessage);
+                // Also update global state
+                addMessageToChat(chatId, newMessage, true);
+                return updated;
+              }
+            }
+            
+            // Check if a temp message exists with same content and recent timestamp (fallback replacement)
+            const recentTempMsg = prev.find(msg => 
+              msg.id.startsWith('temp-') &&
+              msg.text === newMessage.text && 
+              msg.sender?.id === newMessage.sender?.id
+            );
+            
+            if (recentTempMsg) {
+              // Replace the temp message with the real one
+              const updated = prev.map(msg => 
+                msg.id === recentTempMsg.id ? newMessage : msg
+              );
               // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
               ultraFastChatCache.addMessageInstantly(chatId, newMessage);
               // Also update global state
               addMessageToChat(chatId, newMessage, true);
               return updated;
             }
+            
+            // If no temp message found, this might be a duplicate from socket broadcast
+            // Check if we have a very recent message with same text (within last 2 seconds)
+            const now = new Date().getTime();
+            const hasSimilarRecentMessage = prev.some(msg => 
+              msg.text === newMessage.text && 
+              msg.sender?.id === newMessage.sender?.id &&
+              !msg.id.startsWith('temp-') &&
+              (now - new Date(msg.timestamp).getTime() < 2000)
+            );
+            
+            if (hasSimilarRecentMessage) {
+              // Skip this duplicate message
+              return prev;
+            }
           }
-          // Check if a temp message exists with same content (fallback replacement)
-          const tempMsgIndex = prev.findIndex(msg => 
-            msg.id.startsWith('temp_') &&
-            msg.text === newMessage.text && 
-            msg.sender?.id === newMessage.sender?.id
-          );
-          if (tempMsgIndex !== -1) {
-            const updated = [...prev];
-            updated[tempMsgIndex] = newMessage;
-            // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
-            ultraFastChatCache.addMessageInstantly(chatId, newMessage);
-            // Also update global state
-            addMessageToChat(chatId, newMessage, true);
-            return updated;
-          }
-          // New message - add it
+          
+          // New message from another user - add it
           // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
           ultraFastChatCache.addMessageInstantly(chatId, newMessage);
           // Also add to global state
