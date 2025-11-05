@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useChatContext } from '../../context/ChatContext';
 import { Colors } from '../../constants/theme';
 import { fcmService } from '../../lib/fcmService';
+import { chatCache } from '@/store/chatCache';
 
 export default function IndividualChatScreen() {
   const params = useLocalSearchParams();
@@ -94,7 +95,24 @@ export default function IndividualChatScreen() {
     }
     
     if (!id) return;
-    setLoading(true);
+    
+    // 🚀 OPTIMISTIC LOADING: Use cached data from params if available
+    const cachedName = params.cachedName as string;
+    const cachedAvatar = params.cachedAvatar as string;
+    const cachedIsOnline = params.cachedIsOnline === 'true';
+    
+    setChatData({
+      id: id as string,
+      name: cachedName || 'Loading...',
+      username: cachedName || 'Loading...',
+      avatar: cachedAvatar || '',
+      isOnline: cachedIsOnline || false,
+      lastSeen: 'recently',
+      lastSeenText: cachedIsOnline ? 'Online' : 'Last seen recently',
+      userId: 'unknown',
+    });
+    setLoading(false); // No loading screen, show chat immediately
+    
     try {
       // Strategy 1: Try to get chat by ID directly (most reliable for new chats)
       try {
@@ -199,6 +217,15 @@ export default function IndividualChatScreen() {
     }
   };
   
+  // Handle chat deletion - immediately remove from cache
+  const handleChatDeleted = (chatId: string) => {
+    // Immediately remove from cache
+    chatCache.removeChatFromCache(chatId);
+    
+    // Refresh unread counts
+    refreshUnreadCounts();
+  };
+  
   // Handle first message for new chats
   const handleFirstMessage = async (messageContent: string) => {
     if (!user || !params.userId) {
@@ -206,6 +233,8 @@ export default function IndividualChatScreen() {
     }
 
     try {
+      console.log('🆕 [NEW CHAT] Creating chat and sending first message...');
+      
       // Create the chat on backend
       const chat = await apiService.createChatWithUser(params.userId as string);
       const chatId = (chat as any)?.id || (chat as any)?.data?.id;
@@ -214,8 +243,17 @@ export default function IndividualChatScreen() {
         throw new Error('Failed to create chat');
       }
 
+      console.log('✅ [NEW CHAT] Chat created with ID:', chatId);
+
       // Store the actual chat ID
       setActualChatId(chatId);
+
+      // 🚀 INSTANT: Update chatData in place to transition from new chat to real chat
+      // This prevents screen remount and double navigation
+      setChatData(prevData => ({
+        ...prevData!,
+        id: chatId, // Update to real chat ID
+      }));
 
       // Send the first message
       await apiService.sendMessage(chatId, {
@@ -224,27 +262,37 @@ export default function IndividualChatScreen() {
         senderId: user.id
       });
 
+      console.log('✅ [NEW CHAT] First message sent successfully');
+
       // Refresh unread counts
       refreshUnreadCounts();
+      
+      // Clear all chat caches to force refresh on chats screen
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        await AsyncStorage.removeItem(`user_chats_${user.id}`);
+        // Also clear the chatCache
+        await chatCache.clearCache();
+      } catch (error) {
+        console.log('Failed to clear chat cache:', error);
+      }
 
-      // Replace current route with the actual chat route
-      router.replace(`/chat/${chatId}`);
+      // 🚀 FIX: No navigation! Just update the URL silently using setParams
+      // This prevents double navigation and screen remount
+      router.setParams({ id: chatId });
+
+      console.log('✅ [NEW CHAT] Transitioned to real chat without navigation');
 
       return chatId;
     } catch (error) {
-      console.error('Error creating chat and sending message:', error);
+      console.error('❌ [NEW CHAT] Error creating chat and sending message:', error);
       throw error;
     }
   };
 
   return (
     <View style={styles.container}>
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Loading chat...</Text>
-        </View>
-      ) : chatData ? (
+      {chatData ? (
         <ChatScreen 
           chatData={chatData}
           onBack={handleBack}
@@ -252,6 +300,7 @@ export default function IndividualChatScreen() {
           forceInitialRefresh={isFromNotification}
           isNewChat={isNewChat}
           onFirstMessage={isNewChat ? handleFirstMessage : undefined}
+          onChatDeleted={handleChatDeleted}
         />
       ) : (
         <View style={styles.errorContainer}>

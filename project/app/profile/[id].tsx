@@ -252,8 +252,15 @@ export default function ProfileScreen() {
       const existingChat = chatsArray.find((chat: any) => chat.userId === String(userId));
       
       if (existingChat) {
-        // Chat exists, navigate to it
-        router.push(`/chat/${existingChat.id}`);
+        // Chat exists, navigate to it with user data for instant display
+        router.push({
+          pathname: `/chat/${existingChat.id}`,
+          params: {
+            cachedName: profile?.username || 'User',
+            cachedAvatar: profile?.avatar_url || '',
+            cachedIsOnline: 'false',
+          }
+        });
       } else {
         // No existing chat - navigate to new chat with user data in params
         // Chat will be created when first message is sent
@@ -261,8 +268,8 @@ export default function ProfileScreen() {
           pathname: '/chat/new',
           params: {
             userId: String(userId),
-            username: profileData?.username || 'User',
-            avatar: profileData?.avatar_url || '',
+            username: profile?.username || 'User',
+            avatar: profile?.avatar_url || '',
             isOnline: 'false',
           }
         });
@@ -273,7 +280,7 @@ export default function ProfileScreen() {
     } finally {
       setChatLoading(false);
     }
-  }, [userId, chatLoading, user, profileData]);
+  }, [userId, chatLoading, user, profile]);
 
   // Sync userPosts with global interactions and like counts in real-time
   const syncedUserPosts = useMemo(() => {

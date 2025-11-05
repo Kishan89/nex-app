@@ -146,6 +146,59 @@ class ChatCacheManager {
     } catch (error) {
       }
   }
+  // Add new chat to cache
+  addChatToCache(chat: Chat): void {
+    if (!this.memoryCache) {
+      // Initialize cache if it doesn't exist
+      this.memoryCache = {
+        chats: [],
+        totalUnread: 0,
+        timestamp: Date.now()
+      };
+    }
+    
+    // Check if chat already exists
+    const chatExists = this.memoryCache.chats.some(c => String(c.id) === String(chat.id));
+    if (chatExists) {
+      return; // Don't add duplicates
+    }
+    
+    // Add new chat to the beginning of the list
+    const updatedChats = [chat, ...this.memoryCache.chats];
+    
+    const totalUnread = updatedChats.reduce((sum, c) => sum + (c.unread || 0), 0);
+    
+    this.memoryCache = {
+      chats: updatedChats,
+      totalUnread,
+      timestamp: Date.now()
+    };
+    
+    // Update storage in background
+    this.saveMemoryCacheToStorage();
+  }
+
+  // Remove chat from cache
+  removeChatFromCache(chatId: string | number): void {
+    if (!this.memoryCache) return;
+    
+    const updatedChats = this.memoryCache.chats.filter(
+      chat => String(chat.id) !== String(chatId)
+    );
+    
+    const totalUnread = updatedChats.reduce((sum, chat) => sum + (chat.unread || 0), 0);
+    
+    this.memoryCache = {
+      ...this.memoryCache,
+      chats: updatedChats,
+      totalUnread,
+      timestamp: Date.now()
+    };
+    
+    // Update storage in background
+    this.saveMemoryCacheToStorage();
+  }
+
   // Get cache info for debugging
   getCacheInfo(): { hasMemoryCache: boolean; age?: number; count?: number; unread?: number } {
     return {

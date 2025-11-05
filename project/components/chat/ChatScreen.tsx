@@ -24,6 +24,7 @@ import { useChatContext } from '@/context/ChatContext';
 // Memory management will be handled by regular setTimeout for now
 import { apiService } from '@/lib/api';
 import { chatMessageCache } from '@/store/chatMessageCache';
+import { chatCache } from '@/store/chatCache';
 import { formatMessageTime, getCurrentTimestamp, fixServerTimestamp, compareTimestamps } from '@/lib/timestampUtils';
 import { Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import { fcmService } from '@/lib/fcmService';
@@ -46,6 +47,7 @@ interface ChatScreenProps {
   isNewChat?: boolean;
   onFirstMessage?: (messageContent: string) => Promise<string>;
   forceInitialRefresh?: boolean;
+  onChatDeleted?: (chatId: string) => void;
 }
 const ChatScreen = React.memo(function ChatScreen({ 
   chatData, 
@@ -53,15 +55,12 @@ const ChatScreen = React.memo(function ChatScreen({
   onUserProfile,
   isNewChat = false,
   onFirstMessage,
-  forceInitialRefresh = false
+  forceInitialRefresh = false,
+  onChatDeleted
 }: ChatScreenProps) {
-  // Safety check for chatData - inspired by original ChatScreen
+  // Safety check for chatData - if no data, return null (parent will handle)
   if (!chatData || !chatData.id) {
-    return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
-        <Text style={{ color: '#fff', fontSize: 16 }}>Loading chat...</Text>
-      </SafeAreaView>
-    );
+    return null;
   }
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
@@ -294,7 +293,8 @@ const ChatScreen = React.memo(function ChatScreen({
     const tempId = `temp-${Date.now()}`;
     
     // 🆕 NEW CHAT HANDLING: If this is a new chat, create it first
-    if (isNewChat && onFirstMessage) {
+    // Only treat as new if ID is literally 'new' (not a real chat ID)
+    if (isNewChat && onFirstMessage && chatId === 'new') {
       console.log('🆕 [NEW CHAT] Creating chat with first message...');
       try {
         // Clear input immediately for instant feedback
@@ -321,7 +321,8 @@ const ChatScreen = React.memo(function ChatScreen({
         const realChatId = await onFirstMessage(messageText);
         console.log('✅ [NEW CHAT] Chat created with ID:', realChatId);
         
-        // The screen will be replaced, so no need to update messages here
+        // Chat has been created, chatData.id will be updated by parent
+        // No navigation needed - just wait for chatData to update
         return;
       } catch (error) {
         console.error('❌ [NEW CHAT] Failed to create chat:', error);
@@ -511,19 +512,44 @@ const ChatScreen = React.memo(function ChatScreen({
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await apiService.deleteChat(String(chatData.id));
-              Alert.alert('Success', 'Chat deleted successfully');
-              onBack?.();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete chat. Please try again.');
-            }
+          onPress: () => {
+            const chatId = String(chatData.id);
+            
+            // 🚀 INSTANT: Notify parent to remove from list immediately
+            onChatDeleted?.(chatId);
+            
+            // 🚀 INSTANT: Go back immediately
+            onBack?.();
+            
+            // 🚀 INSTANT UI UPDATE: Remove from all caches immediately (non-blocking)
+            setTimeout(() => {
+              chatCache.removeChatFromCache(chatId);
+              chatMessageCache.clearChatCache(chatId);
+              ultraFastChatCache.clearChatCache(chatId);
+              
+              // Clear from AsyncStorage to ensure it doesn't come back
+              if (user?.id) {
+                const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                AsyncStorage.removeItem(`user_chats_${user.id}`).catch(() => {});
+              }
+            }, 0);
+            
+            // 📡 BACKGROUND SYNC: Delete from backend
+            setTimeout(() => {
+              apiService.deleteChat(chatId)
+                .then(() => {
+                  console.log('✅ Chat deleted from backend:', chatId);
+                })
+                .catch((error) => {
+                  console.error('❌ Failed to delete chat from backend:', error);
+                  // Silently fail - chat already removed from UI
+                });
+            }, 0);
           }
         }
       ]
     );
-  }, [chatData.id, chatData.name, onBack]);
+  }, [chatData.id, chatData.name, onBack, user?.id]);
   const handleComingSoon = (feature: string) => {
     Alert.alert('Coming Soon', `${feature} feature will be available in the next update!`);
   };
@@ -881,7 +907,10 @@ const ChatScreen = React.memo(function ChatScreen({
         renderItem={renderMessage}
         keyExtractor={(item, index) => `msg-${item.id}-${index}`}
         style={styles.messagesList}
-        contentContainerStyle={styles.messagesContent}
+        contentContainerStyle={[
+          styles.messagesContent,
+          messages.length === 0 && styles.emptyMessagesContent
+        ]}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => {
           // 🚀 IMPROVED: Scroll to last message with slight delay for better reliability
@@ -900,6 +929,16 @@ const ChatScreen = React.memo(function ChatScreen({
           setTimeout(() => scrollToBottom(false), 50);
           setTimeout(() => scrollToBottom(false), 100);
         }}
+        ListEmptyComponent={
+          <View style={styles.emptyStateContainer}>
+            <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
+              {loading ? '⏳ Loading messages...' : '👋 Start a conversation!'}
+            </Text>
+            <Text style={[styles.emptyStateSubtext, { color: colors.textMuted }]}>
+              {loading ? 'Please wait...' : 'Send a message to begin chatting'}
+            </Text>
+          </View>
+        }
       />
       {renderMessageInput()}
       {/* Options Menu Modal */}
@@ -999,6 +1038,28 @@ const createStyles = (colors: any) => StyleSheet.create({
   messagesContent: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
+  },
+  emptyMessagesContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.semibold,
+    marginBottom: Spacing.xs,
+    textAlign: 'center',
+  },
+  emptyStateSubtext: {
+    fontSize: FontSizes.sm,
+    textAlign: 'center',
+    opacity: 0.7,
   },
   messageContainer: {
     marginVertical: Spacing.xs,

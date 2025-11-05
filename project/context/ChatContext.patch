@@ -1,0 +1,41 @@
+--- a/project/context/ChatContext.tsx
++++ b/project/context/ChatContext.tsx
+@@ -12,6 +12,7 @@ interface ChatContextType {
+   updateReadCount: (chatId: string, readCount: number) => void;
+   refreshUnreadCounts: () => Promise<void>;
+   markChatAsRead: (chatId: string, totalMessages: number) => void;
++  removeChat: (chatId: string) => void;
+   // Global message management
+   getChatMessages: (chatId: string) => Message[];
+   addMessageToChat: (chatId: string, message: Message, skipDuplicateCheck?: boolean) => void;
+@@ -191,6 +192,22 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
+       return newState;
+     });
+   }, []);
++  
++  // Remove chat completely (for deletion)
++  const removeChat = useCallback((chatId: string) => {
++    // Clear messages
++    clearChatMessages(chatId);
++    
++    // Clear read counts
++    setChatReadCounts(prev => {
++      const newCounts = { ...prev };
++      delete newCounts[chatId];
++      return newCounts;
++    });
++    
++    // Refresh unread counts
++    refreshUnreadCounts();
++  }, [clearChatMessages, refreshUnreadCounts]);
+   // New function to merge server messages with global messages
+   const mergeServerMessages = useCallback((chatId: string, serverMessages: Message[]): Message[] => {
+     const globalMessages = globalChatMessages[chatId] || [];
+@@ -333,6 +350,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
+     updateReadCount,
+     refreshUnreadCounts,
+     markChatAsRead,
++    removeChat,
+     getChatMessages,
+     addMessageToChat,
+     clearChatMessages,

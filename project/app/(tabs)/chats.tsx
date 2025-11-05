@@ -54,25 +54,20 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       setRefreshing(false);
       return;
     }
-    // Try to load from cache first for instant display (only if not force refreshing)
-    if (!forceRefresh) {
-      const cachedData = await chatCache.getCachedChats();
-      if (cachedData && cachedData.chats.length > 0) {
-        setChats(cachedData.chats);
-        setLoading(false);
-        setRefreshing(false);
-        // Load fresh data in background after showing cached content
-        setTimeout(() => {
-          loadChats(true); // Force refresh to get latest data
-        }, 500);
-        return;
-      }
-      // If cache is empty but we're not force refreshing, still fetch from server
-      // This handles the case where user has 0 chats initially
+    
+    // 🚀 INSTANT: Always load from cache first for immediate UI update
+    const cachedData = await chatCache.getCachedChats();
+    if (cachedData && cachedData.chats.length > 0 && !forceRefresh) {
+      setChats(cachedData.chats);
+      setLoading(false);
     }
+    
+    // Then fetch fresh data from server
     try {
       setError(null);
-      if (chats.length === 0) setLoading(true);
+      // Only show loading if we don't have cached data
+      if (chats.length === 0 && !cachedData) setLoading(true);
+      
       const resp = await apiService.getUserChats(user.id);
       let items: Chat[] = [];
       if (Array.isArray(resp)) {
@@ -84,10 +79,13 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       } else {
         items = [];
       }
-      // Debug: Log chat data to check avatar URLs
+      
+      // Update state with fresh data
       setChats(items);
+      
       // Cache the chats for instant loading next time
       chatCache.cacheChats(items);
+      
       // Preload recent chat messages for instant chat opening (top 5 chats)
       const topChats = items.slice(0, 5);
       const chatIds = topChats.map(chat => String(chat.id));
@@ -97,20 +95,24 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           chatMessageCache.preloadChats(chatIds);
         }, 500);
       }
+      
       // Keep old AsyncStorage cache for backward compatibility
       AsyncStorage.setItem(`user_chats_${user.id}`, JSON.stringify(items)).catch(() => {});
     } catch (err) {
       setError('Failed to load chats. Please try again.');
-      setChats([]);
+      // Don't clear chats if we have cached data
+      if (!cachedData || cachedData.chats.length === 0) {
+        setChats([]);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user]);
+  }, [user, chats.length]);
   useEffect(() => {
     loadChats();
   }, [loadChats]);
-  // Socket listeners for new messages and online status updates
+  // Socket listeners for new messages, online status, chat creation and deletion
   useEffect(() => {
     if (!user) return;
     const handleNewMessage = (socketMessage: any) => {
@@ -157,28 +159,101 @@ const ChatsScreen = React.memo(function ChatsScreen() {
         )
       );
     };
+    
+    // 🚀 NEW: Handle chat created event
+    const handleChatCreated = (data: { chat: any; chatId: string; timestamp: string }) => {
+      console.log('✅ [CHAT CREATED] Received socket event:', data.chatId);
+      
+      // Check if chat already exists
+      setChats(prevChats => {
+        const chatExists = prevChats.some(chat => String(chat.id) === String(data.chatId));
+        if (chatExists) {
+          console.log('⚠️ [CHAT CREATED] Chat already exists in list, skipping');
+          return prevChats;
+        }
+        
+        // Add new chat to the top of the list
+        const newChat: Chat = {
+          id: data.chat.id || data.chatId,
+          name: data.chat.name || data.chat.username || 'New Chat',
+          avatar: data.chat.avatar || '',
+          isOnline: data.chat.isOnline || false,
+          lastMessage: data.chat.lastMessage || '',
+          time: 'now',
+          unread: 0,
+          userId: data.chat.userId || '',
+          lastSeen: data.chat.lastSeen || 'recently',
+          lastSeenText: data.chat.lastSeenText || (data.chat.isOnline ? 'Online' : 'Last seen recently')
+        };
+        
+        console.log('✅ [CHAT CREATED] Adding chat to list:', newChat);
+        
+        // Add to cache
+        chatCache.addChatToCache(newChat);
+        
+        return [newChat, ...prevChats];
+      });
+      
+      // Refresh counts
+      refreshChats();
+    };
+    
+    // 🚀 NEW: Handle chat deleted event
+    const handleChatDeleted = (data: { chatId: string; timestamp: string }) => {
+      console.log('✅ [CHAT DELETED] Received socket event:', data.chatId);
+      
+      // Remove chat from list immediately
+      setChats(prevChats => {
+        const filteredChats = prevChats.filter(chat => String(chat.id) !== String(data.chatId));
+        console.log(`✅ [CHAT DELETED] Removed chat from list. Before: ${prevChats.length}, After: ${filteredChats.length}`);
+        return filteredChats;
+      });
+      
+      // Remove from cache
+      chatCache.removeChatFromCache(data.chatId);
+      
+      // Refresh counts
+      refreshChats();
+    };
+    
     // Add socket listeners
     socketService.addMessageListener(handleNewMessage);
     const removeOnlineStatusListener = socketService.onOnlineStatusChange(handleOnlineStatusChange);
+    
+    // 🚀 NEW: Add listeners for chat created/deleted events
+    const socket = (socketService as any).socket;
+    if (socket) {
+      socket.on('chat_created', handleChatCreated);
+      socket.on('chat_deleted', handleChatDeleted);
+    }
+    
     // Cleanup listeners on unmount
     return () => {
       socketService.removeMessageListener(handleNewMessage);
       removeOnlineStatusListener();
+      
+      // 🚀 NEW: Remove chat created/deleted listeners
+      if (socket) {
+        socket.off('chat_created', handleChatCreated);
+        socket.off('chat_deleted', handleChatDeleted);
+      }
     };
-  }, []);
+  }, [user, refreshChats]);
   // Load chats only on first mount, refresh counts on focus
   useEffect(() => {
     if (user && chats.length === 0) {
       loadChats();
     }
   }, [user, loadChats]);
-  // Only refresh unread counts when screen comes into focus (no reloading)
+  // Refresh chats when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (user && chats.length > 0) {
-        refreshChats(); // Only refresh counts, don't reload data
+      if (user) {
+        // 🚀 INSTANT: Always force reload from server for latest data
+        // This ensures created/deleted chats show immediately
+        loadChats(true);
       }
-    }, [user, refreshChats, chats.length])
+    }, [user, loadChats])
   );
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -202,8 +277,15 @@ const ChatsScreen = React.memo(function ChatsScreen() {
     } catch (error) {
       // Even if server call fails, keep local state updated
     }
-    // Navigate to standalone chat screen
-    router.push(`/chat/${chat.id}`);
+    // Navigate to standalone chat screen with cached data for instant display
+    router.push({
+      pathname: `/chat/${chat.id}`,
+      params: {
+        cachedName: chat.name || 'User',
+        cachedAvatar: chat.avatar || '',
+        cachedIsOnline: chat.isOnline ? 'true' : 'false',
+      }
+    });
   };
   const handleSearchPress = () => {
     router.push('/search-users');
@@ -279,10 +361,6 @@ const ChatsScreen = React.memo(function ChatsScreen() {
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
-      ) : chats.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No chats available</Text>
-        </View>
       ) : (
         <FlatList
           style={styles.chatsList}
@@ -291,6 +369,11 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           renderItem={renderChatItem}
           contentContainerStyle={{ paddingTop: 5, paddingBottom: 8, }}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No chats available</Text>
+            </View>
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

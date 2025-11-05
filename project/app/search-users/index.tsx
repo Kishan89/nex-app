@@ -188,8 +188,15 @@ export default function SearchUsersScreen() {
         const existingChat = chatsArray.find((chat: any) => chat.userId === targetUser.id);
         
         if (existingChat) {
-          // Chat exists, navigate to it
-          router.push(`/chat/${existingChat.id}`);
+          // Chat exists, navigate to it with user data for instant display
+          router.push({
+            pathname: `/chat/${existingChat.id}`,
+            params: {
+              cachedName: targetUser.username,
+              cachedAvatar: targetUser.avatar || '',
+              cachedIsOnline: targetUser.isOnline ? 'true' : 'false',
+            }
+          });
           setChatLoadingId(null);
           return;
         }
