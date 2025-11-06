@@ -33,7 +33,7 @@ interface ListenContextType {
   loadPosts: () => Promise<void>;
   loadMorePosts: () => Promise<void>;
   loadFollowingPosts: () => Promise<void>;
-  loadTrendingPosts: () => Promise<void>;
+  loadTrendingPosts: (loadMore?: boolean) => Promise<void>;
   onRefresh: () => Promise<void>;
   loadComments: (postId: string, forceRefresh?: boolean) => Promise<void>;
   getPostById: (postId: string) => NormalizedPost | undefined;
@@ -189,6 +189,8 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [trendingPage, setTrendingPage] = useState(1);
+  const [followingPage, setFollowingPage] = useState(1);
   const [loadingTrending, setLoadingTrending] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -382,14 +384,29 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
       setLoadingFollowing(false);
     }
   }, [loadSavedInteractions, loadSavedPollVotes]);
-  const loadTrendingPosts = useCallback(async () => {
-    setLoadingTrending(true);
+  const loadTrendingPosts = useCallback(async (loadMore = false) => {
+    if (loadMore) {
+      setLoadingMore(true);
+    } else {
+      setLoadingTrending(true);
+      setTrendingPage(1); // Reset page on fresh load
+    }
     setError(null);
     try {
+      const pageToLoad = loadMore ? trendingPage + 1 : 1;
       const savedInteractions = await loadSavedInteractions();
       const savedPollVotes = await loadSavedPollVotes();
-      const postsData = await apiService.getTrendingPosts();
+      const postsData = await apiService.getTrendingPosts(pageToLoad);
       const normalized = (postsData || []).map(normalizePost);
+      
+      // If no posts returned, we've reached the end
+      if (normalized.length === 0) {
+        if (loadMore) {
+          setLoadingMore(false);
+        }
+        return;
+      }
+      
       // Use server data for like counts and status - prioritize server truth
       const combinedInteractions: Record<string, { liked: boolean; bookmarked: boolean }> = {};
       normalized.forEach(p => {
@@ -420,17 +437,30 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
           userPollVote: undefined
         };
       }));
-      // Use fresh server data for trending posts
-      setTrendingPosts(postsWithPollVotes);
+      
+      // Append or replace based on loadMore flag
+      if (loadMore) {
+        setTrendingPosts(prev => [...prev, ...postsWithPollVotes]);
+        setTrendingPage(pageToLoad);
+      } else {
+        setTrendingPosts(postsWithPollVotes);
+      }
+      
       // Update interactions for trending posts too
       setPostInteractions(prev => ({ ...prev, ...combinedInteractions }));
     } catch (err) {
       setError('Failed to load trending posts.');
-      setTrendingPosts([]);
+      if (!loadMore) {
+        setTrendingPosts([]);
+      }
     } finally {
-      setLoadingTrending(false);
+      if (loadMore) {
+        setLoadingMore(false);
+      } else {
+        setLoadingTrending(false);
+      }
     }
-  }, [loadSavedInteractions, loadSavedPollVotes]);
+  }, [loadSavedInteractions, loadSavedPollVotes, trendingPage]);
   useEffect(() => { 
     // Initialize stores for fast loading
     const initializeStores = async () => {

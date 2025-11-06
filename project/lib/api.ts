@@ -245,9 +245,9 @@ class ApiService {
             return [];
         }
     }
-    async getTrendingPosts(): Promise<any[]> {
+    async getTrendingPosts(page: number = 1): Promise<any[]> {
         try {
-            const posts = await this.get<any[]>(API_ENDPOINTS.TRENDING_POSTS);
+            const posts = await this.get<any[]>(`${API_ENDPOINTS.TRENDING_POSTS}?page=${page}`);
             return Array.isArray(posts) ? posts : [];
         } catch (error) {
             return [];

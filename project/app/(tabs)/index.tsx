@@ -13,9 +13,10 @@ import {
   ActivityIndicator,
   Share as RNShare,
   Animated as RNAnimated,
+  Easing as RNEasing,
   Dimensions,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolate, Extrapolate, interpolateColor, runOnUI } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, interpolate, Extrapolate, interpolateColor, runOnUI, useAnimatedScrollHandler, Easing } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PenTool, Bell } from 'lucide-react-native';
@@ -94,50 +95,56 @@ export default function HomeScreen() {
   useEffect(() => {
     trackScreenView('home_screen');
     
-    // INSTANT prefetch - start immediately for fastest tab switching
+    // Professional prefetch - balanced timing for smooth experience
     const prefetchTimer = setTimeout(() => {
-      if (trendingPosts.length === 0) {
-        loadTrendingPosts();
-      }
-      if (followingPosts.length === 0) {
-        loadFollowingPosts();
-      }
-    }, 100); // Start prefetch after just 100ms
+      requestAnimationFrame(() => {
+        if (trendingPosts.length === 0) {
+          loadTrendingPosts();
+        }
+        if (followingPosts.length === 0) {
+          loadFollowingPosts();
+        }
+      });
+    }, 150); // Professional delay for smooth initial load
     
     return () => clearTimeout(prefetchTimer);
   }, []); // Empty dependency array to run only once
   // Notification count is now handled by NotificationCountContext
   // Real-time notifications removed - clean FCM handles this now
   // Notification counting is handled by NotificationCountContext
-  // Handle scroll - optimized to prevent flicker
+  // Handle scroll - smooth professional animations with easing
   const handleScroll = useCallback((event: any) => {
     const currentScrollY = event.nativeEvent.contentOffset.y;
     const scrollDiff = currentScrollY - lastScrollY.current;
     
-    // Increase threshold to prevent flicker
-    if (Math.abs(scrollDiff) > 15) {
-      if (scrollDiff > 0 && currentScrollY > 100) {
-        // Scrolling down
+    // Professional threshold - not too sensitive
+    if (Math.abs(scrollDiff) > 20) {
+      if (scrollDiff > 0 && currentScrollY > 120) {
+        // Scrolling down - smooth hide with professional easing
         RNAnimated.timing(headerTranslateY, {
           toValue: -120,
-          duration: 250,
+          duration: 400,
+          easing: RNEasing.bezier(0.25, 0.1, 0.25, 1), // Professional ease-in-out
           useNativeDriver: true,
         }).start();
         RNAnimated.timing(fabScale, {
           toValue: 0,
-          duration: 250,
+          duration: 350,
+          easing: RNEasing.bezier(0.4, 0, 0.2, 1), // Material Design easing
           useNativeDriver: true,
         }).start();
-      } else if (scrollDiff < -10 || currentScrollY < 50) {
-        // Scrolling up
+      } else if (scrollDiff < -15 || currentScrollY < 60) {
+        // Scrolling up - smooth reveal with professional easing
         RNAnimated.timing(headerTranslateY, {
           toValue: 0,
-          duration: 250,
+          duration: 400,
+          easing: RNEasing.bezier(0.25, 0.1, 0.25, 1),
           useNativeDriver: true,
         }).start();
         RNAnimated.timing(fabScale, {
           toValue: 1,
-          duration: 250,
+          duration: 350,
+          easing: RNEasing.bezier(0, 0, 0.2, 1), // Smooth entrance
           useNativeDriver: true,
         }).start();
       }
@@ -251,30 +258,38 @@ export default function HomeScreen() {
   const handleTabChange = useCallback((tab: string, tabIndex?: number) => {
     const index = tabIndex !== undefined ? tabIndex : tabs.indexOf(tab);
     
-    // INSTANT UI update - no blocking
+    // Prevent rapid tab changes
+    if (currentTabIndex.current === index) return;
+    
+    // Instant UI update - no delay for color change
     setActiveTab(tab);
     currentTabIndex.current = index;
     
-    // Scroll horizontal FlatList to the selected tab - INSTANT (no animation)
-    horizontalFlatListRef.current?.scrollToIndex({
-      index,
-      animated: false, // No animation for instant switching
-    });
-    
-    // Load data in background - non-blocking
+    // Very slow controlled scroll animation - prevents skipping
     setTimeout(() => {
+      horizontalFlatListRef.current?.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.5,
+      });
+    }, 100); // Longer delay for smoother, slower transition
+    
+    // Smart data prefetching
+    requestAnimationFrame(() => {
       if (tab === 'Following' && followingPosts.length === 0) {
         loadFollowingPosts();
       } else if (tab === 'Trending' && trendingPosts.length === 0) {
         loadTrendingPosts();
       }
-      
-      // Track tab change event (non-blocking)
+    });
+    
+    // Track tab change event (non-blocking)
+    setTimeout(() => {
       trackEvent('home_tab_change', {
         tab_name: tab.toLowerCase(),
         previous_tab: activeTab.toLowerCase()
       });
-    }, 0);
+    }, 100);
   }, [loadFollowingPosts, loadTrendingPosts, activeTab, tabs, followingPosts.length, trendingPosts.length]);
   // Animated style for tab indicator - runs on UI thread for 60fps
   const tabIndicatorStyle = useAnimatedStyle(() => {
@@ -291,21 +306,15 @@ export default function HomeScreen() {
     };
   });
 
-  // Handle horizontal scroll for tab indicator - INSTANT response with reanimated
-  const handleHorizontalScroll = useCallback((event: any) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const normalizedPosition = offsetX / SCREEN_WIDTH;
-    
-    // INSTANT indicator position update - runs on UI thread
-    tabIndicatorPosition.value = normalizedPosition;
-    
-    // INSTANT tab state update
-    const activeIndex = Math.round(normalizedPosition);
-    if (activeIndex !== currentTabIndex.current && activeIndex >= 0 && activeIndex < tabs.length) {
-      currentTabIndex.current = activeIndex;
-      setActiveTab(tabs[activeIndex]);
-    }
-  }, [tabIndicatorPosition, tabs]);
+  // Handle horizontal scroll for tab indicator - instant response
+  const handleHorizontalScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      const offsetX = event.contentOffset.x;
+      const normalizedPosition = offsetX / SCREEN_WIDTH;
+      // Direct value for instant indicator movement
+      tabIndicatorPosition.value = normalizedPosition;
+    },
+  });
   
   // Handle scroll end to ensure data is loaded and state is synced
   const handleHorizontalScrollEnd = useCallback((event: any) => {
@@ -316,20 +325,20 @@ export default function HomeScreen() {
     if (index >= 0 && index < tabs.length) {
       const tab = tabs[index];
       
-      // Update active tab state (for non-visual logic like data loading)
+      // Instant state update - no delay
       if (currentTabIndex.current !== index) {
         currentTabIndex.current = index;
-        setActiveTab(tab);
+        setActiveTab(tab); // Direct update, no startTransition
       }
       
-      // Load data in background - only if not already cached
-      setTimeout(() => {
+      // Smart prefetching with requestAnimationFrame for smooth performance
+      requestAnimationFrame(() => {
         if (tab === 'Following' && followingPosts.length === 0) {
           loadFollowingPosts();
         } else if (tab === 'Trending' && trendingPosts.length === 0) {
           loadTrendingPosts();
         }
-      }, 0);
+      });
     }
   }, [tabs, loadFollowingPosts, loadTrendingPosts, followingPosts.length, trendingPosts.length]);
   
@@ -368,11 +377,9 @@ export default function HomeScreen() {
     );
   }, [getPostById, postInteractions, toggleLike, openComments, toggleBookmark, votePoll, user?.id, refreshKey]);
   
-  // Render footer for loading more posts - ONLY show loading indicator
+  // Render footer for loading more posts - show for all tabs
   const renderFooter = useCallback(() => {
-    if (activeTab !== 'Latest') return null;
-    
-    // Only show loading indicator when actually loading
+    // Show loading indicator when actually loading
     if (loadingMore) {
       return (
         <View style={styles.loadingFooter}>
@@ -383,7 +390,7 @@ export default function HomeScreen() {
     }
     
     return null;
-  }, [activeTab, loadingMore, colors.primary, colors.textSecondary]);
+  }, [loadingMore, colors.primary, colors.textSecondary]);
   
   // Render vertical FlatList for each tab
   const renderTabContent = useCallback(({ item, index }: { item: string; index: number }) => {
@@ -433,23 +440,36 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 80, paddingTop: 100 }}
           onEndReached={() => {
-            if (item === 'Latest' && hasMorePosts && !loadingMore) {
-              loadMorePosts();
+            // Enable load more for all tabs
+            if (!loadingMore) {
+              if (item === 'Latest' && hasMorePosts) {
+                loadMorePosts();
+              } else if (item === 'Trending') {
+                loadTrendingPosts(true); // Load more trending with pagination
+              } else if (item === 'Following') {
+                loadFollowingPosts(); // Load more following
+              }
             }
           }}
           onEndReachedThreshold={0.5}
-          ListFooterComponent={item === 'Latest' ? renderFooter : null}
+          ListFooterComponent={renderFooter}
           onScroll={handleScroll}
-          scrollEventThrottle={16}
+          scrollEventThrottle={8}
           bounces={true}
           alwaysBounceVertical={true}
           removeClippedSubviews={Platform.OS === 'android'}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
+          maxToRenderPerBatch={8}
+          updateCellsBatchingPeriod={100}
           initialNumToRender={8}
-          windowSize={21}
-          disableIntervalMomentum={true}
-          decelerationRate="fast"
+          windowSize={15}
+          disableIntervalMomentum={false}
+          decelerationRate={0.994}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+            autoscrollToTopThreshold: 10
+          }}
+          nestedScrollEnabled={true}
+          legacyImplementation={false}
         />
       </View>
     );
@@ -547,7 +567,7 @@ export default function HomeScreen() {
           ) : error ? (
             <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
           ) : (
-            <FlatList
+            <Animated.FlatList
               ref={horizontalFlatListRef}
               data={tabs}
               renderItem={renderTabContent}
@@ -557,21 +577,23 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               onScroll={handleHorizontalScroll}
               onMomentumScrollEnd={handleHorizontalScrollEnd}
-              scrollEventThrottle={16}
-              decelerationRate={0.99}
+              scrollEventThrottle={1}
+              decelerationRate={0.96}
               bounces={false}
               removeClippedSubviews={false}
               snapToInterval={SCREEN_WIDTH}
               snapToAlignment="center"
               disableIntervalMomentum={true}
               initialNumToRender={3}
-              maxToRenderPerBatch={3}
+              maxToRenderPerBatch={1}
               windowSize={3}
               getItemLayout={(data, index) => ({
                 length: SCREEN_WIDTH,
                 offset: SCREEN_WIDTH * index,
                 index,
               })}
+              overScrollMode="never"
+              nestedScrollEnabled={false}
             />
           )}
           

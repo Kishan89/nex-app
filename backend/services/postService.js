@@ -467,14 +467,13 @@ class PostService {
 
   async getTrendingPosts(options = {}) {
     const { page = 1, limit = 15, userId } = options;
-    const skip = (page - 1) * limit;
 
     // Calculate date 7 days ago for trending
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // OPTIMIZED: Single query with multi-level ordering
-    const posts = await prisma.post.findMany({
+    // Fetch ALL posts from last 7 days (no skip/take yet)
+    const allPosts = await prisma.post.findMany({
       where: {
         createdAt: { gte: sevenDaysAgo }
       },
@@ -518,26 +517,41 @@ class PostService {
           select: { id: true }
         } : false,
       },
-      orderBy: [
-        { isLive: 'desc' },        // Live posts first
-        { isPinned: 'desc' },      // Pinned posts second
-        { likesCount: 'desc' },    // Most liked
-        { commentsCount: 'desc' }, // Most commented
-        { createdAt: 'desc' }      // Newest
-      ],
-      skip,
-      take: limit,
     });
 
-    return posts.map((post) => {
-      const postWithStatus = {
+    // Calculate trending score: (1 * likes) + (2 * comments)
+    const postsWithScore = allPosts.map((post) => {
+      const trendingScore = (post.likesCount * 1) + (post.commentsCount * 2);
+      return {
         ...post,
+        trendingScore,
         isLiked: userId ? post.likes.length > 0 : false,
         isBookmarked: userId ? post.bookmarks.length > 0 : false,
       };
-      delete postWithStatus.likes;
-      delete postWithStatus.bookmarks;
-      return transformPost(postWithStatus);
+    });
+
+    // Sort by: Live > Pinned > Trending Score > Newest
+    const sortedPosts = postsWithScore.sort((a, b) => {
+      // Live posts first
+      if (a.isLive !== b.isLive) return b.isLive ? 1 : -1;
+      // Pinned posts second
+      if (a.isPinned !== b.isPinned) return b.isPinned ? 1 : -1;
+      // Trending score (higher is better)
+      if (a.trendingScore !== b.trendingScore) return b.trendingScore - a.trendingScore;
+      // Newest first
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    // Apply pagination
+    const skip = (page - 1) * limit;
+    const paginatedPosts = sortedPosts.slice(skip, skip + limit);
+
+    return paginatedPosts.map((post) => {
+      const postWithoutLikes = { ...post };
+      delete postWithoutLikes.likes;
+      delete postWithoutLikes.bookmarks;
+      delete postWithoutLikes.trendingScore; // Remove score from response
+      return transformPost(postWithoutLikes);
     });
   }
 }
