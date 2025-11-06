@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { Comment } from '@/types';
 import CommentReplyPanel from '@/components/CommentReplyPanel';
 interface CommentReplyContextType {
-  openCommentReplies: (comment: Comment, postId: string, commentY?: number) => void;
+  openCommentReplies: (comment: Comment, postId: string, postOwnerId?: string, postIsAnonymous?: boolean, commentY?: number) => void;
   closeReplies: () => void;
   isVisible: boolean;
   onReplyAdded?: (commentId: string) => void;
@@ -21,10 +21,14 @@ export function CommentReplyProvider({
   const [isVisible, setIsVisible] = useState(false);
   const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
   const [postId, setPostId] = useState<string>('');
+  const [postOwnerId, setPostOwnerId] = useState<string>('');
+  const [postIsAnonymous, setPostIsAnonymous] = useState<boolean>(false);
   const [commentY, setCommentY] = useState<number>(0);
-  const openCommentReplies = (comment: Comment, postId: string, commentY?: number) => {
+  const openCommentReplies = (comment: Comment, postId: string, postOwnerId?: string, postIsAnonymous?: boolean, commentY?: number) => {
     setSelectedComment(comment);
     setPostId(postId);
+    setPostOwnerId(postOwnerId || '');
+    setPostIsAnonymous(postIsAnonymous || false);
     setCommentY(commentY || 0);
     setIsVisible(true);
   };
@@ -50,6 +54,8 @@ export function CommentReplyProvider({
         onClose={closeReplies}
         parentComment={selectedComment}
         postId={postId}
+        postOwnerId={postOwnerId}
+        postIsAnonymous={postIsAnonymous}
         currentUserId={currentUserId}
         currentUserAvatar={currentUserAvatar}
         commentY={commentY}

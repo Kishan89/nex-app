@@ -296,12 +296,14 @@ const getMeProfile = async (req, res, next) => {
             id: user.id,
             email: user.email,
             username: user.username,
+            name: user.name || '',
             bio: user.bio || '',
             avatar_url: user.avatar || 'https://via.placeholder.com/150',
             banner_url: user.banner_url || 'https://via.placeholder.com/600x200',
             xp: user.xp || 0,
             followers_count: followCounts.followers,
-            following_count: followCounts.following
+            following_count: followCounts.following,
+            createdAt: user.createdAt // 🚀 NEW: Include account creation date for banner logic
         };
 
         res.status(HTTP_STATUS.OK).json(userProfile);

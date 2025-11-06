@@ -317,12 +317,15 @@ const ChatScreen = React.memo(function ChatScreen({
         
         setMessages(prev => [...prev, tempMessage]);
         
-        // Create chat and send message
+        // Create chat and send message (parent handles it)
         const realChatId = await onFirstMessage(messageText);
         console.log('✅ [NEW CHAT] Chat created with ID:', realChatId);
         
-        // Chat has been created, chatData.id will be updated by parent
-        // No navigation needed - just wait for chatData to update
+        // 🚀 FIX: Remove temp message since parent already sent it
+        // Socket broadcast will add the real message from server
+        setMessages(prev => prev.filter(msg => msg.id !== tempId));
+        console.log('✅ [NEW CHAT] Temp message removed, waiting for socket broadcast');
+        
         return;
       } catch (error) {
         console.error('❌ [NEW CHAT] Failed to create chat:', error);
@@ -333,6 +336,7 @@ const ChatScreen = React.memo(function ChatScreen({
         return;
       }
     }
+    
     
     console.log('📤 [SEND] Sending message:', {
       tempId,
@@ -515,41 +519,45 @@ const ChatScreen = React.memo(function ChatScreen({
           onPress: () => {
             const chatId = String(chatData.id);
             
-            // 🚀 INSTANT: Notify parent to remove from list immediately
+            console.log('🗑️ [DELETE] Instant UI deletion started:', chatId);
+            
+            // 🚀 INSTANT #1: Notify parent to remove from list immediately
             onChatDeleted?.(chatId);
             
-            // 🚀 INSTANT: Go back immediately
+            // 🚀 INSTANT #2: Remove from all caches immediately (synchronous)
+            chatCache.removeChatFromCache(chatId);
+            chatMessageCache.clearChatCache(chatId);
+            ultraFastChatCache.clearChatCache(chatId);
+            
+            // Clear from AsyncStorage
+            if (user?.id) {
+              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+              AsyncStorage.removeItem(`user_chats_${user.id}`).catch(() => {});
+            }
+            
+            console.log('✅ [DELETE] UI updated instantly, chat removed from all caches');
+            
+            // 🚀 INSTANT #3: Go back immediately after cache cleanup
             onBack?.();
             
-            // 🚀 INSTANT UI UPDATE: Remove from all caches immediately (non-blocking)
+            // 📡 BACKGROUND SYNC: Delete from backend (non-blocking)
             setTimeout(() => {
-              chatCache.removeChatFromCache(chatId);
-              chatMessageCache.clearChatCache(chatId);
-              ultraFastChatCache.clearChatCache(chatId);
-              
-              // Clear from AsyncStorage to ensure it doesn't come back
-              if (user?.id) {
-                const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-                AsyncStorage.removeItem(`user_chats_${user.id}`).catch(() => {});
-              }
-            }, 0);
-            
-            // 📡 BACKGROUND SYNC: Delete from backend
-            setTimeout(() => {
+              console.log('🌐 [DELETE] Starting backend sync...');
               apiService.deleteChat(chatId)
                 .then(() => {
-                  console.log('✅ Chat deleted from backend:', chatId);
+                  console.log('✅ [DELETE] Backend sync successful:', chatId);
                 })
                 .catch((error) => {
-                  console.error('❌ Failed to delete chat from backend:', error);
+                  console.error('❌ [DELETE] Backend sync failed:', error);
                   // Silently fail - chat already removed from UI
+                  // User won't notice since UI is already updated
                 });
-            }, 0);
+            }, 100); // Small delay to let UI update complete first
           }
         }
       ]
     );
-  }, [chatData.id, chatData.name, onBack, user?.id]);
+  }, [chatData.id, chatData.name, onBack, onChatDeleted, user?.id]);
   const handleComingSoon = (feature: string) => {
     Alert.alert('Coming Soon', `${feature} feature will be available in the next update!`);
   };

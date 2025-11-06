@@ -248,13 +248,6 @@ export default function IndividualChatScreen() {
       // Store the actual chat ID
       setActualChatId(chatId);
 
-      // 🚀 INSTANT: Update chatData in place to transition from new chat to real chat
-      // This prevents screen remount and double navigation
-      setChatData(prevData => ({
-        ...prevData!,
-        id: chatId, // Update to real chat ID
-      }));
-
       // Send the first message
       await apiService.sendMessage(chatId, {
         content: messageContent,
@@ -264,18 +257,35 @@ export default function IndividualChatScreen() {
 
       console.log('✅ [NEW CHAT] First message sent successfully');
 
-      // Refresh unread counts
-      refreshUnreadCounts();
+      // 🚀 INSTANT: Add chat to cache immediately for instant display in list
+      const newChatForCache = {
+        id: chatId,
+        name: params.username as string,
+        avatar: (params.avatar as string) || '',
+        isOnline: params.isOnline === 'true',
+        lastMessage: messageContent.substring(0, 50),
+        time: 'now',
+        unread: 0,
+        userId: params.userId as string,
+        lastSeen: 'recently',
+        lastSeenText: params.isOnline === 'true' ? 'Online' : 'Last seen recently'
+      };
       
-      // Clear all chat caches to force refresh on chats screen
-      try {
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        await AsyncStorage.removeItem(`user_chats_${user.id}`);
-        // Also clear the chatCache
-        await chatCache.clearCache();
-      } catch (error) {
-        console.log('Failed to clear chat cache:', error);
-      }
+      chatCache.addChatToCache(newChatForCache);
+      console.log('✅ [NEW CHAT] Added to cache instantly for list display');
+
+      // 🚀 INSTANT: Update chatData in place to transition from new chat to real chat
+      // This prevents screen remount and double navigation
+      // Update AFTER message is sent to prevent ChatScreen from sending it again
+      setChatData(prevData => ({
+        ...prevData!,
+        id: chatId, // Update to real chat ID
+      }));
+
+      // Refresh unread counts in background
+      setTimeout(() => {
+        refreshUnreadCounts();
+      }, 0);
 
       // 🚀 FIX: No navigation! Just update the URL silently using setParams
       // This prevents double navigation and screen remount

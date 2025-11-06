@@ -52,6 +52,8 @@ interface CommentReplyPanelProps {
   onClose: () => void;
   parentComment: Comment | null;
   postId: string;
+  postOwnerId?: string;
+  postIsAnonymous?: boolean;
   currentUserId: string;
   currentUserAvatar?: string;
   commentY?: number;
@@ -61,6 +63,8 @@ export default function CommentReplyPanel({
   onClose,
   parentComment,
   postId,
+  postOwnerId,
+  postIsAnonymous,
   currentUserId,
   currentUserAvatar,
   commentY = 0,
@@ -76,6 +80,10 @@ export default function CommentReplyPanel({
   const [isAnonymous, setIsAnonymous] = useState(false);
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Check if current user is the post owner AND post is anonymous
+  const isPostOwner = postOwnerId === currentUserId;
+  const canReplyAnonymously = isPostOwner && postIsAnonymous === true;
   // Animation values
   const translateX = useSharedValue(SCREEN_WIDTH); // Start off-screen to the right
   const translateY = useSharedValue(0);
@@ -237,12 +245,12 @@ export default function CommentReplyPanel({
       createdAt: new Date().toISOString(),
     };
 
-    // Add optimistic reply at the top for latest first
-    setReplies(prev => [optimisticReply, ...prev]);
+    // Add optimistic reply at the end for oldest-to-latest order
+    setReplies(prev => [...prev, optimisticReply]);
     
-    // Scroll to top to show the new reply
+    // Scroll to bottom to show the new reply
     setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
     try {
@@ -279,9 +287,9 @@ export default function CommentReplyPanel({
         ));
       }
       
-      // Scroll to top to show new reply
+      // Scroll to bottom to show new reply
       setTimeout(() => {
-        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 50);
     } catch (error) {
       // Remove optimistic reply on error and restore text
@@ -549,12 +557,14 @@ export default function CommentReplyPanel({
                   multiline
                   keyboardAppearance={isDark ? "dark" : "light"} 
                 />
-                <TouchableOpacity
-                  style={[styles.anonymousToggle, { backgroundColor: isAnonymous ? colors.primaryAlpha : 'transparent' }]}
-                  onPress={() => setIsAnonymous(!isAnonymous)}
-                >
-                  <UserX size={18} color={isAnonymous ? colors.primary : colors.textMuted} />
-                </TouchableOpacity>
+                {canReplyAnonymously && (
+                  <TouchableOpacity
+                    style={[styles.anonymousToggle, { backgroundColor: isAnonymous ? colors.primaryAlpha : 'transparent' }]}
+                    onPress={() => setIsAnonymous(!isAnonymous)}
+                  >
+                    <UserX size={18} color={isAnonymous ? colors.primary : colors.textMuted} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   onPress={sendReply}
                   style={[styles.sendButton, { opacity: newReply.trim() ? 1 : 0.5 }]}

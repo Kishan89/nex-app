@@ -33,7 +33,7 @@ class CommentService {
         }
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: 'asc' // Changed to 'asc' for oldest to latest
       },
       skip,
       take: limit,
@@ -55,11 +55,15 @@ class CommentService {
       replyMap[reply.parentId].push(reply);
     });
     
-    // Transform comments with nested replies - latest first
+    // Transform comments with nested replies - oldest first
     const transformedComments = parentComments.map(parent => {
       const transformedParent = transformComment(parent);
       const replies = replyMap[parent.id] || [];
-      transformedParent.replies = replies.map(transformComment);
+      // Sort replies by createdAt ascending (oldest to latest)
+      const sortedReplies = replies.sort((a, b) => 
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+      transformedParent.replies = sortedReplies.map(transformComment);
       return transformedParent;
     });
 
@@ -92,6 +96,28 @@ class CommentService {
     });
 
     try {
+      // Check if post is anonymous and user is the post owner when trying to post anonymously
+      if (isAnonymous) {
+        const post = await prisma.post.findUnique({
+          where: { id: postId },
+          select: { userId: true, isAnonymous: true }
+        });
+        
+        if (!post) {
+          throw new NotFoundError('Post not found');
+        }
+        
+        // Only allow anonymous comments on anonymous posts
+        if (!post.isAnonymous) {
+          throw new UnauthorizedError('Anonymous comments are only allowed on anonymous posts');
+        }
+        
+        // Only the post owner can comment anonymously
+        if (post.userId !== userId) {
+          throw new UnauthorizedError('Only the post owner can comment anonymously');
+        }
+      }
+      
       const commentDataToCreate = {
         text,
         postId,

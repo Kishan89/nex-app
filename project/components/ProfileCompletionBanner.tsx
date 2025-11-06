@@ -14,6 +14,7 @@ interface ProfileCompletionBannerProps {
   hasName: boolean;
   hasBanner: boolean;
   username: string;
+  userCreatedAt?: string | Date; // When user account was created
 }
 
 const BANNER_DISMISSED_KEY = '@profile_completion_banner_dismissed';
@@ -24,7 +25,8 @@ export default function ProfileCompletionBanner({
   hasBio,
   hasName,
   hasBanner,
-  username
+  username,
+  userCreatedAt
 }: ProfileCompletionBannerProps) {
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
@@ -34,6 +36,17 @@ export default function ProfileCompletionBanner({
 
   // Check if profile is incomplete
   const isProfileIncomplete = !hasAvatar || !hasBio || !hasName || !hasBanner;
+  
+  // 🚀 NEW: Check if user is new (within 7 days of account creation)
+  const isNewUser = () => {
+    if (!userCreatedAt) return false; // If no creation date, assume old user
+    
+    const createdDate = new Date(userCreatedAt);
+    const now = new Date();
+    const daysSinceCreation = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
+    
+    return daysSinceCreation <= 7; // Show banner only for users created within last 7 days
+  };
 
   useEffect(() => {
     if (isProfileIncomplete) {
@@ -44,11 +57,18 @@ export default function ProfileCompletionBanner({
   const checkBannerStatus = async () => {
     if (!isProfileIncomplete) return;
     
+    // 🚀 FIX: Only show banner for new users (within 7 days of account creation)
+    if (!isNewUser()) {
+      console.log('🚫 [BANNER] User is not new (>7 days old), skipping banner');
+      return;
+    }
+    
     try {
       const dismissedData = await AsyncStorage.getItem(`${BANNER_DISMISSED_KEY}_${userId}`);
       const hasShownBefore = await AsyncStorage.getItem(`${BANNER_DISMISSED_KEY}_shown_${userId}`);
       
       if (!dismissedData && !hasShownBefore) {
+        console.log('✅ [BANNER] Showing banner for new user with incomplete profile');
         await AsyncStorage.setItem(`${BANNER_DISMISSED_KEY}_shown_${userId}`, 'true');
         setVisible(true);
         // Animate in

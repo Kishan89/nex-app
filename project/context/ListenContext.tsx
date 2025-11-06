@@ -848,20 +848,20 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
           const currentComments = prev[postId] || [];
           
           if (parentId) {
-            // This is a reply - add to parent's replies array
+            // This is a reply - add to parent's replies array at the end (oldest to latest)
             const updatedComments = currentComments.map(comment => {
               if (comment.id === parentId) {
                 return {
                   ...comment,
-                  replies: [newComment, ...(comment.replies || [])]
+                  replies: [...(comment.replies || []), newComment]
                 };
               }
               return comment;
             });
             return { ...prev, [postId]: updatedComments };
           } else {
-            // This is a top-level comment - add to main array
-            return { ...prev, [postId]: [newComment, ...currentComments] };
+            // This is a top-level comment - add to end of array (oldest to latest)
+            return { ...prev, [postId]: [...currentComments, newComment] };
           }
         });
       }

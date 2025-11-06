@@ -414,6 +414,7 @@ export default function HomeScreen() {
                 hasName={!!user.name}
                 hasBanner={!!user.banner_url}
                 username={user.username || ''}
+                userCreatedAt={(user as any).createdAt || (user as any).created_at}
               />
             ) : null
           }

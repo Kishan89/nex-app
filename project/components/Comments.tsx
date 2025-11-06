@@ -93,6 +93,10 @@ export default function CommentsModal({
   // Get the current post with real-time updates
   const currentPost = post ? (getPostById(post.id) || post) : null;
   const currentInteractions = currentPost ? postInteractions[currentPost.id] : null;
+  
+  // Check if current user is the post owner AND post is anonymous
+  const isPostOwner = currentPost?.userId === currentUserId;
+  const canCommentAnonymously = isPostOwner && currentPost?.isAnonymous === true;
   useEffect(() => {
     if (post) {
       // Try to load cached comments first for instant display
@@ -253,7 +257,8 @@ export default function CommentsModal({
           // Replace existing (optimistic -> real)
           return prev.map(c => c.id === newComment.id ? newComment : c);
         }
-        return [newComment, ...prev];
+        // Add to end for oldest-to-latest order
+        return [...prev, newComment];
       }
       
       // Reply - find parent and add to its replies
@@ -268,7 +273,8 @@ export default function CommentsModal({
               replies: comment.replies.map(r => r.id === newComment.id ? newComment : r)
             };
           }
-          return { ...comment, replies: [newComment, ...comment.replies] };
+          // Add to end for oldest-to-latest order
+          return { ...comment, replies: [...comment.replies, newComment] };
         }
         return comment;
       });
@@ -449,17 +455,17 @@ export default function CommentsModal({
       const commentRef = commentRefs[comment.id];
       if (commentRef?.current) {
         commentRef.current.measure((x, y, width, height, pageX, pageY) => {
-          openCommentReplies(comment, post.id, pageY);
+          openCommentReplies(comment, post.id, currentPost?.userId, currentPost?.isAnonymous, pageY);
         });
       } else {
-        openCommentReplies(comment, post.id);
+        openCommentReplies(comment, post.id, currentPost?.userId, currentPost?.isAnonymous);
       }
     }
   };
   const handleViewReplies = (comment: Comment) => {
     // Open the sliding reply panel to view replies
     if (post?.id) {
-      openCommentReplies(comment, post.id);
+      openCommentReplies(comment, post.id, currentPost?.userId, currentPost?.isAnonymous);
     }
   };
   const toggleReplies = (commentId: string) => {
@@ -682,12 +688,14 @@ export default function CommentsModal({
                 multiline
                 keyboardAppearance={isDark ? "dark" : "light"}
               />
-              <TouchableOpacity
-                style={[styles.anonymousToggle, { backgroundColor: isAnonymous ? colors.primaryAlpha : 'transparent' }]}
-                onPress={() => setIsAnonymous(!isAnonymous)}
-              >
-                <UserX size={18} color={isAnonymous ? colors.primary : colors.textMuted} />
-              </TouchableOpacity>
+              {canCommentAnonymously && (
+                <TouchableOpacity
+                  style={[styles.anonymousToggle, { backgroundColor: isAnonymous ? colors.primaryAlpha : 'transparent' }]}
+                  onPress={() => setIsAnonymous(!isAnonymous)}
+                >
+                  <UserX size={18} color={isAnonymous ? colors.primary : colors.textMuted} />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 onPress={handleSendComment}
                 style={[styles.sendButton, { opacity: newComment.trim() ? 1 : 0.5 }]}

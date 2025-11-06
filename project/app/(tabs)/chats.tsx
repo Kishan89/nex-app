@@ -55,14 +55,19 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       return;
     }
     
-    // 🚀 INSTANT: Always load from cache first for immediate UI update
+    // 🚀 INSTANT: Load from cache first (0ms delay)
     const cachedData = await chatCache.getCachedChats();
-    if (cachedData && cachedData.chats.length > 0 && !forceRefresh) {
+    if (cachedData && cachedData.chats.length > 0) {
       setChats(cachedData.chats);
       setLoading(false);
+      
+      // If not forcing refresh, just use cache and return
+      if (!forceRefresh) {
+        return;
+      }
     }
     
-    // Then fetch fresh data from server
+    // Background refresh from server (only if force refresh or no cache)
     try {
       setError(null);
       // Only show loading if we don't have cached data
@@ -86,11 +91,10 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       // Cache the chats for instant loading next time
       chatCache.cacheChats(items);
       
-      // Preload recent chat messages for instant chat opening (top 5 chats)
+      // Preload recent chat messages in background
       const topChats = items.slice(0, 5);
       const chatIds = topChats.map(chat => String(chat.id));
       if (chatIds.length > 0) {
-        // Preload in background without blocking UI
         setTimeout(() => {
           chatMessageCache.preloadChats(chatIds);
         }, 500);
@@ -160,19 +164,20 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       );
     };
     
-    // 🚀 NEW: Handle chat created event
+    // 🚀 INSTANT: Handle chat created event
     const handleChatCreated = (data: { chat: any; chatId: string; timestamp: string }) => {
       console.log('✅ [CHAT CREATED] Received socket event:', data.chatId);
       
-      // Check if chat already exists
+      // Immediately add to list (synchronous)
       setChats(prevChats => {
+        // Check if chat already exists
         const chatExists = prevChats.some(chat => String(chat.id) === String(data.chatId));
         if (chatExists) {
-          console.log('⚠️ [CHAT CREATED] Chat already exists in list, skipping');
+          console.log('⚠️ [CHAT CREATED] Chat already exists, skipping');
           return prevChats;
         }
         
-        // Add new chat to the top of the list
+        // Create new chat object
         const newChat: Chat = {
           id: data.chat.id || data.chatId,
           name: data.chat.name || data.chat.username || 'New Chat',
@@ -186,34 +191,31 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           lastSeenText: data.chat.lastSeenText || (data.chat.isOnline ? 'Online' : 'Last seen recently')
         };
         
-        console.log('✅ [CHAT CREATED] Adding chat to list:', newChat);
+        console.log('✅ [CHAT CREATED] Instantly added to list');
         
-        // Add to cache
+        // Add to cache (synchronous)
         chatCache.addChatToCache(newChat);
         
+        // Add to top of list
         return [newChat, ...prevChats];
       });
-      
-      // Refresh counts
-      refreshChats();
     };
     
-    // 🚀 NEW: Handle chat deleted event
+    // 🚀 INSTANT: Handle chat deleted event
     const handleChatDeleted = (data: { chatId: string; timestamp: string }) => {
       console.log('✅ [CHAT DELETED] Received socket event:', data.chatId);
       
-      // Remove chat from list immediately
+      // Immediately remove from list (synchronous)
       setChats(prevChats => {
-        const filteredChats = prevChats.filter(chat => String(chat.id) !== String(data.chatId));
-        console.log(`✅ [CHAT DELETED] Removed chat from list. Before: ${prevChats.length}, After: ${filteredChats.length}`);
-        return filteredChats;
+        const filtered = prevChats.filter(chat => String(chat.id) !== String(data.chatId));
+        console.log(`✅ [CHAT DELETED] Instantly removed. Before: ${prevChats.length}, After: ${filtered.length}`);
+        return filtered;
       });
       
-      // Remove from cache
+      // Remove from cache (synchronous)
       chatCache.removeChatFromCache(data.chatId);
       
-      // Refresh counts
-      refreshChats();
+      console.log('✅ [CHAT DELETED] Cache cleared instantly');
     };
     
     // Add socket listeners
@@ -239,22 +241,12 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       }
     };
   }, [user, refreshChats]);
-  // Load chats only on first mount, refresh counts on focus
+  // Load chats only on first mount
   useEffect(() => {
     if (user && chats.length === 0) {
       loadChats();
     }
   }, [user, loadChats]);
-  // Refresh chats when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      if (user) {
-        // 🚀 INSTANT: Always force reload from server for latest data
-        // This ensures created/deleted chats show immediately
-        loadChats(true);
-      }
-    }, [user, loadChats])
-  );
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadChats(true); // Force refresh on pull to refresh
