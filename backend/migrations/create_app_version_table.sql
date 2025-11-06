@@ -24,7 +24,7 @@ VALUES (
   'android', 
   true, 
   'Please update the app from Play Store to continue using Nexeed.',
-  'https://play.google.com/store/apps/details?id=com.nexeed.app'
+  'https://play.google.com/store/apps/details?id=com.mycompany.nexeed1'
 )
 ON CONFLICT DO NOTHING;
 
