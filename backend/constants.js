@@ -95,14 +95,14 @@ const SUCCESS_MESSAGES = {
   MESSAGE_DELETED: 'Message deleted',
 };
 
-// Pagination
+// Pagination (Optimized for smooth scrolling)
 const PAGINATION = {
   DEFAULT_PAGE: 1,
-  DEFAULT_LIMIT: 20,
-  MAX_LIMIT: 100,
-  POSTS_PER_PAGE: 10,
+  DEFAULT_LIMIT: 15,        // Reduced for faster initial load
+  MAX_LIMIT: 50,            // Reduced max for performance
+  POSTS_PER_PAGE: 15,       // Smooth scroll experience
   COMMENTS_PER_PAGE: 20,
-  MESSAGES_PER_PAGE: 50,
+  MESSAGES_PER_PAGE: 30,    // Reduced for faster chat load
 };
 
 // Cache TTL (Time To Live) in seconds

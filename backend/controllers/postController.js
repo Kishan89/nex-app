@@ -2,7 +2,7 @@ const postService = require('../services/postService');
 const { addXpJob } = require('../services/queueService');
 const { successResponse, errorResponse } = require('../utils/helpers');
 const { createLogger } = require('../utils/logger');
-const { HTTP_STATUS, ERROR_MESSAGES } = require('../constants');
+const { HTTP_STATUS, ERROR_MESSAGES, PAGINATION } = require('../constants');
 const { BadRequestError, UnauthorizedError, NotFoundError } = require('../utils/errors');
 
 const logger = createLogger('PostController');
@@ -13,11 +13,11 @@ class PostController {
    */
   async getAllPosts(req, res, next) {
     try {
-      const { page = 1, limit = 20 } = req.query;
+      const { page = 1, limit = PAGINATION.DEFAULT_LIMIT } = req.query;
       const userId = req.user?.userId || null;
       
       const pageNum = parseInt(page) || 1;
-      const limitNum = parseInt(limit) || 20;
+      const limitNum = Math.min(parseInt(limit) || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
       
       const posts = await postService.getAllPosts({ page: pageNum, limit: limitNum, userId });
       res.status(HTTP_STATUS.OK).json(posts);
@@ -156,16 +156,19 @@ class PostController {
    */
   async getFollowingPosts(req, res, next) {
     try {
-      const { page, limit } = req.query;
+      const { page = 1, limit = PAGINATION.DEFAULT_LIMIT } = req.query;
       const userId = req.user?.userId;
       
       if (!userId) {
         throw new UnauthorizedError(ERROR_MESSAGES.AUTH_REQUIRED);
       }
       
+      const pageNum = parseInt(page) || 1;
+      const limitNum = Math.min(parseInt(limit) || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
+      
       logger.debug('getFollowingPosts - userId:', userId);
       
-      const posts = await postService.getFollowingPosts({ page, limit, userId });
+      const posts = await postService.getFollowingPosts({ page: pageNum, limit: limitNum, userId });
       
       res.status(HTTP_STATUS.OK).json(posts);
     } catch (error) {
@@ -199,13 +202,16 @@ class PostController {
    */
   async getTrendingPosts(req, res, next) {
     try {
-      const { page, limit } = req.query;
+      const { page = 1, limit = PAGINATION.DEFAULT_LIMIT } = req.query;
       // Use authenticated user's ID for like status (null if not authenticated)
       const userId = req.user?.userId || null;
       
+      const pageNum = parseInt(page) || 1;
+      const limitNum = Math.min(parseInt(limit) || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
+      
       logger.info('getTrendingPosts request', { userId: userId || 'guest' });
       
-      const posts = await postService.getTrendingPosts({ page, limit, userId });
+      const posts = await postService.getTrendingPosts({ page: pageNum, limit: limitNum, userId });
       
       res.json(posts);
     } catch (error) {
