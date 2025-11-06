@@ -84,6 +84,14 @@ export default function CommentReplyPanel({
   // Check if current user is the post owner AND post is anonymous
   const isPostOwner = postOwnerId === currentUserId;
   const canReplyAnonymously = isPostOwner && postIsAnonymous === true;
+  
+  // Reset anonymous state when post is not anonymous
+  useEffect(() => {
+    if (!canReplyAnonymously) {
+      setIsAnonymous(false);
+    }
+  }, [canReplyAnonymously]);
+  
   // Animation values
   const translateX = useSharedValue(SCREEN_WIDTH); // Start off-screen to the right
   const translateY = useSharedValue(0);

@@ -359,7 +359,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           data={chats}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderChatItem}
-          contentContainerStyle={{ paddingTop: 5, paddingBottom: 8, }}
+          contentContainerStyle={{ paddingTop: 5, paddingBottom: 100, }}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>

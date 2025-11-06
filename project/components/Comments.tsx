@@ -87,6 +87,7 @@ export default function CommentsModal({
   const [showMenuForComment, setShowMenuForComment] = useState<string | null>(null);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
   const { openCommentReplies } = useCommentReply();
   // Get real-time post data and interactions from ListenContext
   const { posts, postInteractions, getPostById } = useListen();
@@ -97,6 +98,14 @@ export default function CommentsModal({
   // Check if current user is the post owner AND post is anonymous
   const isPostOwner = currentPost?.userId === currentUserId;
   const canCommentAnonymously = isPostOwner && currentPost?.isAnonymous === true;
+  
+  // Reset anonymous state when post changes or when post is not anonymous
+  useEffect(() => {
+    if (!canCommentAnonymously) {
+      setIsAnonymous(false);
+    }
+  }, [canCommentAnonymously]);
+  
   useEffect(() => {
     if (post) {
       // Try to load cached comments first for instant display
@@ -215,7 +224,7 @@ export default function CommentsModal({
             // Check if this comment already exists
             const exists = withoutOptimistic.some(c => c.id === processedComment.id);
             if (exists) return prev; // Already added, skip
-            return [processedComment, ...withoutOptimistic];
+            return [...withoutOptimistic, processedComment]; // Add to end for oldest-to-latest
           });
         }
       })
@@ -303,6 +312,11 @@ export default function CommentsModal({
       addComment(optimisticComment);
       setNewComment('');
       // Don't reset anonymous state - let user control it
+      
+      // Scroll to bottom immediately to show the optimistic comment
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 50);
 
       // Call the actual API
       try {
@@ -612,6 +626,7 @@ export default function CommentsModal({
           </TouchableOpacity>
         </View>
         <ScrollView 
+          ref={scrollViewRef}
           style={styles.scrollContainer} 
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
