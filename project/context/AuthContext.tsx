@@ -12,6 +12,7 @@ type User = {
   username?: string;
   avatar_url?: string;
   bio?: string;
+  isAdmin?: boolean;
   [key: string]: any;
 };
 type SignInPayload = {

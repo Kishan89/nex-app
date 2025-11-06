@@ -57,6 +57,8 @@ const API_ENDPOINTS = {
     UNBOOKMARK_POST: (postId: string) => `/posts/${postId}/unbookmark`,
     REPORT_POST: (postId: string) => `/posts/${postId}/report`,
     DELETE_POST: (postId: string) => `/posts/${postId}`,
+    PIN_POST: (postId: string) => `/posts/${postId}/pin`,
+    LIVE_POST: (postId: string) => `/posts/${postId}/live`,
     REGISTER_PUSH_TOKEN: "/push-tokens",
     XP_RULES: "/xp/rules",
     USER_XP: (userId: string) => `/xp/user/${userId}`,
@@ -523,6 +525,12 @@ class ApiService {
     }
     async deletePost(postId: string) {
         return this.delete(API_ENDPOINTS.DELETE_POST(postId));
+    }
+    async togglePinPost(postId: string) {
+        return this.post(API_ENDPOINTS.PIN_POST(postId), {});
+    }
+    async toggleLivePost(postId: string) {
+        return this.post(API_ENDPOINTS.LIVE_POST(postId), {});
     }
     async deleteComment(postId: string, commentId: string) {
         try {

@@ -88,6 +88,8 @@ function transformPost(post) {
         bookmarked: post.isBookmarked || false,
         // Include pinned status
         isPinned: post.isPinned || false,
+        // Include live status
+        isLive: post.isLive || false,
         // Include anonymous status
         isAnonymous: post.isAnonymous || false,
     };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -86,6 +87,7 @@ export default function CommentsModal({
   const [commentRefs, setCommentRefs] = useState<{[key: string]: React.RefObject<View>}>({});
   const [showMenuForComment, setShowMenuForComment] = useState<string | null>(null);
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [refreshingComments, setRefreshingComments] = useState(false);
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   const { openCommentReplies } = useCommentReply();
@@ -198,9 +200,20 @@ export default function CommentsModal({
       setCommentsLoading(true);
       onLoadComments(post.id, forceRefresh);
       // Reset loading after a delay (comments should load quickly)
-      setTimeout(() => setCommentsLoading(false), 1500);
+      setTimeout(() => setCommentsLoading(false), 1000); // Reduced from 1500ms to 1000ms
     }
   }, [visible, post?.id, onLoadComments, forceRefresh]);
+  
+  // Handle pull-to-refresh for comments
+  const handleRefreshComments = useCallback(async () => {
+    if (!post?.id || !onLoadComments) return;
+    setRefreshingComments(true);
+    try {
+      await onLoadComments(post.id, true); // Force refresh
+    } finally {
+      setRefreshingComments(false);
+    }
+  }, [post?.id, onLoadComments]);
   // Real-time comment sync with nested structure support
   useEffect(() => {
     if (!post?.id || !visible) return;
@@ -217,15 +230,36 @@ export default function CommentsModal({
             user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous)
           };
           
-          // Remove any optimistic comment first, then add real comment
-          setLocalComments(prev => {
-            // Remove optimistic comments (temp IDs)
-            const withoutOptimistic = prev.filter(c => !c.isOptimistic);
-            // Check if this comment already exists
-            const exists = withoutOptimistic.some(c => c.id === processedComment.id);
-            if (exists) return prev; // Already added, skip
-            return [...withoutOptimistic, processedComment]; // Add to end for oldest-to-latest
-          });
+          // Check if this is a reply (has parentId)
+          if (processedComment.parentId) {
+            // This is a REPLY - add it to the parent comment's replies array
+            setLocalComments(prev => {
+              return prev.map(c => {
+                if (c.id === processedComment.parentId) {
+                  // Found the parent comment - add reply to its replies array
+                  const existingReplies = c.replies || [];
+                  const replyExists = existingReplies.some(r => r.id === processedComment.id);
+                  if (replyExists) return c; // Reply already exists
+                  
+                  return {
+                    ...c,
+                    replies: [...existingReplies, processedComment]
+                  };
+                }
+                return c;
+              });
+            });
+          } else {
+            // This is a TOP-LEVEL COMMENT - add to main comments list
+            setLocalComments(prev => {
+              // Remove optimistic comments (temp IDs)
+              const withoutOptimistic = prev.filter(c => !c.isOptimistic);
+              // Check if this comment already exists
+              const exists = withoutOptimistic.some(c => c.id === processedComment.id);
+              if (exists) return prev; // Already added, skip
+              return [...withoutOptimistic, processedComment]; // Add to end for oldest-to-latest
+            });
+          }
         }
       })
       .on('broadcast', { event: 'comment_deleted' }, (payload) => {
@@ -632,7 +666,15 @@ export default function CommentsModal({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="interactive"
-          bounces={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshingComments}
+              onRefresh={handleRefreshComments}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+              progressBackgroundColor={colors.backgroundTertiary}
+            />
+          }
         >
           {/* Post Content - Using PostCard for consistency */}
           <View style={styles.postContainer}>

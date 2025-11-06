@@ -28,6 +28,8 @@ import { fcmService } from '@/lib/fcmService';
 import { ultraFastChatCache } from '@/lib/ChatCache';
 import OptimizationManager from '@/lib/optimizationManager';
 import { oneSignalService } from '@/lib/onesignal';
+import { checkAppVersion, VersionInfo } from '@/lib/versionCheck';
+import UpdateModal from '@/components/UpdateModal';
 // Removed imports - initialization moved to SplashContext
 // Component to manage the status bar appearance
 const AppStatusBar = () => {
@@ -72,11 +74,59 @@ function AppWithNotifications() {
   const { colors } = useTheme();
   const { isAppReady, isSplashVisible, splashTrigger, hideSplash, isInitialLoad } = useSplash();
   const insets = useSafeAreaInsets();
+  
+  // Version check state
+  const [versionInfo, setVersionInfo] = React.useState<VersionInfo | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = React.useState(false);
   // Initialize OneSignal once on mount (before user authentication)
   useEffect(() => {
     // Initialize OneSignal early to prevent "Must call initWithContext before logout" error
     oneSignalService.initialize();
   }, []);
+  
+  // Check app version on mount and when app becomes active
+  useEffect(() => {
+    const performVersionCheck = async () => {
+      const info = await checkAppVersion();
+      if (info && info.updateRequired) {
+        setVersionInfo(info);
+        setShowUpdateModal(true);
+      } else if (info && compareVersions(info.latestVersion, getCurrentVersion()) > 0) {
+        // Optional update available - show once per session
+        setVersionInfo(info);
+        setShowUpdateModal(true);
+      }
+    };
+    
+    // Check on mount
+    performVersionCheck();
+    
+    // Check when app becomes active
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        performVersionCheck();
+      }
+    });
+    
+    return () => subscription?.remove();
+  }, []);
+  
+  // Helper to compare versions and get current version
+  const compareVersions = (v1: string, v2: string): number => {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+      const part1 = parts1[i] || 0;
+      const part2 = parts2[i] || 0;
+      if (part1 < part2) return -1;
+      if (part1 > part2) return 1;
+    }
+    return 0;
+  };
+  
+  const getCurrentVersion = (): string => {
+    return require('expo-constants').default.expoConfig?.version || '1.0.0';
+  };
 
   // Initialize notification services and ultra-fast cache
   useEffect(() => {
@@ -189,6 +239,20 @@ function AppWithNotifications() {
       <AppStatusBar />
       {/* Global notification manager - renders on top of all screens */}
       <NotificationManager />
+      
+      {/* Update modal - shows when update is required or available */}
+      {versionInfo && (
+        <UpdateModal
+          visible={showUpdateModal}
+          versionInfo={versionInfo}
+          onDismiss={() => {
+            if (!versionInfo.updateRequired) {
+              setShowUpdateModal(false);
+            }
+          }}
+        />
+      )}
+      
       <Stack
         screenOptions={{
           headerShown: false,

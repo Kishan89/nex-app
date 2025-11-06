@@ -149,6 +149,7 @@ export interface NormalizedPost {
   liked: boolean;
   bookmarked: boolean;
   isPinned?: boolean;
+  isLive?: boolean;
   isAnonymous?: boolean;
   // Poll data
   poll?: Poll | null;

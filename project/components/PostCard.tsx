@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Modal, Alert, Share as RNShare } from 'react-native';
-import { Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, Pin } from 'lucide-react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, Pin, Radio } from 'lucide-react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withRepeat, withTiming, withSequence } from 'react-native-reanimated';
 import { NormalizedPost } from '@/types';
 import TruncatedText from './TruncatedText';
 import PollComponent from './PollComponent';
@@ -28,8 +28,11 @@ type Props = {
   onShare?: () => void;
   onReport?: () => void;
   onDelete?: () => void;
+  onTogglePin?: () => void;
+  onToggleLive?: () => void;
   onImagePress?: (imageUri: string) => void;
   currentUserId?: string;
+  isCurrentUserAdmin?: boolean; // New prop - true if current user is app admin
   allowImageClick?: boolean; // New prop to control image click functionality
   onTextToggle?: () => void; // Callback for text expand/collapse
   refreshKey?: number; // Key to reset TruncatedText state on refresh
@@ -49,19 +52,43 @@ const PostCard = React.memo(function PostCard({
   onShare,
   onReport,
   onDelete,
+  onTogglePin,
+  onToggleLive,
   onImagePress,
   allowImageClick = false,
   currentUserId,
+  isCurrentUserAdmin = false,
   onTextToggle,
   refreshKey,
 }: Props) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   
   // Use post.liked as the source of truth, with isLiked as fallback
   const [localIsLiked, setLocalIsLiked] = useState(post.liked ?? isLiked ?? false);
   const [localLikesCount, setLocalLikesCount] = useState(post.likesCount || post.likes || 0);
   const [localCommentsCount, setLocalCommentsCount] = useState(post.commentsCount || post.comments || 0);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  
+  // Blinking animation for Live indicator
+  const liveOpacity = useSharedValue(1);
+  
+  useEffect(() => {
+    if (post.isLive) {
+      // Create a blinking effect: fade out to 0.3, then back to 1, repeat forever
+      liveOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.3, { duration: 800 }),
+          withTiming(1, { duration: 800 })
+        ),
+        -1, // Repeat indefinitely
+        false
+      );
+    }
+  }, [post.isLive]);
+  
+  const liveAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: liveOpacity.value,
+  }));
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [optimizedImageUri, setOptimizedImageUri] = useState<string | null>(null);
   const moreButtonRef = React.useRef<any>(null);
@@ -146,6 +173,17 @@ const PostCard = React.memo(function PostCard({
       ]
     );
   };
+  
+  const handleTogglePin = () => {
+    setShowOptionsMenu(false);
+    onTogglePin?.();
+  };
+  
+  const handleToggleLive = () => {
+    setShowOptionsMenu(false);
+    onToggleLive?.();
+  };
+  
   const isOwnPost = currentUserId === post.userId;
   
   return (
@@ -171,6 +209,12 @@ const PostCard = React.memo(function PostCard({
                 <View style={[styles.pinnedBadge, { backgroundColor: '#004aad15', borderColor: '#004aad30' }]}>
                   <Pin size={13} color="#004aad" strokeWidth={2.8} fill="#004aad" />
                   <Text style={[styles.pinnedText, { color: '#004aad' }]}>Pinned</Text>
+                </View>
+              )}
+              {post.isLive && (
+                <View style={[styles.liveBadge, { backgroundColor: '#ff000015', borderColor: '#ff000030' }]}>
+                  <Animated.View style={[styles.liveIndicator, liveAnimatedStyle]} />
+                  <Text style={[styles.liveText, { color: '#ff0000' }]}>Live</Text>
                 </View>
               )}
             </View>
@@ -314,6 +358,22 @@ const PostCard = React.memo(function PostCard({
               <Share size={20} color={colors.text} />
               <Text style={[styles.optionText, { color: colors.text }]}>Share</Text>
             </TouchableOpacity>
+            {isCurrentUserAdmin && (
+              <>
+                <TouchableOpacity style={styles.optionItem} onPress={handleTogglePin}>
+                  <Pin size={20} color={post.isPinned ? colors.primary : colors.text} />
+                  <Text style={[styles.optionText, { color: post.isPinned ? colors.primary : colors.text }]}>
+                    {post.isPinned ? 'Unpin Post' : 'Pin Post'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.optionItem} onPress={handleToggleLive}>
+                  <Radio size={20} color={post.isLive ? '#ff0000' : colors.text} />
+                  <Text style={[styles.optionText, { color: post.isLive ? '#ff0000' : colors.text }]}>
+                    {post.isLive ? 'End Live' : 'Go Live'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
             <TouchableOpacity style={styles.optionItem} onPress={handleReport}>
               <Flag size={20} color={colors.error} />
               <Text style={[styles.optionText, { color: colors.error }]}>Report Post</Text>
@@ -337,6 +397,8 @@ const PostCard = React.memo(function PostCard({
     prevProps.isBookmarked === nextProps.isBookmarked &&
     prevProps.post.likesCount === nextProps.post.likesCount &&
     prevProps.post.commentsCount === nextProps.post.commentsCount &&
+    prevProps.post.isPinned === nextProps.post.isPinned &&
+    prevProps.post.isLive === nextProps.post.isLive &&
     prevProps.hasVotedOnPoll === nextProps.hasVotedOnPoll &&
     prevProps.userPollVote === nextProps.userPollVote &&
     prevProps.refreshKey === nextProps.refreshKey
@@ -398,6 +460,27 @@ const styles = StyleSheet.create({
     borderColor: '#004aad40',
   },
   pinnedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#ff000040',
+  },
+  liveIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ff0000',
+  },
+  liveText: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.3,

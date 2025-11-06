@@ -10,11 +10,11 @@ class PostService {
   async getAllPosts(options = {}) {
     const { page = 1, limit = 20, userId } = options;
     
-    // For page 1, include pinned posts at the top
+    // For page 1, include live and pinned posts at the top
     if (page === 1) {
-      // Fetch pinned posts
-      const pinnedPosts = await prisma.post.findMany({
-        where: { isPinned: true },
+      // Fetch live posts first (highest priority)
+      const livePosts = await prisma.post.findMany({
+        where: { isLive: true },
         include: {
           user: {
             select: {
@@ -58,12 +58,65 @@ class PostService {
         orderBy: { createdAt: 'desc' },
       });
 
+      // Fetch pinned posts (second priority) - can also be live
+      const pinnedPosts = await prisma.post.findMany({
+        where: { 
+          isPinned: true
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              name: true,
+              avatar: true,
+              verified: true,
+            },
+          },
+          _count: {
+            select: {
+              likes: true,
+              comments: true,
+              bookmarks: true
+            }
+          },
+          poll: {
+            select: {
+              id: true,
+              question: true,
+              options: {
+                select: {
+                  id: true,
+                  text: true,
+                  votesCount: true,
+                  _count: { select: { votes: true } }
+                }
+              }
+            }
+          },
+          likes: userId ? {
+            where: { userId },
+            select: { id: true }
+          } : false,
+          bookmarks: userId ? {
+            where: { userId },
+            select: { id: true }
+          } : false,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const liveCount = livePosts.length;
       const pinnedCount = pinnedPosts.length;
+      const specialPostsCount = liveCount + pinnedCount;
       
-      // Fetch regular posts (limit minus pinned posts count)
-      const regularPostsLimit = Math.max(1, limit - pinnedCount);
+      // Fetch regular posts (limit minus live and pinned posts count)
+      const regularPostsLimit = Math.max(1, limit - specialPostsCount);
       const posts = await prisma.post.findMany({
-        where: { isPinned: false },
+        where: { 
+          isPinned: false,
+          isLive: false
+        },
         include: {
           user: {
             select: {
@@ -108,8 +161,8 @@ class PostService {
         take: regularPostsLimit,
       });
 
-      // Combine pinned posts first, then regular posts
-      const allPosts = [...pinnedPosts, ...posts];
+      // Combine live posts first (highest priority), then pinned posts, then regular posts
+      const allPosts = [...livePosts, ...pinnedPosts, ...posts];
       
       return allPosts.map((post) => {
         const postWithStatus = {
@@ -123,10 +176,13 @@ class PostService {
       });
     }
     
-    // For page 2+, skip pinned posts and paginate regular posts
+    // For page 2+, skip live and pinned posts and paginate regular posts
     const skip = (page - 1) * limit;
     const posts = await prisma.post.findMany({
-      where: { isPinned: false },
+      where: { 
+        isPinned: false,
+        isLive: false
+      },
       include: {
         user: {
           select: {
@@ -479,9 +535,9 @@ class PostService {
         return [];
       }
 
-    // Fetch pinned posts separately (always from page 1)
-    const pinnedPosts = page === 1 ? await prisma.post.findMany({
-      where: { isPinned: true },
+    // Fetch live posts separately (always from page 1, highest priority)
+    const livePosts = page === 1 ? await prisma.post.findMany({
+      where: { isLive: true },
       include: {
         user: {
           select: {
@@ -518,10 +574,52 @@ class PostService {
       orderBy: { createdAt: 'desc' },
     }) : [];
 
-    // Get posts only from followed users (excluding pinned)
+    // Fetch pinned posts separately (always from page 1, second priority) - can also be live
+    const pinnedPosts = page === 1 ? await prisma.post.findMany({
+      where: { 
+        isPinned: true
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            avatar: true,
+            verified: true,
+          },
+        },
+        poll: {
+          select: {
+            id: true,
+            question: true,
+            options: {
+              select: {
+                id: true,
+                text: true,
+                votesCount: true,
+                _count: { select: { votes: true } }
+              }
+            }
+          }
+        },
+        likes: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false,
+        bookmarks: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false,
+      },
+      orderBy: { createdAt: 'desc' },
+    }) : [];
+
+    // Get posts only from followed users (excluding live and pinned)
     const posts = await prisma.post.findMany({
       where: {
         isPinned: false,
+        isLive: false,
         userId: {
           in: followedUserIds
         }
@@ -565,8 +663,8 @@ class PostService {
       take: limit,
     });
 
-    // Combine pinned posts first, then regular posts
-    const allPosts = [...pinnedPosts, ...posts];
+    // Combine live posts first (highest priority), then pinned posts, then regular posts
+    const allPosts = [...livePosts, ...pinnedPosts, ...posts];
     
     return allPosts.map((post) => {
       // Add like status to post object
@@ -614,9 +712,50 @@ class PostService {
     const { page = 1, limit = 20, userId } = options;
     const skip = (page - 1) * limit;
 
-    // Fetch pinned posts separately (always from page 1)
+    // Fetch live posts separately (always from page 1, highest priority)
+    const livePosts = page === 1 ? await prisma.post.findMany({
+      where: { isLive: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            avatar: true,
+            verified: true,
+          },
+        },
+        poll: {
+          select: {
+            id: true,
+            question: true,
+            options: {
+              select: {
+                id: true,
+                text: true,
+                votesCount: true,
+                _count: { select: { votes: true } }
+              }
+            }
+          }
+        },
+        likes: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false,
+        bookmarks: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false,
+      },
+      orderBy: { createdAt: 'desc' },
+    }) : [];
+
+    // Fetch pinned posts separately (always from page 1, second priority) - can also be live
     const pinnedPosts = page === 1 ? await prisma.post.findMany({
-      where: { isPinned: true },
+      where: { 
+        isPinned: true
+      },
       include: {
         user: {
           select: {
@@ -657,10 +796,11 @@ class PostService {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // Get posts from the last 7 days with their counts (excluding pinned)
+    // Get posts from the last 7 days with their counts (excluding live and pinned)
     const posts = await prisma.post.findMany({
       where: {
         isPinned: false,
+        isLive: false,
         createdAt: {
           gte: sevenDaysAgo
         }
@@ -724,6 +864,16 @@ class PostService {
     // Sort by trending score (highest first)
     postsWithScores.sort((a, b) => b.trendingScore - a.trendingScore);
 
+    // Transform live posts
+    const transformedLivePosts = livePosts.map((post) => {
+      const postWithStatus = {
+        ...post,
+        isLiked: userId ? post.likes.length > 0 : false,
+        isBookmarked: userId ? post.bookmarks.length > 0 : false,
+      };
+      return transformPost(postWithStatus);
+    });
+
     // Transform pinned posts
     const transformedPinnedPosts = pinnedPosts.map((post) => {
       const postWithStatus = {
@@ -734,10 +884,8 @@ class PostService {
       return transformPost(postWithStatus);
     });
 
-    // Combine pinned posts first, then trending posts
-    const finalPosts = [...transformedPinnedPosts, ...postsWithScores.map(({ trendingScore, ...post }) => post)];
-
-    return finalPosts;
+    // Combine live posts first (highest priority), then pinned posts, then trending posts
+    return [...transformedLivePosts, ...transformedPinnedPosts, ...postsWithScores.map(({ trendingScore, ...post }) => post)];
   }
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -39,6 +39,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { apiService } from '@/lib/api';
 import { ReplySkeleton } from './skeletons';
 import { getDisplayUser, ANONYMOUS_AVATAR } from '@/lib/commentUtils';
+import { supabase } from '@/lib/supabase';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PANEL_WIDTH = SCREEN_WIDTH; // Full width like YouTube
 const PANEL_HEIGHT = SCREEN_HEIGHT; // Full height like YouTube
@@ -96,64 +97,9 @@ export default function CommentReplyPanel({
   const translateX = useSharedValue(SCREEN_WIDTH); // Start off-screen to the right
   const translateY = useSharedValue(0);
   const backdropOpacity = useSharedValue(0);
-  // Load replies when panel opens
-  useEffect(() => {
-    if (visible && parentComment) {
-      loadReplies();
-      // Small delay to prevent immediate closing
-      setTimeout(() => {
-        openPanel();
-      }, 50);
-    }
-  }, [visible, parentComment?.id]);
-  // Separate effect for closing to prevent conflicts
-  useEffect(() => {
-    if (!visible && !sending && !isOperating) {
-      closePanel();
-    }
-  }, [visible, sending, isOperating]);
-  // Set navigation bar theme-aware when panel opens
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      const navBarColor = isDark ? '#000000' : '#ffffff';
-      const buttonStyle = isDark ? 'light' : 'dark';
-      if (visible) {
-        // Immediately set navigation bar color using both APIs
-        NavigationBar.setBackgroundColorAsync(navBarColor);
-        NavigationBar.setButtonStyleAsync(buttonStyle);
-        SystemUI.setBackgroundColorAsync(navBarColor);
-        // Force it multiple times with different delays
-        setTimeout(() => {
-          NavigationBar.setBackgroundColorAsync(navBarColor);
-          NavigationBar.setButtonStyleAsync(buttonStyle);
-          SystemUI.setBackgroundColorAsync(navBarColor);
-        }, 50);
-        setTimeout(() => {
-          NavigationBar.setBackgroundColorAsync(navBarColor);
-          NavigationBar.setButtonStyleAsync(buttonStyle);
-          SystemUI.setBackgroundColorAsync(navBarColor);
-        }, 200);
-        setTimeout(() => {
-          NavigationBar.setBackgroundColorAsync(navBarColor);
-          NavigationBar.setButtonStyleAsync(buttonStyle);
-          SystemUI.setBackgroundColorAsync(navBarColor);
-        }, 500);
-      }
-    }
-  }, [visible, isDark]);
-  // Handle Android back button
-  useEffect(() => {
-    const backAction = () => {
-      if (visible) {
-        onClose();
-        return true;
-      }
-      return false;
-    };
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-    return () => backHandler.remove();
-  }, [visible, onClose]);
-  const loadReplies = async () => {
+  
+  // Load replies function - defined before use
+  const loadReplies = useCallback(async () => {
     if (!parentComment || !postId) {
       return;
     }
@@ -212,7 +158,135 @@ export default function CommentReplyPanel({
     } finally {
       setLoading(false);
     }
-  };
+  }, [parentComment, postId]);
+  
+  // Real-time broadcast listener for new replies
+  useEffect(() => {
+    if (!visible || !parentComment || !postId) return;
+
+    console.log('🔔 [ReplyPanel] Setting up broadcast listener for replies to comment:', parentComment.id);
+
+    const channel = supabase
+      .channel('reply-panel-comments')
+      .on('broadcast', { event: 'comment_added' }, (payload) => {
+        const { postId: broadcastPostId, comment } = payload.payload;
+        
+        console.log('📨 [ReplyPanel] Received comment_added broadcast:', {
+          broadcastPostId,
+          currentPostId: postId,
+          commentId: comment.id,
+          parentId: comment.parentId,
+          targetParentId: parentComment.id
+        });
+
+        // Only add if it's for this post AND it's a reply to our parent comment
+        if (broadcastPostId === postId && comment.parentId === parentComment.id) {
+          console.log('✅ [ReplyPanel] Adding new reply from broadcast');
+          
+          // Apply display masking to the new reply
+          const processedReply = {
+            ...comment,
+            username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
+            avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
+            user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous)
+          };
+
+          setReplies(prev => {
+            // Check if reply already exists (prevent duplicates)
+            const exists = prev.some(r => r.id === processedReply.id);
+            if (exists) {
+              console.log('⚠️ [ReplyPanel] Reply already exists, skipping');
+              return prev;
+            }
+            
+            // Remove any optimistic reply with temp ID
+            const withoutOptimistic = prev.filter(r => !r.isOptimistic);
+            
+            // Add new reply at the end (oldest-to-latest order)
+            console.log('✅ [ReplyPanel] Reply added to list');
+            return [...withoutOptimistic, processedReply];
+          });
+
+          // Scroll to bottom to show new reply
+          setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+        }
+      })
+      .on('broadcast', { event: 'comment_deleted' }, (payload) => {
+        const { postId: broadcastPostId, commentId } = payload.payload;
+        
+        if (broadcastPostId === postId) {
+          console.log('🗑️ [ReplyPanel] Received comment_deleted broadcast for:', commentId);
+          setReplies(prev => prev.filter(r => r.id !== commentId));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      console.log('🔕 [ReplyPanel] Cleaning up broadcast listener');
+      supabase.removeChannel(channel);
+    };
+  }, [visible, parentComment?.id, postId]);
+
+  // Load replies when panel opens
+  useEffect(() => {
+    if (visible && parentComment) {
+      // Always reload replies to get latest from server (including broadcast updates)
+      loadReplies();
+      // Small delay to prevent immediate closing
+      setTimeout(() => {
+        openPanel();
+      }, 50);
+    }
+  }, [visible, parentComment?.id, loadReplies]);
+  // Separate effect for closing to prevent conflicts
+  useEffect(() => {
+    if (!visible && !sending && !isOperating) {
+      closePanel();
+    }
+  }, [visible, sending, isOperating]);
+  // Set navigation bar theme-aware when panel opens
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const navBarColor = isDark ? '#000000' : '#ffffff';
+      const buttonStyle = isDark ? 'light' : 'dark';
+      if (visible) {
+        // Immediately set navigation bar color using both APIs
+        NavigationBar.setBackgroundColorAsync(navBarColor);
+        NavigationBar.setButtonStyleAsync(buttonStyle);
+        SystemUI.setBackgroundColorAsync(navBarColor);
+        // Force it multiple times with different delays
+        setTimeout(() => {
+          NavigationBar.setBackgroundColorAsync(navBarColor);
+          NavigationBar.setButtonStyleAsync(buttonStyle);
+          SystemUI.setBackgroundColorAsync(navBarColor);
+        }, 50);
+        setTimeout(() => {
+          NavigationBar.setBackgroundColorAsync(navBarColor);
+          NavigationBar.setButtonStyleAsync(buttonStyle);
+          SystemUI.setBackgroundColorAsync(navBarColor);
+        }, 200);
+        setTimeout(() => {
+          NavigationBar.setBackgroundColorAsync(navBarColor);
+          NavigationBar.setButtonStyleAsync(buttonStyle);
+          SystemUI.setBackgroundColorAsync(navBarColor);
+        }, 500);
+      }
+    }
+  }, [visible, isDark]);
+  // Handle Android back button
+  useEffect(() => {
+    const backAction = () => {
+      if (visible) {
+        onClose();
+        return true;
+      }
+      return false;
+    };
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [visible, onClose]);
   const openPanel = () => {
     // Simplified animation to prevent crashes
     translateY.value = 0;
@@ -271,34 +345,39 @@ export default function CommentReplyPanel({
       });
       
       const response = await apiService.addComment(postId, finalText, parentComment.id, isAnonymous);
-      console.log('Reply sent, response:', response);
+      console.log('✅ [ReplyPanel] Reply sent, response:', response);
       
-      // Replace optimistic reply with real server response
-      if (response && response.data) {
-        const serverReply: Comment = {
-          id: response.data.id,
-          text: response.data.text,
-          userId: response.data.userId,
-          username: getDisplayUser(response.data.user || response.data, response.data.isAnonymous).username,
-          avatar: getDisplayUser(response.data.user || response.data, response.data.isAnonymous).avatar,
-          time: response.data.time,
-          createdAt: response.data.createdAt || new Date().toISOString(),
-          parentId: response.data.parentId,
-          replies: [],
-          isAnonymous: response.data.isAnonymous,
-          user: getDisplayUser(response.data.user || { id: response.data.userId, username: response.data.username, avatar: response.data.avatar }, response.data.isAnonymous)
-        };
-        
-        // Replace optimistic reply with server data
-        setReplies(prev => prev.map(reply => 
-          reply.id === optimisticReply.id ? serverReply : reply
-        ));
-      }
+      // Wait for broadcast to add the real reply, with fallback
+      // If broadcast doesn't arrive in 3 seconds, replace optimistic with server response
+      let broadcastReceived = false;
       
-      // Scroll to bottom to show new reply
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 50);
+      const broadcastTimeout = setTimeout(() => {
+        if (!broadcastReceived) {
+          console.log('⚠️ [ReplyPanel] Broadcast timeout, using API response as fallback');
+          setReplies(prev => {
+            // Remove optimistic and add server response
+            const withoutOptimistic = prev.filter(reply => reply.id !== optimisticReply.id);
+            
+            // Process the response comment
+            const serverReply = {
+              ...response,
+              username: getDisplayUser(response.user || response, response.isAnonymous).username,
+              avatar: getDisplayUser(response.user || response, response.isAnonymous).avatar,
+              user: getDisplayUser(response.user || { id: response.userId, username: response.username, avatar: response.avatar }, response.isAnonymous)
+            };
+            
+            return [...withoutOptimistic, serverReply];
+          });
+          
+          // Scroll to bottom
+          setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }, 50);
+        }
+      }, 3000);
+      
+      // Store timeout ID to clear it if broadcast arrives
+      (window as any).__replyBroadcastTimeout = broadcastTimeout;
     } catch (error) {
       // Remove optimistic reply on error and restore text
       setReplies(prev => prev.filter(reply => reply.id !== optimisticReply.id));

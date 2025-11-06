@@ -15,8 +15,9 @@ import {
   KeyboardAvoidingView,
   FlatList,
   Modal,
+  Linking,
 } from 'react-native';
-import { ArrowLeft, Send, MoreVertical, Phone, Video, Trash2, UserX, Flag } from 'lucide-react-native';
+import { ArrowLeft, Send, MoreVertical, Trash2, UserX, Flag } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { Message } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -771,6 +772,74 @@ const ChatScreen = React.memo(function ChatScreen({
       unsubscribeStatusUpdates();
     };
   }, [chatData?.id, user?.id]);
+  
+  // Helper function to render text with clickable links
+  const renderTextWithLinks = useCallback((text: string, isUserMessage: boolean) => {
+    // URL regex pattern - improved to catch more URLs
+    const urlPattern = /(https?:\/\/[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[^\s]{2,})/g;
+    const matches = [];
+    let match;
+    
+    while ((match = urlPattern.exec(text)) !== null) {
+      matches.push({
+        url: match[0],
+        index: match.index,
+        length: match[0].length
+      });
+    }
+    
+    if (matches.length === 0) {
+      return text;
+    }
+    
+    const parts = [];
+    let lastIndex = 0;
+    
+    matches.forEach((matchInfo, i) => {
+      // Add text before the URL
+      if (matchInfo.index > lastIndex) {
+        parts.push(
+          <Text key={`text-${i}-before`}>
+            {text.substring(lastIndex, matchInfo.index)}
+          </Text>
+        );
+      }
+      
+      // Add clickable URL using TouchableOpacity
+      const url = matchInfo.url;
+      const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+      parts.push(
+        <Text key={`link-${i}`}>
+          <Text
+            style={[styles.linkText, { color: isUserMessage ? '#ffffff' : '#004aad' }]}
+            onPress={() => {
+              console.log('🔗 Opening URL:', fullUrl);
+              Linking.openURL(fullUrl).catch(err => {
+                console.error('Failed to open URL:', err);
+                Alert.alert('Error', 'Could not open link');
+              });
+            }}
+          >
+            {url}
+          </Text>
+        </Text>
+      );
+      
+      lastIndex = matchInfo.index + matchInfo.length;
+    });
+    
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(
+        <Text key="text-end">
+          {text.substring(lastIndex)}
+        </Text>
+      );
+    }
+    
+    return <>{parts}</>;
+  }, []);
+  
   // Render message item
   const renderMessage = useCallback(({ item }: { item: Message }) => {
     const isUserMessage = item.isUser;
@@ -789,7 +858,7 @@ const ChatScreen = React.memo(function ChatScreen({
             styles.messageText,
             { color: isUserMessage ? '#ffffff' : colors.text }
           ]}>
-            {item.text}
+            {renderTextWithLinks(item.text, isUserMessage)}
           </Text>
           <View style={styles.messageFooter}>
             <Text style={[
@@ -848,18 +917,6 @@ const ChatScreen = React.memo(function ChatScreen({
             </View>
           </TouchableOpacity>
           <View style={styles.headerActions}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => handleComingSoon('Voice Call')}
-            >
-              <Phone size={20} color={colors?.text || '#fff'} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => handleComingSoon('Video Call')}
-            >
-              <Video size={20} color={colors?.text || '#fff'} />
-            </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
               onPress={() => setShowOptionsMenu(true)}
@@ -972,26 +1029,6 @@ const ChatScreen = React.memo(function ChatScreen({
               <Trash2 size={20} color="#ff4444" />
               <Text style={[styles.optionText, styles.destructiveText]}>Delete Chat</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.optionItem}
-              onPress={() => {
-                setShowOptionsMenu(false);
-                handleComingSoon('Block User');
-              }}
-            >
-              <UserX size={20} color={colors.text} />
-              <Text style={[styles.optionText, { color: colors.text }]}>Block User</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.optionItem}
-              onPress={() => {
-                setShowOptionsMenu(false);
-                handleComingSoon('Report User');
-              }}
-            >
-              <Flag size={20} color={colors.text} />
-              <Text style={[styles.optionText, { color: colors.text }]}>Report User</Text>
-            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -1093,6 +1130,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   messageText: {
     fontSize: FontSizes.md,
     lineHeight: 20,
+  },
+  linkText: {
+    textDecorationLine: 'underline',
+    fontWeight: FontWeights.semibold,
   },
   messageTime: {
     fontSize: FontSizes.xs,

@@ -65,6 +65,7 @@ model Post {
   youtubeUrl       String?
   youtubeVideoId   String?
   isPinned         Boolean        @default(false)
+  isLive           Boolean        @default(false)
   isAnonymous      Boolean        @default(false)
   poll             Poll?
   bookmarks        Bookmark[]
