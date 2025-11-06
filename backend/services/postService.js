@@ -468,6 +468,8 @@ class PostService {
   async getTrendingPosts(options = {}) {
     const { page = 1, limit = 15, userId } = options;
 
+    console.log('📊 getTrendingPosts called:', { page, limit, userId });
+
     // Calculate date 7 days ago for trending
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -545,6 +547,15 @@ class PostService {
     // Apply pagination
     const skip = (page - 1) * limit;
     const paginatedPosts = sortedPosts.slice(skip, skip + limit);
+
+    console.log('📊 Trending results:', { 
+      totalPosts: allPosts.length, 
+      sortedCount: sortedPosts.length,
+      page, 
+      skip, 
+      limit,
+      returning: paginatedPosts.length 
+    });
 
     return paginatedPosts.map((post) => {
       const postWithoutLikes = { ...post };

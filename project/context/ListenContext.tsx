@@ -403,6 +403,8 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
       if (normalized.length === 0) {
         if (loadMore) {
           setLoadingMore(false);
+        } else {
+          setLoadingTrending(false);
         }
         return;
       }
