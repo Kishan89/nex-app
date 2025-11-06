@@ -20,7 +20,7 @@ try {
   };
 }
 
-const { authenticate } = require('../middleware/auth');
+const { verifyAuthToken } = require('../middleware/auth');
 
 // Public route - no authentication required
 // GET /api/version/check?version=1.0.11&platform=android
@@ -32,6 +32,6 @@ router.get('/current', versionController.getCurrentVersion);
 
 // Protected route - admin only (you can add admin middleware later)
 // POST /api/version/update
-router.post('/update', authenticate, versionController.updateVersion);
+router.post('/update', verifyAuthToken, versionController.updateVersion);
 
 module.exports = router;

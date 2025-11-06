@@ -276,3 +276,19 @@ enum NotificationType {
   FOLLOW
   MESSAGE
 }
+
+model AppVersion {
+  id            Int      @id @default(autoincrement())
+  version       String   @db.VarChar(20)
+  minVersion    String   @map("min_version") @db.VarChar(20)
+  platform      String   @default("android") @db.VarChar(10)
+  forceUpdate   Boolean  @default(true) @map("force_update")
+  updateMessage String?  @default("Please update the app to continue") @map("update_message") @db.Text
+  playStoreUrl  String?  @map("play_store_url") @db.Text
+  appStoreUrl   String?  @map("app_store_url") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([platform])
+  @@map("app_version")
+}
