@@ -4,6 +4,7 @@ const chatService = require('./chatService');
 const notificationService = require('./notificationService');
 const { sendMessageNotification } = require('./fcmService');
 const { createLogger } = require('../utils/logger');
+const { MESSAGE_STATUS } = require('../constants');
 const logger = createLogger('SocketService');
 
 class SocketService {
@@ -119,7 +120,7 @@ class SocketService {
           content: message.content || message.text,
           isUser: false, // Will be determined by receiver
           timestamp: message.timestamp,
-          status: 'delivered', // Mark as delivered since saved to DB
+          status: MESSAGE_STATUS.DELIVERED, // Mark as delivered since saved to DB
           sender: message.sender,
           chatId,
           tempMessageId // Include temp ID for replacement
@@ -135,7 +136,7 @@ class SocketService {
             success: true,
             messageId: message.id,
             tempMessageId,
-            status: 'delivered',
+            status: MESSAGE_STATUS.DELIVERED,
             timestamp: message.timestamp
           });
           logger.debug('Message acknowledgment sent', { messageId: message.id });

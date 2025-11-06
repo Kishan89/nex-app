@@ -112,12 +112,12 @@ const CACHE = {
   TRENDING: 600, // 10 minutes
 };
 
-// Message Status
+// Message Status (must match Prisma enum exactly)
 const MESSAGE_STATUS = {
-  SENT: 'sent',
-  DELIVERED: 'delivered',
-  READ: 'read',
-  FAILED: 'failed',
+  SENDING: 'SENDING',
+  SENT: 'SENT',
+  DELIVERED: 'DELIVERED',
+  READ: 'READ',
 };
 
 // Notification Types
