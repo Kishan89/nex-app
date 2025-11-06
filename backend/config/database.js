@@ -1,7 +1,15 @@
-const { PrismaClient } = require('@prisma/client');
 const { createClient } = require('@supabase/supabase-js');
 
 const globalForPrisma = globalThis;
+
+// ✅ Safely import PrismaClient (may not be generated yet)
+let PrismaClient = null;
+try {
+  PrismaClient = require('@prisma/client').PrismaClient;
+} catch (error) {
+  console.error('❌ Failed to import PrismaClient:', error.message);
+  console.log('⚠️ Prisma client not generated. Run "npm run db:generate" or "prisma generate"');
+}
 
 // ✅ Get database URL with safety checks
 const getDatabaseUrl = () => {
@@ -20,16 +28,16 @@ const databaseUrl = getDatabaseUrl();
 let prisma = null;
 
 try {
-  prisma = databaseUrl
-    ? (globalForPrisma.prisma ||
-        new PrismaClient({
-          log: process.env.NODE_ENV === 'development' ? ['query', 'error'] : ['error'],
-          datasources: {
-            db: { url: databaseUrl },
-          },
-          errorFormat: 'minimal',
-        }))
-    : null;
+  if (PrismaClient && databaseUrl) {
+    prisma = globalForPrisma.prisma ||
+      new PrismaClient({
+        log: process.env.NODE_ENV === 'development' ? ['query', 'error'] : ['error'],
+        datasources: {
+          db: { url: databaseUrl },
+        },
+        errorFormat: 'minimal',
+      });
+  }
 } catch (error) {
   console.error('❌ Failed to initialize Prisma client:', error.message);
   console.log('⚠️ Server will start without database connection');
