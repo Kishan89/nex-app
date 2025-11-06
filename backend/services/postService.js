@@ -107,7 +107,11 @@ class PostService {
       });
 
       const liveCount = livePosts.length;
-      const pinnedCount = pinnedPosts.length;
+      
+      // Filter out posts that are already in live posts to prevent duplicates
+      const livePostIds = new Set(livePosts.map(p => p.id));
+      const uniquePinnedPosts = pinnedPosts.filter(p => !livePostIds.has(p.id));
+      const pinnedCount = uniquePinnedPosts.length;
       const specialPostsCount = liveCount + pinnedCount;
       
       // Fetch regular posts (limit minus live and pinned posts count)
@@ -161,8 +165,8 @@ class PostService {
         take: regularPostsLimit,
       });
 
-      // Combine live posts first (highest priority), then pinned posts, then regular posts
-      const allPosts = [...livePosts, ...pinnedPosts, ...posts];
+      // Combine live posts first (highest priority), then unique pinned posts, then regular posts
+      const allPosts = [...livePosts, ...uniquePinnedPosts, ...posts];
       
       return allPosts.map((post) => {
         const postWithStatus = {
@@ -615,6 +619,10 @@ class PostService {
       orderBy: { createdAt: 'desc' },
     }) : [];
 
+    // Filter out posts that are already in live posts to prevent duplicates
+    const livePostIds = new Set(livePosts.map(p => p.id));
+    const uniquePinnedPosts = pinnedPosts.filter(p => !livePostIds.has(p.id));
+
     // Get posts only from followed users (excluding live and pinned)
     const posts = await prisma.post.findMany({
       where: {
@@ -663,8 +671,8 @@ class PostService {
       take: limit,
     });
 
-    // Combine live posts first (highest priority), then pinned posts, then regular posts
-    const allPosts = [...livePosts, ...pinnedPosts, ...posts];
+    // Combine live posts first (highest priority), then unique pinned posts, then regular posts
+    const allPosts = [...livePosts, ...uniquePinnedPosts, ...posts];
     
     return allPosts.map((post) => {
       // Add like status to post object
@@ -792,6 +800,10 @@ class PostService {
       orderBy: { createdAt: 'desc' },
     }) : [];
 
+    // Filter out posts that are already in live posts to prevent duplicates
+    const livePostIds = new Set(livePosts.map(p => p.id));
+    const uniquePinnedPosts = pinnedPosts.filter(p => !livePostIds.has(p.id));
+
     // Calculate date 7 days ago
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -874,8 +886,8 @@ class PostService {
       return transformPost(postWithStatus);
     });
 
-    // Transform pinned posts
-    const transformedPinnedPosts = pinnedPosts.map((post) => {
+    // Transform unique pinned posts
+    const transformedPinnedPosts = uniquePinnedPosts.map((post) => {
       const postWithStatus = {
         ...post,
         isLiked: userId ? post.likes.length > 0 : false,
@@ -884,7 +896,7 @@ class PostService {
       return transformPost(postWithStatus);
     });
 
-    // Combine live posts first (highest priority), then pinned posts, then trending posts
+    // Combine live posts first (highest priority), then unique pinned posts, then trending posts
     return [...transformedLivePosts, ...transformedPinnedPosts, ...postsWithScores.map(({ trendingScore, ...post }) => post)];
   }
 }

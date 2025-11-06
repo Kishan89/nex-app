@@ -183,6 +183,12 @@ export default function CommentReplyPanel({
         if (broadcastPostId === postId && comment.parentId === parentComment.id) {
           console.log('✅ [ReplyPanel] Adding new reply from broadcast');
           
+          // Clear the fallback timeout since broadcast arrived
+          if ((window as any).__replyBroadcastTimeout) {
+            clearTimeout((window as any).__replyBroadcastTimeout);
+            (window as any).__replyBroadcastTimeout = null;
+          }
+          
           // Apply display masking to the new reply
           const processedReply = {
             ...comment,
