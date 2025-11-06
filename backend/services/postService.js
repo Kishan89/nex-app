@@ -532,13 +532,13 @@ class PostService {
 
     // Sort by: Live > Pinned > Trending Score > Newest
     const sortedPosts = postsWithScore.sort((a, b) => {
-      // Live posts first
+      // Live posts first (highest priority)
       if (a.isLive !== b.isLive) return b.isLive ? 1 : -1;
       // Pinned posts second
       if (a.isPinned !== b.isPinned) return b.isPinned ? 1 : -1;
-      // Trending score (higher is better)
+      // Trending score (higher is better) - main sort for regular posts
       if (a.trendingScore !== b.trendingScore) return b.trendingScore - a.trendingScore;
-      // Newest first
+      // Newest first as tiebreaker
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
