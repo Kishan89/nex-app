@@ -1,6 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const versionController = require('../controllers/versionController');
+
+// Debug: Check if versionController loads properly
+let versionController;
+try {
+  versionController = require('../controllers/versionController');
+  console.log('✅ versionController loaded:', {
+    checkVersion: typeof versionController.checkVersion,
+    getCurrentVersion: typeof versionController.getCurrentVersion,
+    updateVersion: typeof versionController.updateVersion
+  });
+} catch (error) {
+  console.error('❌ Failed to load versionController:', error.message);
+  // Provide fallback handlers to prevent crash
+  versionController = {
+    checkVersion: (req, res) => res.status(503).json({ success: false, message: 'Version service unavailable' }),
+    getCurrentVersion: (req, res) => res.status(503).json({ success: false, message: 'Version service unavailable' }),
+    updateVersion: (req, res) => res.status(503).json({ success: false, message: 'Version service unavailable' })
+  };
+}
+
 const { authenticate } = require('../middleware/auth');
 
 // Public route - no authentication required
