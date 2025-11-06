@@ -17,16 +17,24 @@ const getDatabaseUrl = () => {
 
 // ✅ Initialize Prisma client (optimized for Supabase/Railway)
 const databaseUrl = getDatabaseUrl();
-const prisma = databaseUrl
-  ? (globalForPrisma.prisma ||
-      new PrismaClient({
-        log: process.env.NODE_ENV === 'development' ? ['query', 'error'] : ['error'],
-        datasources: {
-          db: { url: databaseUrl },
-        },
-        errorFormat: 'minimal',
-      }))
-  : null;
+let prisma = null;
+
+try {
+  prisma = databaseUrl
+    ? (globalForPrisma.prisma ||
+        new PrismaClient({
+          log: process.env.NODE_ENV === 'development' ? ['query', 'error'] : ['error'],
+          datasources: {
+            db: { url: databaseUrl },
+          },
+          errorFormat: 'minimal',
+        }))
+    : null;
+} catch (error) {
+  console.error('❌ Failed to initialize Prisma client:', error.message);
+  console.log('⚠️ Server will start without database connection');
+  prisma = null;
+}
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 

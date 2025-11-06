@@ -177,11 +177,10 @@ async function startServer() {
         server.listen(PORT, HOST, () => {
             console.log('🚀 Social Media API Server started successfully!');
             console.log(`📍 Server running on http://${HOST}:${PORT}`);
-            console.log(`📊 Health check: http://${HOST}:${PORT}/api/health`);
+            console.log(`📊 Health check: http://${HOST}:${PORT}/health`);
             console.log(`📝 API endpoints: http://${HOST}:${PORT}/api/*`);
             console.log(`🔌 Socket.IO: ✅ Enabled and ready for connections`);
             console.log(`💬 Chat WebSocket: ws://${HOST}:${PORT}/socket.io/`);
-            console.log(`🗄️ Database: ✅ Connected`);
             console.log(`🌍 Environment: ${process.env.NODE_ENV || 'production'}`);
             console.log('');
             console.log('📱 Mobile apps can now connect to Socket.IO for real-time chat');
