@@ -14,6 +14,18 @@ class VersionService {
     try {
       logger.debug('Checking app version', { currentVersion, platform });
 
+      // Check if prisma is available
+      if (!prisma) {
+        logger.warn('Database not available for version check');
+        return {
+          updateRequired: false,
+          forceUpdate: false,
+          currentVersion,
+          latestVersion: currentVersion,
+          message: 'Version check unavailable'
+        };
+      }
+
       // Get latest version info from database
       const versionInfo = await prisma.$queryRaw`
         SELECT version, min_version, force_update, update_message, 
@@ -132,6 +144,11 @@ class VersionService {
         forceUpdate 
       });
 
+      // Check if prisma is available
+      if (!prisma) {
+        throw new Error('Database not available');
+      }
+
       // Update or insert version info
       const result = await prisma.$executeRaw`
         INSERT INTO app_version (version, min_version, platform, force_update, update_message, play_store_url, app_store_url)
@@ -169,6 +186,12 @@ class VersionService {
    */
   async getCurrentVersion(platform = 'android') {
     try {
+      // Check if prisma is available
+      if (!prisma) {
+        logger.warn('Database not available for getCurrentVersion');
+        return null;
+      }
+
       const versionInfo = await prisma.$queryRaw`
         SELECT version, min_version, force_update, update_message, 
                play_store_url, app_store_url, updated_at
