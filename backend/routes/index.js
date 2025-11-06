@@ -12,6 +12,7 @@ const fcmRouter = require('./fcm');
 const followRoutes = require('./followRoutes');
 const searchRoutes = require('./searchRoutes');
 const xpRoutes = require('./xpRoutes');
+const versionRoutes = require('./version');
 
 const userController = require('../controllers/userController'); 
 
@@ -41,6 +42,6 @@ router.use('/fcm', fcmRouter);
 router.use('/follow', followRoutes);
 router.use('/search', searchRoutes);
 router.use('/xp', xpRoutes);
- 
+router.use('/version', versionRoutes);
 
 module.exports = router;

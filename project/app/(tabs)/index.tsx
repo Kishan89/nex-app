@@ -440,14 +440,16 @@ export default function HomeScreen() {
           onEndReachedThreshold={0.5}
           ListFooterComponent={item === 'Latest' ? renderFooter : null}
           onScroll={handleScroll}
-          scrollEventThrottle={100}
+          scrollEventThrottle={16}
           bounces={true}
           alwaysBounceVertical={true}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={5}
-          updateCellsBatchingPeriod={100}
-          initialNumToRender={5}
-          windowSize={10}
+          removeClippedSubviews={Platform.OS === 'android'}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={8}
+          windowSize={21}
+          disableIntervalMomentum={true}
+          decelerationRate="fast"
         />
       </View>
     );
@@ -556,12 +558,15 @@ export default function HomeScreen() {
               onScroll={handleHorizontalScroll}
               onMomentumScrollEnd={handleHorizontalScrollEnd}
               scrollEventThrottle={16}
-              decelerationRate={0.98}
+              decelerationRate={0.99}
               bounces={false}
               removeClippedSubviews={false}
               snapToInterval={SCREEN_WIDTH}
               snapToAlignment="center"
               disableIntervalMomentum={true}
+              initialNumToRender={3}
+              maxToRenderPerBatch={3}
+              windowSize={3}
               getItemLayout={(data, index) => ({
                 length: SCREEN_WIDTH,
                 offset: SCREEN_WIDTH * index,

@@ -571,6 +571,16 @@ class ApiService {
             return { data: [] };
         }
     }
+
+    // Version Check
+    async checkAppVersion(version: string, platform: string = 'android') {
+        try {
+            return this.get(`/version/check?version=${version}&platform=${platform}`);
+        } catch (error) {
+            console.error('Error checking app version:', error);
+            return { success: false, data: null };
+        }
+    }
 }
 export const apiService = new ApiService();
 export default apiService;

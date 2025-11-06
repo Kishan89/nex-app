@@ -174,20 +174,15 @@ export default function CommentReplyPanel({
         console.log('📨 [ReplyPanel] Received comment_added broadcast:', {
           broadcastPostId,
           currentPostId: postId,
-          commentId: comment.id,
-          parentId: comment.parentId,
-          targetParentId: parentComment.id
+          commentId: comment?.id,
+          commentParentId: comment?.parentId,
+          targetParentId: parentComment?.id,
+          match: broadcastPostId === postId && comment?.parentId === parentComment?.id
         });
 
         // Only add if it's for this post AND it's a reply to our parent comment
-        if (broadcastPostId === postId && comment.parentId === parentComment.id) {
-          console.log('✅ [ReplyPanel] Adding new reply from broadcast');
-          
-          // Clear the fallback timeout since broadcast arrived
-          if ((window as any).__replyBroadcastTimeout) {
-            clearTimeout((window as any).__replyBroadcastTimeout);
-            (window as any).__replyBroadcastTimeout = null;
-          }
+        if (broadcastPostId === postId && comment?.parentId === parentComment?.id) {
+          console.log('✅ [ReplyPanel] Match found! Adding new reply from broadcast');
           
           // Apply display masking to the new reply
           const processedReply = {
@@ -353,37 +348,25 @@ export default function CommentReplyPanel({
       const response = await apiService.addComment(postId, finalText, parentComment.id, isAnonymous);
       console.log('✅ [ReplyPanel] Reply sent, response:', response);
       
-      // Wait for broadcast to add the real reply, with fallback
-      // If broadcast doesn't arrive in 3 seconds, replace optimistic with server response
-      let broadcastReceived = false;
+      // Update optimistic reply with real data from API response
+      // This ensures avatar, username, and all fields are correct
+      setReplies(prev => prev.map(r => 
+        r.id === optimisticReply.id 
+          ? { 
+              ...response.data,
+              isOptimistic: false,
+              username: getDisplayUser(response.data.user || response.data, response.data.isAnonymous).username,
+              avatar: getDisplayUser(response.data.user || response.data, response.data.isAnonymous).avatar,
+              user: getDisplayUser(response.data.user || { 
+                id: response.data.userId, 
+                username: response.data.username, 
+                avatar: response.data.avatar 
+              }, response.data.isAnonymous)
+            } 
+          : r
+      ));
       
-      const broadcastTimeout = setTimeout(() => {
-        if (!broadcastReceived) {
-          console.log('⚠️ [ReplyPanel] Broadcast timeout, using API response as fallback');
-          setReplies(prev => {
-            // Remove optimistic and add server response
-            const withoutOptimistic = prev.filter(reply => reply.id !== optimisticReply.id);
-            
-            // Process the response comment
-            const serverReply = {
-              ...response,
-              username: getDisplayUser(response.user || response, response.isAnonymous).username,
-              avatar: getDisplayUser(response.user || response, response.isAnonymous).avatar,
-              user: getDisplayUser(response.user || { id: response.userId, username: response.username, avatar: response.avatar }, response.isAnonymous)
-            };
-            
-            return [...withoutOptimistic, serverReply];
-          });
-          
-          // Scroll to bottom
-          setTimeout(() => {
-            scrollViewRef.current?.scrollToEnd({ animated: true });
-          }, 50);
-        }
-      }, 3000);
-      
-      // Store timeout ID to clear it if broadcast arrives
-      (window as any).__replyBroadcastTimeout = broadcastTimeout;
+      console.log('✅ [ReplyPanel] Reply sent successfully, updated with API data, waiting for broadcast');
     } catch (error) {
       // Remove optimistic reply on error and restore text
       setReplies(prev => prev.filter(reply => reply.id !== optimisticReply.id));
