@@ -54,6 +54,10 @@ export default function HomeScreen() {
     refreshing,
     loadingMore,
     hasMorePosts,
+    hasMoreTrendingPosts,
+    hasMoreFollowingPosts,
+    loadingTrending,
+    loadingFollowing,
     error,
     toggleLike,
     toggleBookmark,
@@ -440,15 +444,13 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 80, paddingTop: 100 }}
           onEndReached={() => {
-            // Enable load more for all tabs
-            if (!loadingMore) {
-              if (item === 'Latest' && hasMorePosts) {
-                loadMorePosts();
-              } else if (item === 'Trending') {
-                loadTrendingPosts(true); // Load more trending with pagination
-              } else if (item === 'Following') {
-                loadFollowingPosts(); // Load more following
-              }
+            // Enable load more for all tabs with proper loading checks
+            if (item === 'Latest' && hasMorePosts && !loadingMore) {
+              loadMorePosts();
+            } else if (item === 'Trending' && hasMoreTrendingPosts && !loadingMore && !loadingTrending) {
+              loadTrendingPosts(true); // Load more trending with pagination
+            } else if (item === 'Following' && hasMoreFollowingPosts && !loadingMore && !loadingFollowing) {
+              loadFollowingPosts(); // Load more following
             }
           }}
           onEndReachedThreshold={0.5}

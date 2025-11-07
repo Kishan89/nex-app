@@ -62,20 +62,6 @@ export default function EditProfileScreen() {
     } catch (error: any) {
       console.log('Profile update error:', error);
 
-      // Handle username taken error (multiple ways it can come)
-      if (
-        (error.response?.status === 400 && error.response?.data?.code === 'USERNAME_TAKEN') ||
-        (error.response?.status === 400 && error.response?.data?.error?.includes('Username is already taken')) ||
-        (error.message && error.message.includes('Username is already taken'))
-      ) {
-        Alert.alert(
-          'Username Already Taken',
-          'This username is already being used by another user. Please choose a different username.',
-          [{ text: 'OK', style: 'default' }]
-        );
-        return;
-      }
-
       // Handle user not found
       if (error.response?.status === 404) {
         Alert.alert(

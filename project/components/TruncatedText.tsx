@@ -11,6 +11,7 @@ interface TruncatedTextProps {
   onPress?: () => void;
   onToggle?: () => void;
   refreshKey?: number; // Add refresh key to reset state
+  forceExpand?: boolean; // Force text to be fully expanded
 }
 
 export default function TruncatedText({ 
@@ -19,7 +20,8 @@ export default function TruncatedText({
   style,
   onPress,
   onToggle,
-  refreshKey
+  refreshKey,
+  forceExpand = false
 }: TruncatedTextProps) {
   const { colors } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -43,10 +45,15 @@ export default function TruncatedText({
   };
   
   const handleToggle = () => {
-    // Only allow expanding, not collapsing
-    if (!isExpanded) {
-      setIsExpanded(true);
-      onToggle?.();
+    // If onPress is provided, navigate to comment screen instead of expanding
+    if (onPress) {
+      onPress();
+    } else {
+      // Fallback: expand text inline
+      if (!isExpanded) {
+        setIsExpanded(true);
+        onToggle?.();
+      }
     }
   };
 
@@ -67,7 +74,7 @@ export default function TruncatedText({
       <Text
         ref={textRef}
         style={[styles.text, { color: colors.text }, style]}
-        numberOfLines={isExpanded ? undefined : maxLines}
+        numberOfLines={forceExpand || isExpanded ? undefined : maxLines}
         onTextLayout={handleTextLayout}
       >
         <LinkDetector 
@@ -76,7 +83,7 @@ export default function TruncatedText({
         />
       </Text>
       
-      {(shouldShowReadMore) && !isExpanded && (
+      {(shouldShowReadMore) && !isExpanded && !forceExpand && (
         <TouchableOpacity 
           onPress={handleToggle} 
           style={styles.readMoreButton}

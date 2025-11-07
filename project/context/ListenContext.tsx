@@ -23,6 +23,8 @@ interface ListenContextType {
   refreshing: boolean;
   loadingMore: boolean;
   hasMorePosts: boolean;
+  hasMoreTrendingPosts: boolean;
+  hasMoreFollowingPosts: boolean;
   loadingTrending: boolean;
   loadingFollowing: boolean;
   error: string | null;
@@ -188,6 +190,8 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [hasMoreTrendingPosts, setHasMoreTrendingPosts] = useState(true);
+  const [hasMoreFollowingPosts, setHasMoreFollowingPosts] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [trendingPage, setTrendingPage] = useState(1);
   const [followingPage, setFollowingPage] = useState(1);
@@ -385,11 +389,17 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
     }
   }, [loadSavedInteractions, loadSavedPollVotes]);
   const loadTrendingPosts = useCallback(async (loadMore = false) => {
+    // Prevent loading if already loading or no more posts
+    if (loadMore && (!hasMoreTrendingPosts || loadingMore)) {
+      return;
+    }
+    
     if (loadMore) {
       setLoadingMore(true);
     } else {
       setLoadingTrending(true);
       setTrendingPage(1); // Reset page on fresh load
+      setHasMoreTrendingPosts(true); // Reset flag on fresh load
     }
     setError(null);
     try {
@@ -401,12 +411,18 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
       
       // If no posts returned, we've reached the end
       if (normalized.length === 0) {
+        setHasMoreTrendingPosts(false);
         if (loadMore) {
           setLoadingMore(false);
         } else {
           setLoadingTrending(false);
         }
         return;
+      }
+      
+      // If we got fewer posts than expected (15), we've reached the end
+      if (normalized.length < 15) {
+        setHasMoreTrendingPosts(false);
       }
       
       // Use server data for like counts and status - prioritize server truth
@@ -446,6 +462,7 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
         setTrendingPage(pageToLoad);
       } else {
         setTrendingPosts(postsWithPollVotes);
+        setTrendingPage(1);
       }
       
       // Update interactions for trending posts too
@@ -546,12 +563,21 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadPosts(1, false, true);
+      // Reset all tabs on refresh
+      setTrendingPage(1);
+      setFollowingPage(1);
+      
+      // Load all tabs in parallel
+      await Promise.all([
+        loadPosts(1, false, true),
+        loadTrendingPosts(false),
+        loadFollowingPosts()
+      ]);
     } finally {
       // Add a small delay to ensure loading circle is visible
       setTimeout(() => setRefreshing(false), 500);
     }
-  }, [loadPosts]);
+  }, [loadPosts, loadTrendingPosts, loadFollowingPosts]);
   const toggleLike = useCallback((postId: string) => {
     // Check if already processing this like
     if (interactionStore.isPending(postId, 'liking')) return;
@@ -928,7 +954,7 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
   }, [posts, followingPosts]);
   return (
     <ListenContext.Provider value={{
-      posts, followingPosts, trendingPosts, postInteractions, pollVotes, comments, loading, refreshing, loadingMore, hasMorePosts, loadingTrending, loadingFollowing, error,
+      posts, followingPosts, trendingPosts, postInteractions, pollVotes, comments, loading, refreshing, loadingMore, hasMorePosts, hasMoreTrendingPosts, hasMoreFollowingPosts, loadingTrending, loadingFollowing, error,
       toggleLike, toggleBookmark, votePoll, addComment, loadPosts, loadMorePosts, loadFollowingPosts, loadTrendingPosts, onRefresh, loadComments, getPostById
     }}>
       {children}

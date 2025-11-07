@@ -63,10 +63,12 @@ class ChatCacheManager {
     const updatedChats = this.memoryCache.chats.map(chat =>
       String(chat.id) === String(chatId) ? { ...chat, ...updates } : chat
     );
-    // Sort chats by most recent activity
+    // Sort chats by most recent activity - prioritize 'now' time
     const sortedChats = updatedChats.sort((a, b) => {
-      if (a.time === 'now') return -1;
-      if (b.time === 'now') return 1;
+      // Chats with 'now' time should be at the top
+      if (a.time === 'now' && b.time !== 'now') return -1;
+      if (a.time !== 'now' && b.time === 'now') return 1;
+      // If both have 'now' or neither, maintain order
       if (a.lastMessage && !b.lastMessage) return -1;
       if (!a.lastMessage && b.lastMessage) return 1;
       return 0;

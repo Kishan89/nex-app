@@ -140,8 +140,12 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           }
           return chat;
         });
-        // Sort chats by most recent message
+        // Sort chats by most recent message - prioritize 'now' time
         return updatedChats.sort((a, b) => {
+          // Chats with 'now' time should be at the top
+          if (a.time === 'now' && b.time !== 'now') return -1;
+          if (a.time !== 'now' && b.time === 'now') return 1;
+          // If both have 'now' or neither, maintain order
           if (a.lastMessage && !b.lastMessage) return -1;
           if (!a.lastMessage && b.lastMessage) return 1;
           return 0;
@@ -166,7 +170,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
     
     // 🚀 INSTANT: Handle chat created event
     const handleChatCreated = (data: { chat: any; chatId: string; timestamp: string }) => {
-      console.log('✅ [CHAT CREATED] Received socket event:', data.chatId);
+      console.log('✅ [CHAT CREATED] Received socket event:', data.chatId, data.chat);
       
       // Immediately add to list (synchronous)
       setChats(prevChats => {
@@ -177,21 +181,31 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           return prevChats;
         }
         
-        // Create new chat object
+        // Extract other participant's info for 1-on-1 chats
+        let otherParticipant = null;
+        if (data.chat.participants && Array.isArray(data.chat.participants)) {
+          otherParticipant = data.chat.participants.find(
+            (p: any) => p.userId !== user?.id || p.user?.id !== user?.id
+          );
+        }
+        
+        const participantUser = otherParticipant?.user;
+        
+        // Create new chat object with proper user data
         const newChat: Chat = {
           id: data.chat.id || data.chatId,
-          name: data.chat.name || data.chat.username || 'New Chat',
-          avatar: data.chat.avatar || '',
+          name: participantUser?.username || data.chat.name || 'New Chat',
+          avatar: participantUser?.avatar || data.chat.avatar || '',
           isOnline: data.chat.isOnline || false,
           lastMessage: data.chat.lastMessage || '',
           time: 'now',
           unread: 0,
-          userId: data.chat.userId || '',
+          userId: participantUser?.id || data.chat.userId || '',
           lastSeen: data.chat.lastSeen || 'recently',
           lastSeenText: data.chat.lastSeenText || (data.chat.isOnline ? 'Online' : 'Last seen recently')
         };
         
-        console.log('✅ [CHAT CREATED] Instantly added to list');
+        console.log('✅ [CHAT CREATED] Instantly added to list with user:', newChat.name);
         
         // Add to cache (synchronous)
         chatCache.addChatToCache(newChat);

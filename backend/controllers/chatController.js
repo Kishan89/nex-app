@@ -176,6 +176,45 @@ class ChatController {
             
             // Broadcast to all users in the chat (including sender for temp message replacement)
             socketService.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
+            
+            // Check if this is the first message in the chat
+            const messageCount = await prisma.message.count({
+              where: { chatId }
+            });
+            
+            // If this is the first message, emit chat_created to other participants
+            if (messageCount === 1) {
+              const chat = await prisma.chat.findUnique({
+                where: { id: chatId },
+                include: {
+                  participants: {
+                    include: {
+                      user: {
+                        select: {
+                          id: true,
+                          username: true,
+                          avatar: true,
+                        }
+                      }
+                    }
+                  }
+                }
+              });
+              
+              if (chat) {
+                // Emit chat_created only to other participants (not the sender)
+                chat.participants.forEach(participant => {
+                  if (participant.userId !== senderId) {
+                    socketService.emitToUser(participant.userId, 'chat_created', {
+                      chat: chat,
+                      chatId: chat.id,
+                      timestamp: new Date().toISOString()
+                    });
+                  }
+                });
+                logger.info('Chat created event emitted after first message', { chatId: chat.id });
+              }
+            }
           }
           
           await this.sendMessageNotification(chatId, senderId, content);
@@ -273,25 +312,9 @@ class ChatController {
       
       res.status(HTTP_STATUS.CREATED).json(successResponse(chat, SUCCESS_MESSAGES.CHAT_CREATED));
       
-      // 🚀 REAL-TIME: Emit socket event to all participants
-      setImmediate(() => {
-        try {
-          const socketService = require('../services/socketService');
-          if (socketService.io) {
-            // Notify each participant about the new chat
-            participantIds.forEach(userId => {
-              socketService.emitToUser(userId, 'chat_created', {
-                chat: chat,
-                chatId: chat.id,
-                timestamp: new Date().toISOString()
-              });
-            });
-            logger.info('Chat created event emitted to participants', { chatId: chat.id, participantCount: participantIds.length });
-          }
-        } catch (socketError) {
-          logger.error('Failed to emit chat_created event:', socketError);
-        }
-      });
+      // 🚀 REAL-TIME: DO NOT emit chat_created event here
+      // Chat will only appear in other user's list when first message is sent
+      // This prevents empty chats from appearing in the chat list
     } catch (error) {
       next(error);
     }

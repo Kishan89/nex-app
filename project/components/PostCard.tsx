@@ -36,6 +36,7 @@ type Props = {
   allowImageClick?: boolean; // New prop to control image click functionality
   onTextToggle?: () => void; // Callback for text expand/collapse
   refreshKey?: number; // Key to reset TruncatedText state on refresh
+  forceExpandText?: boolean; // Force text to be fully expanded (for comment screen)
 };
 const PostCard = React.memo(function PostCard({
   post,
@@ -60,6 +61,7 @@ const PostCard = React.memo(function PostCard({
   isCurrentUserAdmin = false,
   onTextToggle,
   refreshKey,
+  forceExpandText = false,
 }: Props) {
   const { colors, isDark } = useTheme();
   
@@ -248,6 +250,7 @@ const PostCard = React.memo(function PostCard({
                 onPress={onPress}
                 onToggle={onTextToggle}
                 refreshKey={refreshKey}
+                forceExpand={forceExpandText}
               />
             )}
             {post.image && (

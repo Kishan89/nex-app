@@ -694,6 +694,7 @@ export default function CommentsModal({
               onReport={onReport}
               onDelete={onDelete}
               currentUserId={currentUserId}
+              forceExpandText={true}
             />
           </View>
           {/* Comments Section (preserved) */}
