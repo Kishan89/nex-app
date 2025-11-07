@@ -27,11 +27,6 @@ const register = async (req, res, next) => {
             return res.status(HTTP_STATUS.CONFLICT).json({ error: 'Email already in use.' });
         }
 
-        const existingUsername = await userService.findUserByUsername(username);
-        if (existingUsername) {
-            return res.status(HTTP_STATUS.CONFLICT).json({ error: 'Username already taken.' });
-        }
-
         const newUser = await userService.createUser({ email, username, password });
         
         res.status(HTTP_STATUS.CREATED).json({
@@ -408,13 +403,6 @@ const updateUserProfile = async (req, res, next) => {
         res.status(HTTP_STATUS.OK).json({ message: 'Profile updated successfully.', user: userProfile });
     } catch (error) {
         logger.error('Error updating user profile:', error);
-        
-        if (error.message && error.message.includes('Username is already taken')) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                error: 'Username is already taken. Please choose a different username.',
-                code: 'USERNAME_TAKEN'
-            });
-        }
         
         if (error.message && error.message.includes('User not found')) {
             return res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'User not found.' });

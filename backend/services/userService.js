@@ -88,18 +88,6 @@ const updateUser = async (id, updates) => {
   try {
     if (updates.password) delete updates.password;
     
-    // Check if username is being updated and if it's already taken
-    if (updates.username) {
-      const existingUser = await prisma.user.findUnique({
-        where: { username: updates.username },
-        select: { id: true }
-      });
-      
-      if (existingUser && existingUser.id !== id) {
-        throw new Error('USERNAME_TAKEN');
-      }
-    }
-    
     const updatedUser = await prisma.user.update({
       where: { id },
       data: updates,
@@ -108,13 +96,7 @@ const updateUser = async (id, updates) => {
     return updatedUser;
   } catch (error) {
     logger.error('Error updating user in database:', error);
-    if (error.message === 'USERNAME_TAKEN') {
-      throw new Error('Username is already taken. Please choose a different username.');
-    }
     if (error.code === 'P2025') throw new Error('User not found.');
-    if (error.code === 'P2002' && error.meta?.target?.includes('username')) {
-      throw new Error('Username is already taken. Please choose a different username.');
-    }
     throw new Error('User update failed. Please try again.');
   }
 };
