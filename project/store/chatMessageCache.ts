@@ -75,7 +75,19 @@ class ChatMessageCacheManager {
       this.messageCache.set(String(chatId), updatedCache);
       // Save to storage in background
       this.saveToStorage(chatId, updatedCache);
-      }
+    } else {
+      // IMPORTANT: If cache doesn't exist, create it with this message
+      // This ensures messages received via socket (when user is outside ChatScreen) are cached
+      const newCache: CachedChatMessages = {
+        messages: [message],
+        timestamp: Date.now(),
+        lastMessageId: message.id,
+        chatData: null // Will be filled when user enters chat
+      };
+      this.messageCache.set(String(chatId), newCache);
+      // Save to storage in background
+      this.saveToStorage(chatId, newCache);
+    }
   }
   // Update message in cache (for delivery status, etc.)
   updateMessageInCache(chatId: string, messageId: string, updates: Partial<Message>): void {

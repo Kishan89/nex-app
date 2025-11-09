@@ -393,39 +393,10 @@ const ChatScreen = React.memo(function ChatScreen({
             serverResponse = await socketService.sendMessage(chatId, messageText, tempId);
             console.log('✅ [SOCKET] Socket response:', serverResponse);
             
-            // IMPORTANT: Since backend now excludes sender from broadcast,
-            // sender must replace temp message using the callback response
-            if (serverResponse && serverResponse.success && serverResponse.messageId) {
-              const realMessageId = serverResponse.messageId;
-              const serverTimestamp = serverResponse.timestamp ? 
-                fixServerTimestamp(serverResponse.timestamp) : tempMessage.timestamp;
-              
-              console.log('✅ [SOCKET CALLBACK] Replacing temp message immediately:', {
-                tempId,
-                realMessageId
-              });
-              
-              // Replace temp message with real message from callback
-              setMessages(prev => {
-                const updated = prev.map(msg => 
-                  msg.id === tempId ? {
-                    ...msg,
-                    id: realMessageId,
-                    status: 'sent' as const,
-                    timestamp: serverTimestamp
-                  } : msg
-                );
-                
-                // Update caches
-                const realMessage = updated.find(m => m.id === realMessageId);
-                if (realMessage) {
-                  ultraFastChatCache.addMessageInstantly(chatId, realMessage);
-                  addMessageToChat(chatId, realMessage, true);
-                }
-                
-                return updated;
-              });
-            }
+            // NOTE: Don't replace temp message here - let socket broadcast handle it
+            // Backend broadcasts to ALL users including sender, so sender will receive
+            // the message via socket broadcast and the global listener will replace the temp message
+            // This ensures consistent behavior whether sender stays in ChatScreen or leaves
           } catch (socketError) {
             console.log('❌ [SOCKET] Socket error:', socketError);
           }
@@ -440,21 +411,8 @@ const ChatScreen = React.memo(function ChatScreen({
           });
           console.log('✅ [API] API response:', serverResponse);
           
-          // For API fallback, also replace temp message immediately
-          if (serverResponse && (serverResponse.messageId || serverResponse.id)) {
-            const realMessageId = serverResponse.messageId || serverResponse.id;
-            const serverTimestamp = serverResponse.timestamp ? 
-              fixServerTimestamp(serverResponse.timestamp) : tempMessage.timestamp;
-            
-            setMessages(prev => prev.map(msg => 
-              msg.id === tempId ? {
-                ...msg,
-                id: realMessageId,
-                status: 'sent' as const,
-                timestamp: serverTimestamp
-              } : msg
-            ));
-          }
+          // NOTE: Don't replace temp message here either - socket broadcast handles it
+          // HTTP API also triggers socket broadcast to all users including sender
         }
         
         // Verify message was sent successfully

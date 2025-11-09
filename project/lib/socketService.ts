@@ -124,26 +124,30 @@ class SocketService {
       // IMPORTANT: Only show in-app notification if:
       // 1. Message is NOT from current user (sender should never see their own notification)
       // 2. User is NOT currently in the chat (don't show banner if already viewing the chat)
+      const isSender = message.sender?.id === this.currentUserId;
+      const isInCurrentChat = this.isUserInCurrentChat(message.chatId);
+      
       console.log('🔍 [SOCKET] New message received:', {
-        senderId: message.sender.id,
+        senderId: message.sender?.id,
         currentUserId: this.currentUserId,
         chatId: message.chatId,
         currentChatId: this.currentChatId,
-        isSender: message.sender.id === this.currentUserId,
-        isInChat: this.isUserInCurrentChat(message.chatId)
+        isSender,
+        isInCurrentChat
       });
       
-      if (message.sender.id !== this.currentUserId && !this.isUserInCurrentChat(message.chatId)) {
-        console.log('📬 [SOCKET] Showing notification banner for message from:', message.sender.username);
+      // CRITICAL: Never show notification banner to sender, even if they leave the chat
+      if (!isSender && !isInCurrentChat) {
+        console.log('📬 [SOCKET] Showing notification banner for message from:', message.sender?.username);
         DeviceEventEmitter.emit('showNotificationBanner', {
-          title: message.sender.username,
+          title: message.sender?.username || 'New Message',
           body: message.text || message.content || 'sent you a message',
           data: {
             type: 'message',
             chatId: message.chatId,
-            senderId: message.sender.id,
-            username: message.sender.username,
-            avatar: message.sender.avatar,
+            senderId: message.sender?.id,
+            username: message.sender?.username,
+            avatar: message.sender?.avatar,
           },
           onPress: () => {
             // Navigate to chat
@@ -151,9 +155,9 @@ class SocketService {
             router.push(`/chat/${message.chatId}`);
           }
         });
-      } else if (message.sender.id === this.currentUserId) {
+      } else if (isSender) {
         console.log('🔕 [SOCKET] Suppressing notification - message is from current user');
-      } else if (this.isUserInCurrentChat(message.chatId)) {
+      } else if (isInCurrentChat) {
         console.log('🔕 [SOCKET] Suppressing notification - user is in this chat');
       }
     });
