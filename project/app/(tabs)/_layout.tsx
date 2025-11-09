@@ -12,6 +12,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useChatContext } from '@/context/ChatContext';
 import { useNotificationCount } from '@/context/NotificationCountContext';
+import { socketService } from '@/lib/socketService';
 const TabBarIcon = ({ focused, children, badge, colors }: { focused: boolean; children: React.ReactNode; badge?: number; colors: any }) => (
   <View style={styles.tabIconContainer}>
    
@@ -31,6 +32,14 @@ export default function TabLayout() {
   if (!user) {
     return <Redirect href="/login" />;
   }
+  // CRITICAL: Set current user ID in socket service for notification filtering
+  useEffect(() => {
+    if (user?.id) {
+      console.log('🔧 [TAB LAYOUT] Setting currentUserId in socketService:', user.id);
+      socketService.setCurrentUserId(user.id);
+    }
+  }, [user?.id]);
+  
   // Set system UI colors
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.background);

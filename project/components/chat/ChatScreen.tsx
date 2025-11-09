@@ -368,8 +368,10 @@ const ChatScreen = React.memo(function ChatScreen({
     });
     // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
     ultraFastChatCache.addMessageInstantly(chatId, tempMessage);
-    // Also add to global state for persistence across screen changes
-    addMessageToChat(chatId, tempMessage, true);
+    // Also add to global state for persistence across screen changes (deferred to avoid React warning)
+    setTimeout(() => {
+      addMessageToChat(chatId, tempMessage, true);
+    }, 0);
     // Tell FCM service that user is sending a message (to suppress notifications)
     fcmService.setUserIsSendingMessage(chatId);
     // Clear input immediately after message appears in UI
@@ -656,6 +658,9 @@ const ChatScreen = React.memo(function ChatScreen({
           sender: socketMessage.sender
         };
         // IMPROVED: Better duplicate check with temp message replacement
+        let shouldUpdateGlobalState = false;
+        let finalMessage: Message | null = null;
+        
         setMessages(prev => {
           console.log('🔍 [CHECK] Current messages count:', prev.length);
           
@@ -679,8 +684,9 @@ const ChatScreen = React.memo(function ChatScreen({
                 updated[tempMsgIndex] = newMessage;
                 // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
                 ultraFastChatCache.addMessageInstantly(chatId, newMessage);
-                // Also update global state
-                addMessageToChat(chatId, newMessage, true);
+                // Mark for global state update (outside setState)
+                shouldUpdateGlobalState = true;
+                finalMessage = newMessage;
                 return updated;
               } else {
                 console.log('⚠️ [NOT FOUND] Temp message not found with ID:', socketMessage.tempMessageId);
@@ -702,8 +708,9 @@ const ChatScreen = React.memo(function ChatScreen({
               );
               // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
               ultraFastChatCache.addMessageInstantly(chatId, newMessage);
-              // Also update global state
-              addMessageToChat(chatId, newMessage, true);
+              // Mark for global state update (outside setState)
+              shouldUpdateGlobalState = true;
+              finalMessage = newMessage;
               return updated;
             }
             
@@ -729,10 +736,18 @@ const ChatScreen = React.memo(function ChatScreen({
           // New message from another user - add it
           // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
           ultraFastChatCache.addMessageInstantly(chatId, newMessage);
-          // Also add to global state
-          addMessageToChat(chatId, newMessage, true);
+          // Mark for global state update (outside setState)
+          shouldUpdateGlobalState = true;
+          finalMessage = newMessage;
           return [...prev, newMessage];
         });
+        
+        // Update global state AFTER setState completes (avoids React warning)
+        if (shouldUpdateGlobalState && finalMessage) {
+          setTimeout(() => {
+            addMessageToChat(chatId, finalMessage!, true);
+          }, 0);
+        }
         // 🚀 IMPROVED: Auto-scroll to bottom with multiple attempts
         setTimeout(() => scrollToBottom(true), 50);
         setTimeout(() => scrollToBottom(true), 150);

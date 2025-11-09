@@ -19,6 +19,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useChatContext } from '@/context/ChatContext';
 import { chatCache } from '@/store/chatCache';
 import { chatMessageCache } from '@/store/chatMessageCache';
+import { ultraFastChatCache } from '@/lib/ChatCache';
 import { router } from 'expo-router';
 import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -42,7 +43,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const { chatReadCounts, markChatAsRead, refreshUnreadCounts } = useChatContext();
+  const { chatReadCounts, markChatAsRead, refreshUnreadCounts, addMessageToChat } = useChatContext();
   const { colors, isDark } = useTheme();
   // Refresh chats and sync with context
   const refreshChats = useCallback(() => {
@@ -132,17 +133,41 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       
       // IMPORTANT: Also update message cache so ChatScreen can load the message
       // This ensures messages appear when user returns to ChatScreen
+      
+      // Format timestamp to "11:42 pm" format
+      const formattedTimestamp = socketMessage.timestamp 
+        ? new Date(socketMessage.timestamp).toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          })
+        : new Date().toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+      
       const newMessage = {
         id: socketMessage.id,
         text: socketMessage.text || socketMessage.content,
         isUser: socketMessage.sender?.id === user?.id,
-        timestamp: socketMessage.timestamp || new Date().toISOString(),
+        timestamp: formattedTimestamp,
         status: 'delivered' as const,
         sender: socketMessage.sender
       };
       
-      // Add to message cache
+      // CRITICAL: Update ALL caches and global state for instant message availability
+      // 1. Update regular cache (synchronous)
       chatMessageCache.addMessageToCache(chatId, newMessage);
+      
+      // 2. Update ultra-fast cache for instant loading (synchronous)
+      ultraFastChatCache.addMessageInstantly(chatId, newMessage);
+      
+      // 3. Update global ChatContext state so ChatScreen loads it immediately
+      // Wrap in setTimeout to avoid "Cannot update component while rendering" warning
+      setTimeout(() => {
+        addMessageToChat(chatId, newMessage, false);
+      }, 0);
       
       // Update the chat list with the new message
       setChats(prevChats => {
