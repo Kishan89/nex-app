@@ -392,9 +392,43 @@ const ChatScreen = React.memo(function ChatScreen({
             console.log('🔌 [SOCKET] Sending via socket...');
             serverResponse = await socketService.sendMessage(chatId, messageText, tempId);
             console.log('✅ [SOCKET] Socket response:', serverResponse);
-            } catch (socketError) {
-              console.log('❌ [SOCKET] Socket error:', socketError);
+            
+            // IMPORTANT: Since backend now excludes sender from broadcast,
+            // sender must replace temp message using the callback response
+            if (serverResponse && serverResponse.success && serverResponse.messageId) {
+              const realMessageId = serverResponse.messageId;
+              const serverTimestamp = serverResponse.timestamp ? 
+                fixServerTimestamp(serverResponse.timestamp) : tempMessage.timestamp;
+              
+              console.log('✅ [SOCKET CALLBACK] Replacing temp message immediately:', {
+                tempId,
+                realMessageId
+              });
+              
+              // Replace temp message with real message from callback
+              setMessages(prev => {
+                const updated = prev.map(msg => 
+                  msg.id === tempId ? {
+                    ...msg,
+                    id: realMessageId,
+                    status: 'sent' as const,
+                    timestamp: serverTimestamp
+                  } : msg
+                );
+                
+                // Update caches
+                const realMessage = updated.find(m => m.id === realMessageId);
+                if (realMessage) {
+                  ultraFastChatCache.addMessageInstantly(chatId, realMessage);
+                  addMessageToChat(chatId, realMessage, true);
+                }
+                
+                return updated;
+              });
             }
+          } catch (socketError) {
+            console.log('❌ [SOCKET] Socket error:', socketError);
+          }
         }
         // Fallback to API if socket failed or not connected
         if (!serverResponse || !serverResponse.success) {
@@ -405,37 +439,26 @@ const ChatScreen = React.memo(function ChatScreen({
             senderId: user.id
           });
           console.log('✅ [API] API response:', serverResponse);
-          }
-        // Don't do anything here - socket broadcast handles everything!
-        // The socket broadcast listener will replace the temp message with the real one
-        if (serverResponse && (serverResponse.messageId || serverResponse.id)) {
-          const realMessageId = serverResponse.messageId || serverResponse.id;
-          console.log('✅ [SUCCESS] Message sent successfully, socket broadcast will handle replacement:', {
-            tempId,
-            realMessageId
-          });
           
-          // Fallback: If socket broadcast doesn't arrive within 3 seconds, replace manually
-          setTimeout(() => {
-            setMessages(prev => {
-              // Check if temp message still exists (socket broadcast didn't replace it)
-              const tempStillExists = prev.some(msg => msg.id === tempId);
-              if (tempStillExists) {
-                console.log('⏰ [FALLBACK] Socket broadcast timeout, replacing temp message manually');
-                const serverTimestamp = serverResponse.timestamp ? 
-                  fixServerTimestamp(serverResponse.timestamp) : tempMessage.timestamp;
-                const finalMessage = {
-                  ...tempMessage,
-                  id: realMessageId,
-                  status: 'sent' as const,
-                  timestamp: serverTimestamp
-                };
-                return prev.map(msg => msg.id === tempId ? finalMessage : msg);
-              }
-              return prev;
-            });
-          }, 3000);
-        } else {
+          // For API fallback, also replace temp message immediately
+          if (serverResponse && (serverResponse.messageId || serverResponse.id)) {
+            const realMessageId = serverResponse.messageId || serverResponse.id;
+            const serverTimestamp = serverResponse.timestamp ? 
+              fixServerTimestamp(serverResponse.timestamp) : tempMessage.timestamp;
+            
+            setMessages(prev => prev.map(msg => 
+              msg.id === tempId ? {
+                ...msg,
+                id: realMessageId,
+                status: 'sent' as const,
+                timestamp: serverTimestamp
+              } : msg
+            ));
+          }
+        }
+        
+        // Verify message was sent successfully
+        if (!serverResponse || (!serverResponse.messageId && !serverResponse.id)) {
           throw new Error('Invalid server response');
         }
       } catch (error) {

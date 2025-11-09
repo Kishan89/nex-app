@@ -126,9 +126,9 @@ class SocketService {
           tempMessageId // Include temp ID for replacement
         };
 
-        // Broadcast message to ALL users in the chat (including sender for temp message replacement)
-        logger.info('Broadcasting message to chat room (including sender)', { chatId, messageId: message.id, senderId: userId });
-        this.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
+        // Broadcast message to OTHER users in the chat (exclude sender to prevent duplicates)
+        logger.info('Broadcasting message to chat room (excluding sender)', { chatId, messageId: message.id, senderId: userId });
+        socket.to(`chat:${chatId}`).emit('new_message', socketMessage);
 
         // Send acknowledgment back to sender with delivery confirmation
         if (callback && typeof callback === 'function') {
@@ -359,6 +359,11 @@ class SocketService {
   // Check if user is online
   isUserOnline(userId) {
     return this.connectedUsers.has(userId);
+  }
+
+  // Get user's socket ID
+  getUserSocketId(userId) {
+    return this.connectedUsers.get(userId);
   }
 
   // Send message to specific user

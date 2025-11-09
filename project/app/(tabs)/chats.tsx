@@ -120,17 +120,34 @@ const ChatsScreen = React.memo(function ChatsScreen() {
   useEffect(() => {
     if (!user) return;
     const handleNewMessage = (socketMessage: any) => {
-      // Update cache immediately
+      const chatId = String(socketMessage.chatId);
+      
+      // Update chat cache immediately
       chatCache.addMessageToCache(
-        socketMessage.chatId,
+        chatId,
         socketMessage.text || socketMessage.content,
         socketMessage.sender?.id,
         user?.id
       );
+      
+      // IMPORTANT: Also update message cache so ChatScreen can load the message
+      // This ensures messages appear when user returns to ChatScreen
+      const newMessage = {
+        id: socketMessage.id,
+        text: socketMessage.text || socketMessage.content,
+        isUser: socketMessage.sender?.id === user?.id,
+        timestamp: socketMessage.timestamp || new Date().toISOString(),
+        status: 'delivered' as const,
+        sender: socketMessage.sender
+      };
+      
+      // Add to message cache
+      chatMessageCache.addMessageToCache(chatId, newMessage);
+      
       // Update the chat list with the new message
       setChats(prevChats => {
         const updatedChats = prevChats.map(chat => {
-          if (String(chat.id) === String(socketMessage.chatId)) {
+          if (String(chat.id) === chatId) {
             return {
               ...chat,
               lastMessage: socketMessage.text || socketMessage.content,

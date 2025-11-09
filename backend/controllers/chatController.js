@@ -174,8 +174,16 @@ class ChatController {
               chatId
             };
             
-            // Broadcast to all users in the chat (including sender for temp message replacement)
-            socketService.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
+            // Broadcast to OTHER users in the chat (exclude sender to prevent duplicate notifications)
+            // Try to find sender's socket and exclude them from broadcast
+            const senderSocketId = socketService.getUserSocketId(req.user.id);
+            if (senderSocketId) {
+              // Sender is connected via socket, exclude them from broadcast
+              socketService.io.to(`chat:${chatId}`).except(senderSocketId).emit('new_message', socketMessage);
+            } else {
+              // Sender not connected via socket, broadcast to all (they'll get it via HTTP response)
+              socketService.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
+            }
             
             // Check if this is the first message in the chat
             const messageCount = await prisma.message.count({

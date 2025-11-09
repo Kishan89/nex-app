@@ -121,8 +121,20 @@ class SocketService {
         } catch (error) {
           }
       });
-      // Show in-app notification if user is not in the same chat
+      // IMPORTANT: Only show in-app notification if:
+      // 1. Message is NOT from current user (sender should never see their own notification)
+      // 2. User is NOT currently in the chat (don't show banner if already viewing the chat)
+      console.log('🔍 [SOCKET] New message received:', {
+        senderId: message.sender.id,
+        currentUserId: this.currentUserId,
+        chatId: message.chatId,
+        currentChatId: this.currentChatId,
+        isSender: message.sender.id === this.currentUserId,
+        isInChat: this.isUserInCurrentChat(message.chatId)
+      });
+      
       if (message.sender.id !== this.currentUserId && !this.isUserInCurrentChat(message.chatId)) {
+        console.log('📬 [SOCKET] Showing notification banner for message from:', message.sender.username);
         DeviceEventEmitter.emit('showNotificationBanner', {
           title: message.sender.username,
           body: message.text || message.content || 'sent you a message',
@@ -139,8 +151,11 @@ class SocketService {
             router.push(`/chat/${message.chatId}`);
           }
         });
-      } else {
-        }
+      } else if (message.sender.id === this.currentUserId) {
+        console.log('🔕 [SOCKET] Suppressing notification - message is from current user');
+      } else if (this.isUserInCurrentChat(message.chatId)) {
+        console.log('🔕 [SOCKET] Suppressing notification - user is in this chat');
+      }
     });
     this.socket.on('message_status_updated', (data: { messageId: string; status: string }) => {
       // Update message status in UI

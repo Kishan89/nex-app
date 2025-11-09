@@ -344,6 +344,13 @@ class FCMService {
     if (appState === 'active') {
       // Skip chat messages since socket service handles them with avatars
       if (data.type === 'message') {
+        // IMPORTANT: Don't show notification if user is in the current chat
+        // The notification should only show in the banner when user is NOT in the chat
+        if (data.chatId && this.getCurrentChatId() === data.chatId) {
+          console.log('🔕 [FCM] Suppressing notification - user is in this chat:', data.chatId);
+          return;
+        }
+        
         // Check if user is currently sending a message in this chat
         if (data.chatId && this.isUserSendingMessage(data.chatId)) {
           // Clear the sending flag after a short delay

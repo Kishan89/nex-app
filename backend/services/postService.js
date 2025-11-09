@@ -367,12 +367,18 @@ class PostService {
       }
 
       // OPTIMIZED: Single query with OR condition for followed users
+      // IMPORTANT: Exclude anonymous posts from Following feed (can't follow anonymous users)
       const posts = await prisma.post.findMany({
         where: {
-          OR: [
-            { isLive: true },  // Always show live posts
-            { isPinned: true }, // Always show pinned posts
-            { userId: { in: followedUserIds } } // Show posts from followed users
+          AND: [
+            { isAnonymous: false }, // Exclude anonymous posts from Following feed
+            {
+              OR: [
+                { isLive: true },  // Always show live posts
+                { isPinned: true }, // Always show pinned posts
+                { userId: { in: followedUserIds } } // Show posts from followed users
+              ]
+            }
           ]
         },
         include: {
