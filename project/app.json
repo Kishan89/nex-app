@@ -3,7 +3,7 @@
     "name": "Nexeed",
     "slug": "nexeed-social-app",
     "scheme": "boltnexeed",
-    "version": "1.1.6",
+    "version": "1.1.9",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -80,7 +80,7 @@
         "android.permission.READ_MEDIA_IMAGES"
       ],
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.mycompany.nexeed1",
-      "versionCode": 18
+      "versionCode": 21
     },
     "web": {
       "favicon": "./assets/favicon.png"

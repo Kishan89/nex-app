@@ -40,6 +40,7 @@ import { apiService } from '@/lib/api';
 import { ReplySkeleton } from './skeletons';
 import { getDisplayUser, ANONYMOUS_AVATAR } from '@/lib/commentUtils';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'expo-router';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PANEL_WIDTH = SCREEN_WIDTH; // Full width like YouTube
 const PANEL_HEIGHT = SCREEN_HEIGHT; // Full height like YouTube
@@ -81,6 +82,7 @@ export default function CommentReplyPanel({
   const [isAnonymous, setIsAnonymous] = useState(false);
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
+  const router = useRouter();
   
   // Check if current user is the post owner AND post is anonymous
   const isPostOwner = postOwnerId === currentUserId;
@@ -463,7 +465,16 @@ export default function CommentReplyPanel({
     return (
       <View key={reply.id} style={styles.replyItem}>
         <View style={styles.replyItemRow}>
-          <TouchableOpacity onPress={reply.isAnonymous ? undefined : undefined} activeOpacity={reply.isAnonymous ? 1 : 0.7}>
+          <TouchableOpacity 
+            onPress={reply.isAnonymous ? undefined : () => {
+              const userId = reply.user?.id || reply.userId;
+              if (userId && userId !== 'unknown' && userId !== 'undefined' && userId.trim() !== '') {
+                onClose();
+                setTimeout(() => router.push(`/profile/${userId}`), 100);
+              }
+            }} 
+            activeOpacity={reply.isAnonymous ? 1 : 0.7}
+          >
             <Image 
               source={reply.isAnonymous ? ANONYMOUS_AVATAR : { uri: getDisplayUser(reply, reply.isAnonymous).avatar || 'https://placehold.co/40' }} 
               style={styles.replyAvatar} 
@@ -472,7 +483,16 @@ export default function CommentReplyPanel({
           <View style={styles.replyContent}>
           <View style={styles.replyHeader}>
             <View style={styles.replyUserInfo}>
-              <TouchableOpacity onPress={reply.isAnonymous ? undefined : undefined} activeOpacity={reply.isAnonymous ? 1 : 0.7}>
+              <TouchableOpacity 
+                onPress={reply.isAnonymous ? undefined : () => {
+                  const userId = reply.user?.id || reply.userId;
+                  if (userId && userId !== 'unknown' && userId !== 'undefined' && userId.trim() !== '') {
+                    onClose();
+                    setTimeout(() => router.push(`/profile/${userId}`), 100);
+                  }
+                }} 
+                activeOpacity={reply.isAnonymous ? 1 : 0.7}
+              >
                 <Text style={styles.replyUsername}>{getDisplayUser(reply, reply.isAnonymous).username}</Text>
               </TouchableOpacity>
               <Text style={styles.replyTime}>
@@ -567,7 +587,16 @@ export default function CommentReplyPanel({
               {/* Parent Comment */}
               <View style={styles.parentCommentContainer}>
                 <View style={styles.parentComment}>
-                  <TouchableOpacity onPress={parentComment.isAnonymous ? undefined : undefined} activeOpacity={parentComment.isAnonymous ? 1 : 0.7}>
+                  <TouchableOpacity 
+                    onPress={parentComment.isAnonymous ? undefined : () => {
+                      const userId = parentComment.user?.id || parentComment.userId;
+                      if (userId && userId !== 'unknown' && userId !== 'undefined' && userId.trim() !== '') {
+                        onClose();
+                        setTimeout(() => router.push(`/profile/${userId}`), 100);
+                      }
+                    }} 
+                    activeOpacity={parentComment.isAnonymous ? 1 : 0.7}
+                  >
                     <Image 
                       source={parentComment.isAnonymous ? ANONYMOUS_AVATAR : { uri: getDisplayUser(parentComment, parentComment.isAnonymous).avatar || 'https://placehold.co/40' }} 
                       style={styles.parentAvatar} 
@@ -576,7 +605,16 @@ export default function CommentReplyPanel({
                   <View style={styles.parentContent}>
                     <View style={styles.parentHeader}>
                     <View style={styles.parentUserInfo}>
-                        <TouchableOpacity onPress={parentComment.isAnonymous ? undefined : undefined} activeOpacity={parentComment.isAnonymous ? 1 : 0.7}>
+                        <TouchableOpacity 
+                          onPress={parentComment.isAnonymous ? undefined : () => {
+                            const userId = parentComment.user?.id || parentComment.userId;
+                            if (userId && userId !== 'unknown' && userId !== 'undefined' && userId.trim() !== '') {
+                              onClose();
+                              setTimeout(() => router.push(`/profile/${userId}`), 100);
+                            }
+                          }} 
+                          activeOpacity={parentComment.isAnonymous ? 1 : 0.7}
+                        >
                           <Text style={styles.parentUsername}>{getDisplayUser(parentComment, parentComment.isAnonymous).username}</Text>
                         </TouchableOpacity>
                         <Text style={styles.parentTime}>

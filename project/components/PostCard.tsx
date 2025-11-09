@@ -199,26 +199,32 @@ const PostCard = React.memo(function PostCard({
           />
         </TouchableOpacity>
         <View style={styles.contentSection}>
-          {/* Username and more button */}
+          {/* Username, timestamp and more button */}
           <View style={styles.userInfoHeader}>
-            <View style={styles.usernameRow}>
-              <TouchableOpacity onPress={post.isAnonymous ? undefined : onUserPress} activeOpacity={post.isAnonymous ? 1 : 0.7} style={styles.usernameContainer}>
-                <Text style={[styles.username, { color: colors.text }]} numberOfLines={1}>
-                  {post.isAnonymous ? 'Anonymous' : post.username}
-                </Text>
-              </TouchableOpacity>
-              {post.isPinned && (
-                <View style={[styles.pinnedBadge, { backgroundColor: '#004aad15', borderColor: '#004aad30' }]}>
-                  <Pin size={13} color="#004aad" strokeWidth={2.8} fill="#004aad" />
-                  <Text style={[styles.pinnedText, { color: '#004aad' }]}>Pinned</Text>
-                </View>
-              )}
-              {post.isLive && (
-                <View style={[styles.liveBadge, { backgroundColor: '#ff000015', borderColor: '#ff000030' }]}>
-                  <Animated.View style={[styles.liveIndicator, liveAnimatedStyle]} />
-                  <Text style={[styles.liveText, { color: '#ff0000' }]}>Live</Text>
-                </View>
-              )}
+            <View style={styles.userInfoColumn}>
+              <View style={styles.usernameRow}>
+                <TouchableOpacity onPress={post.isAnonymous ? undefined : onUserPress} activeOpacity={post.isAnonymous ? 1 : 0.7} style={styles.usernameContainer}>
+                  <Text style={[styles.username, { color: colors.text }]} numberOfLines={1}>
+                    {post.isAnonymous ? 'Anonymous' : post.username}
+                  </Text>
+                </TouchableOpacity>
+                {post.isPinned && (
+                  <View style={[styles.pinnedBadge, { backgroundColor: '#004aad15', borderColor: '#004aad30' }]}>
+                    <Pin size={13} color="#004aad" strokeWidth={2.8} fill="#004aad" />
+                    <Text style={[styles.pinnedText, { color: '#004aad' }]}>Pinned</Text>
+                  </View>
+                )}
+                {post.isLive && (
+                  <View style={[styles.liveBadge, { backgroundColor: '#ff000015', borderColor: '#ff000030' }]}>
+                    <Animated.View style={[styles.liveIndicator, liveAnimatedStyle]} />
+                    <Text style={[styles.liveText, { color: '#ff0000' }]}>Live</Text>
+                  </View>
+                )}
+              </View>
+              {/* Timestamp parallel to profile picture */}
+              <Text style={[styles.timeStamp, { color: colors.textMuted }]}>
+                {post.createdAt?.includes('ago') || post.createdAt === 'now' ? post.createdAt : `${post.createdAt} ago`}
+              </Text>
             </View>
             <TouchableOpacity 
               ref={moreButtonRef}
@@ -236,10 +242,6 @@ const PostCard = React.memo(function PostCard({
               <MoreVertical size={20} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
-          {/* Timestamp below username */}
-          <Text style={[styles.timeStamp, { color: colors.textMuted }]}>
-            {post.createdAt?.includes('ago') || post.createdAt === 'now' ? post.createdAt : `${post.createdAt} ago`}
-          </Text>
           {/* Content under username with more space */}
           <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
             {post.content && (
@@ -419,8 +421,7 @@ const styles = StyleSheet.create({
   },
   postHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   userAvatar: { 
     width: ComponentStyles.avatar.medium,
@@ -434,64 +435,69 @@ const styles = StyleSheet.create({
   },
   userInfoHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: Spacing.xs,
+  },
+  userInfoColumn: {
+    flexDirection: 'column',
+    flex: 1,
   },
   usernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
     gap: Spacing.xs,
   },
   usernameContainer: {
     flexShrink: 1,
   },
   username: { 
-    fontSize: FontSizes.md, 
-    fontWeight: FontWeights.semibold, 
+    fontSize: 16, 
+    fontWeight: FontWeights.bold, 
     color: Colors.text,
   },
   pinnedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 9,
+    gap: 3,
     borderWidth: 1,
     borderColor: '#004aad40',
   },
   pinnedText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
+    lineHeight: 12,
   },
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 9,
+    gap: 3,
     borderWidth: 1,
     borderColor: '#ff000040',
   },
   liveIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: '#ff0000',
   },
   liveText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
+    lineHeight: 12,
   },
   timeStamp: { 
     fontSize: FontSizes.xs, 
     color: Colors.textMuted,
-    marginBottom: Spacing.xs,
+    marginTop: 2,
   },
   postContent: { 
     fontSize: 16,
@@ -499,12 +505,13 @@ const styles = StyleSheet.create({
     color: Colors.text, 
     marginBottom: Spacing.sm,
     fontWeight: FontWeights.regular,
-    marginTop: Spacing.sm, // Space between timestamp and content
+    marginTop: Spacing.xs,
   },
   postImage: { 
     width: '100%', 
     height: 200, // Reduced height for compactness
     borderRadius: BorderRadius.md, // Smaller radius
+    marginTop: Spacing.sm, // Space between timestamp and image
     marginBottom: Spacing.sm, // Slight spacing before actions
     backgroundColor: Colors.backgroundTertiary,
   },

@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     fontWeight: FontWeights.regular,
   },
   readMoreButton: {
-    marginTop: Spacing.xs,
+    marginTop: -6,
     alignSelf: 'flex-start',
   },
   readMoreText: {

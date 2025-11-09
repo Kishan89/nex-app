@@ -27,6 +27,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useListen } from '@/context/ListenContext';
 import { useCommentReply } from '@/context/CommentReplyContext';
 import PostCard from './PostCard';
+import { useRouter } from 'expo-router';
 import { CommentsSkeleton } from './skeletons';
 import { commentCache } from '@/store/commentCache';
 import { getDisplayUser, ANONYMOUS_AVATAR } from '@/lib/commentUtils';
@@ -91,6 +92,7 @@ export default function CommentsModal({
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   const { openCommentReplies } = useCommentReply();
+  const router = useRouter();
   // Get real-time post data and interactions from ListenContext
   const { posts, postInteractions, getPostById } = useListen();
   // Get the current post with real-time updates
@@ -571,16 +573,36 @@ export default function CommentsModal({
             isReply && styles.replyItem
           ]}
         >
-          <Image 
-            source={comment.isAnonymous ? ANONYMOUS_AVATAR : { uri: getDisplayUser(comment, comment.isAnonymous).avatar || 'https://placehold.co/40' }} 
-            style={isReply ? styles.replyAvatar : styles.commentAvatar} 
-          />
+          <TouchableOpacity 
+            onPress={comment.isAnonymous ? undefined : () => {
+              const userId = comment.user?.id || comment.userId;
+              if (userId && userId !== 'unknown' && userId !== 'undefined' && userId.trim() !== '') {
+                router.push(`/profile/${userId}`);
+              }
+            }} 
+            activeOpacity={comment.isAnonymous ? 1 : 0.7}
+          >
+            <Image 
+              source={comment.isAnonymous ? ANONYMOUS_AVATAR : { uri: getDisplayUser(comment, comment.isAnonymous).avatar || 'https://placehold.co/40' }} 
+              style={isReply ? styles.replyAvatar : styles.commentAvatar} 
+            />
+          </TouchableOpacity>
           <View style={styles.commentContent}>
             <View style={styles.commentHeader}>
               <View style={styles.commentUserInfo}>
-                <Text style={styles.commentUsername}>
-                  {getDisplayUser(comment, comment.isAnonymous).username}
-                </Text>
+                <TouchableOpacity 
+                  onPress={comment.isAnonymous ? undefined : () => {
+                    const userId = comment.user?.id || comment.userId;
+                    if (userId && userId !== 'unknown' && userId !== 'undefined' && userId.trim() !== '') {
+                      router.push(`/profile/${userId}`);
+                    }
+                  }} 
+                  activeOpacity={comment.isAnonymous ? 1 : 0.7}
+                >
+                  <Text style={styles.commentUsername}>
+                    {getDisplayUser(comment, comment.isAnonymous).username}
+                  </Text>
+                </TouchableOpacity>
                 <Text style={styles.commentTime}>
                   {comment.time?.includes('ago') || comment.time === 'now' ? comment.time : `${comment.time} ago`}
                 </Text>

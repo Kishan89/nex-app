@@ -10,6 +10,8 @@ import {
   StatusBar,
   Platform,
   Alert,
+  Share,
+  Linking,
 } from 'react-native';
 import {
   Palette,
@@ -43,25 +45,53 @@ export default function SettingsScreen() {
   useEffect(() => {
     trackScreenView('settings_screen');
   }, []);
-  const handleRateApp = () => {
-    Alert.alert(
-      'Rate App',
-      'Thank you for using our app! Please rate us on the Play Store.',
-      [{ text: 'OK', style: 'default' }],
-      {
-        userInterfaceStyle: 'dark',
+  const handleRateApp = async () => {
+    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.mycompany.nexeed1';
+    try {
+      const supported = await Linking.canOpenURL(playStoreUrl);
+      if (supported) {
+        await Linking.openURL(playStoreUrl);
+      } else {
+        Alert.alert(
+          'Error',
+          'Unable to open Play Store. Please try again later.',
+          [{ text: 'OK', style: 'default' }]
+        );
       }
-    );
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        'Unable to open Play Store. Please try again later.',
+        [{ text: 'OK', style: 'default' }]
+      );
+    }
   };
-  const handleShareApp = () => {
-    Alert.alert(
-      'Share App',
-      'Share this amazing app with your friends!',
-      [{ text: 'OK', style: 'default' }],
-      {
-        userInterfaceStyle: 'dark',
+  const handleShareApp = async () => {
+    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.mycompany.nexeed1';
+    const message = `Check out Nexeed - Connect, share, and discover with friends!\n\nDownload now: ${playStoreUrl}`;
+    
+    try {
+      const result = await Share.share({
+        message: message,
+        title: 'Share Nexeed App',
+      });
+      
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // Shared with activity type of result.activityType
+        } else {
+          // Shared
+        }
+      } else if (result.action === Share.dismissedAction) {
+        // Dismissed
       }
-    );
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        'Unable to share the app. Please try again later.',
+        [{ text: 'OK', style: 'default' }]
+      );
+    }
   };
   // Appearance Modal
   const AppearanceModal = () => (
@@ -160,7 +190,7 @@ export default function SettingsScreen() {
             ]}
           >
             <Text style={[styles.aboutTitle, { color: colors.text }]}>Nexeed Social</Text>
-            <Text style={[styles.aboutVersion, { color: colors.textMuted }]}>Version 1.0.0</Text>
+            <Text style={[styles.aboutVersion, { color: colors.textMuted }]}>Version 1.1.9</Text>
             <Text style={[styles.aboutDescription, { color: colors.textSecondary }]}>
               Connect, share, and discover with friends in a beautiful social experience.
             </Text>
@@ -225,7 +255,7 @@ export default function SettingsScreen() {
       onPress: handleShareApp,
       section: 'App',
     },
-    { icon: Download, title: 'App Version', subtitle: 'v1.0.0', section: 'App' },
+    { icon: Download, title: 'App Version', subtitle: 'v1.1.9', section: 'App' },
     // Support Section
     {
       icon: Info,
