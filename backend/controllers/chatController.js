@@ -130,9 +130,9 @@ class ChatController {
         throw new BadRequestError(ERROR_MESSAGES.USER_ID_REQUIRED);
       }
       
-      // Use higher limit (500) if not specified to get all messages
+      // Use higher limit (1000) if not specified to get all messages
       // This ensures app reopen fetches all messages, not just 15
-      const messageLimit = parseInt(limit) || 500;
+      const messageLimit = parseInt(limit) || 1000;
       
       const messages = await chatService.getChatMessages(chatId, { 
         page: parseInt(page) || PAGINATION.DEFAULT_PAGE, 

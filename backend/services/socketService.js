@@ -168,16 +168,15 @@ class SocketService {
           tempMessageId // Include temp ID for replacement
         };
 
-        // Broadcast message to ALL users in the chat (including sender for consistency)
-        // Sender's ChatScreen will handle duplicate detection
-        // This ensures sender receives message even if they leave ChatScreen before callback
-        logger.info('📡 [SOCKET] Broadcasting message to chat room (including sender)', { 
+        // Broadcast message to OTHER users in the chat (excluding sender to prevent duplicates)
+        // Sender will receive confirmation via callback
+        logger.info('📡 [SOCKET] Broadcasting message to chat room (excluding sender)', { 
           chatId, 
           messageId: message.id, 
           senderId: userId,
           roomName: `chat:${chatId}`
         });
-        this.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
+        socket.to(`chat:${chatId}`).emit('new_message', socketMessage);
 
         // Send acknowledgment back to sender with delivery confirmation
         if (callback && typeof callback === 'function') {

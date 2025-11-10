@@ -196,9 +196,9 @@ class ChatService {
    */
   async getChatMessages(chatId, options = {}) {
     try {
-      // Use a much higher limit to get all messages (500 instead of 50)
+      // Use a much higher limit to get all messages (1000 instead of 50)
       // This ensures we get all messages when app reopens
-      const { page = PAGINATION.DEFAULT_PAGE, limit = 500, userId, cursor } = options;
+      const { page = PAGINATION.DEFAULT_PAGE, limit = 1000, userId, cursor } = options;
       
       logger.info('📥 [GET MESSAGES] Fetching messages', { chatId, userId, limit, cursor });
       

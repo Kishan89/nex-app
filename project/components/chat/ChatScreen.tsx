@@ -135,57 +135,48 @@ const ChatScreen = React.memo(function ChatScreen({
     
     console.log('📥 [LOAD MESSAGES] Starting...', { chatId, forceRefresh, currentMessageCount: messages.length });
     
-    // 🚀 INSTANT LOADING: Check ultra-fast cache first (0ms delay)
-    if (!forceRefresh) {
-      const instantMessages = ultraFastChatCache.getInstantMessages(chatId);
-      if (instantMessages.length > 0) {
-        console.log('⚡ [CACHE HIT] Loaded from ultra-fast cache:', instantMessages.length, 'messages');
+    // If force refresh, clear ALL caches first BUT preserve temp messages
+    if (forceRefresh) {
+      console.log('🔄 [FORCE REFRESH] Bypassing all caches, fetching from database...');
+      
+      // IMPORTANT: Save temp messages before clearing cache
+      const tempMessages = messages.filter(msg => msg.id.startsWith('temp-'));
+      if (tempMessages.length > 0) {
+        console.log('💾 [PRESERVE] Saving', tempMessages.length, 'temp messages before cache clear');
+      }
+      
+      console.log('🗑️ [CACHE CLEAR] Clearing all caches for chat:', chatId);
+      ultraFastChatCache.clearChatCache(chatId);
+      chatMessageCache.clearChatCache(chatId);
+      
+      // Don't return, continue to fetch from database
+      // Temp messages will be merged with fresh messages later
+    } else {
+      // PRIORITY 1: Ultra-fast cache (instant load)
+      const ultraFastCached = ultraFastChatCache.getInstantMessages(chatId);
+      if (ultraFastCached && ultraFastCached.length > 0) {
+        console.log('⚡ [CACHE HIT] Loaded from ultra-fast cache:', ultraFastCached.length, 'messages');
         // Filter out temp messages to prevent showing duplicates with stuck "sending" status
-        const filteredMessages = instantMessages.filter(msg => !msg.id.startsWith('temp-'));
+        const filteredMessages = ultraFastCached.filter(msg => !msg.id.startsWith('temp-'));
         setMessages(filteredMessages);
         setLoading(false);
-        // Auto scroll immediately
-        safeSetTimeout(() => scrollToBottom(false), 0);
-        // Background sync after 100ms (non-blocking)
-        safeSetTimeout(() => {
+        // Background refresh
+        setTimeout(() => {
           if (!isSending) {
             loadMessages(true);
           }
-        }, 100);
+        }, 300);
         return;
       }
-    } else {
-      console.log('🔄 [FORCE REFRESH] Bypassing all caches, fetching from database...');
-    }
-    // Initialize persistence for this chat (background)
-    messagePersistence.initializeChatPersistence(chatId).catch(console.error);
-    // PRIORITY 1: Check ChatContext global messages
-    const globalMessages = getChatMessages(chatId);
-    if (globalMessages.length > 0 && !forceRefresh) {
-      // Filter out temp messages to prevent showing duplicates with stuck "sending" status
-      const filteredMessages = globalMessages.filter(msg => !msg.id.startsWith('temp-'));
-      setMessages(filteredMessages);
-      setLoading(false);
-      // Cache for future instant access (without temp messages)
-      ultraFastChatCache.cacheMessages(chatId, filteredMessages, chatData);
-      // Background refresh
-      setTimeout(() => {
-        if (!isSending) {
-          loadMessages(true);
-        }
-      }, 500);
-      return;
-    }
-    // PRIORITY 2: Check persistence (only if not force refresh)
-    if (!forceRefresh) {
+      // PRIORITY 2: Try to get from global state first (instant)
       try {
-        const persistedMessages = await messagePersistence.getPersistedMessages(chatId);
-        if (persistedMessages.length > 0) {
+        const globalMessages = getChatMessages(chatId);
+        if (globalMessages && globalMessages.length > 0) {
           // Filter out temp messages to prevent showing duplicates with stuck "sending" status
-          const filteredMessages = persistedMessages.filter(msg => !msg.id.startsWith('temp-'));
+          const filteredMessages = globalMessages.filter(msg => !msg.id.startsWith('temp-'));
           setMessages(filteredMessages);
           setLoading(false);
-          // Cache for instant future access (without temp messages)
+          // Cache in ultra-fast cache (without temp messages)
           ultraFastChatCache.cacheMessages(chatId, filteredMessages, chatData);
           // Background refresh
           setTimeout(() => {
@@ -275,7 +266,34 @@ const ChatScreen = React.memo(function ChatScreen({
           return a.id.localeCompare(b.id);
         });
         // IMPROVED: Merge server messages with global state and local messages
-        const finalMessages = mergeServerMessages(chatId, formattedMessages);
+        let finalMessages = mergeServerMessages(chatId, formattedMessages);
+        
+        // If force refresh, merge with existing temp messages
+        if (forceRefresh) {
+          const currentTempMessages = messages.filter(msg => msg.id.startsWith('temp-'));
+          if (currentTempMessages.length > 0) {
+            console.log('🔄 [MERGE] Merging', currentTempMessages.length, 'temp messages with fresh data');
+            // Add temp messages that don't have a real message yet
+            currentTempMessages.forEach(tempMsg => {
+              // Check if this temp message was replaced by a real message
+              const hasRealMessage = finalMessages.some(msg => 
+                msg.text === tempMsg.text && 
+                msg.sender?.id === tempMsg.sender?.id &&
+                !msg.id.startsWith('temp-')
+              );
+              if (!hasRealMessage) {
+                finalMessages.push(tempMsg);
+              }
+            });
+            // Re-sort after adding temp messages
+            finalMessages.sort((a, b) => {
+              if (a.id.startsWith('temp-') && !b.id.startsWith('temp-')) return 1;
+              if (!a.id.startsWith('temp-') && b.id.startsWith('temp-')) return -1;
+              return a.id.localeCompare(b.id);
+            });
+          }
+        }
+        
         console.log('✅ [MESSAGES] Setting', finalMessages.length, 'messages in state');
         setMessages(finalMessages);
         
@@ -413,26 +431,44 @@ const ChatScreen = React.memo(function ChatScreen({
     setTimeout(() => scrollToBottom(true), 100);
     // Final scroll after keyboard dismiss
     setTimeout(() => scrollToBottom(true), 300);
+    
     // 📡 ASYNC BACKEND WORK - Runs in background
     const sendToBackend = async () => {
       try {
         let serverResponse = null;
-        // Try Socket.io first (real-time)
-        if (socketService.isSocketConnected()) {
-          try {
-            console.log('🔌 [SOCKET] Sending via socket...');
-            serverResponse = await socketService.sendMessage(chatId, messageText, tempId);
-            console.log('✅ [SOCKET] Socket response:', serverResponse);
-            
-            // NOTE: Don't replace temp message here - let socket broadcast handle it
-            // Backend broadcasts to ALL users including sender, so sender will receive
-            // the message via socket broadcast and the global listener will replace the temp message
-            // This ensures consistent behavior whether sender stays in ChatScreen or leaves
-          } catch (socketError) {
-            console.log('❌ [SOCKET] Socket error:', socketError);
-          }
+        console.log('🔌 [SOCKET] Sending via socket...');
+        serverResponse = await socketService.sendMessage(chatId, messageText, tempId);
+        console.log('✅ [SOCKET] Socket response:', serverResponse);
+        
+        // Replace temp message with server message (sender doesn't receive broadcast)
+        if (serverResponse && serverResponse.success && serverResponse.messageId) {
+          const serverMessage: Message = {
+            id: serverResponse.messageId,
+            text: messageText,
+            isUser: true,
+            timestamp: serverResponse.timestamp || new Date().toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            }),
+            status: 'sent',
+            sender: { id: user.id, username: user.username || 'You' }
+          };
+          
+          // Replace temp message with real message
+          setMessages(prev => prev.map(msg => 
+            msg.id === tempId ? serverMessage : msg
+          ));
+          
+          // Update cache
+          ultraFastChatCache.replaceMessageInstantly(chatId, tempId, serverMessage);
+          
+          // Update global state
+          setTimeout(() => {
+            addMessageToChat(chatId, serverMessage, true);
+          }, 0);
         }
-        // Fallback to API if socket failed or not connected
+        
         if (!serverResponse || !serverResponse.success) {
           console.log('🌐 [API] Falling back to HTTP API...');
           serverResponse = await apiService.sendMessage(chatId, { 
@@ -442,8 +478,36 @@ const ChatScreen = React.memo(function ChatScreen({
           });
           console.log('✅ [API] API response:', serverResponse);
           
-          // NOTE: Don't replace temp message here either - socket broadcast handles it
-          // HTTP API also triggers socket broadcast to all users including sender
+          
+          // HTTP API fallback - also need to replace temp message if successful
+          if (serverResponse && (serverResponse.messageId || serverResponse.id)) {
+            const realMessageId = serverResponse.messageId || serverResponse.id;
+            const serverMessage: Message = {
+              id: realMessageId,
+              text: messageText,
+              isUser: true,
+              timestamp: new Date().toLocaleTimeString([], {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              }),
+              status: 'sent',
+              sender: { id: user.id, username: user.username || 'You' }
+            };
+            
+            // Replace temp message with real message
+            setMessages(prev => prev.map(msg => 
+              msg.id === tempId ? serverMessage : msg
+            ));
+            
+            // Update cache
+            ultraFastChatCache.replaceMessageInstantly(chatId, tempId, serverMessage);
+            
+            // Update global state
+            setTimeout(() => {
+              addMessageToChat(chatId, serverMessage, true);
+            }, 0);
+          }
         }
         
         // Verify message was sent successfully
