@@ -185,27 +185,63 @@ class ChatController {
       
       const message = await chatService.sendMessage({ content, chatId, senderId });
       
-      res.status(HTTP_STATUS.CREATED).json(message);
+      // Format timestamp for HTTP response
+      const responseMessage = {
+        ...message,
+        timestamp: message.timestamp 
+          ? new Date(message.timestamp).toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            })
+          : new Date().toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            })
+      };
+      
+      res.status(HTTP_STATUS.CREATED).json(responseMessage);
       
       setImmediate(async () => {
         try {
           const socketService = require('../services/socketService');
           if (socketService.io) {
+            // Format timestamp to "11:42 pm" format
+            const formattedTimestamp = message.timestamp 
+              ? new Date(message.timestamp).toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                })
+              : new Date().toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                });
+                
             const socketMessage = {
               id: message.id,
               text: message.text,
               content: message.text,
               isUser: false,
-              timestamp: message.timestamp,
+              timestamp: formattedTimestamp,
               status: message.status,
               sender: message.sender,
               chatId
             };
             
-            // Broadcast to ALL users in the chat (including sender for consistency)
-            // This ensures sender receives message even if they navigate away before response
-            // Frontend will handle duplicate detection
-            socketService.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
+            // Get sender's socket ID to exclude them from broadcast
+            const senderSocketId = socketService.getUserSocketId(senderId);
+            
+            if (senderSocketId) {
+              // Broadcast to OTHER users in the chat (excluding sender to prevent duplicates)
+              // Sender already has the message from HTTP response
+              socketService.io.to(`chat:${chatId}`).except(senderSocketId).emit('new_message', socketMessage);
+            } else {
+              // If sender not connected via socket, broadcast to all in the room
+              socketService.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
+            }
             
             // Check if this is the first message in the chat
             const messageCount = await prisma.message.count({

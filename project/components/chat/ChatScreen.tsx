@@ -779,41 +779,11 @@ const ChatScreen = React.memo(function ChatScreen({
         tempMessageId: socketMessage.tempMessageId,
         senderId: socketMessage.sender?.id,
         currentUserId: user.id,
-        isFromCurrentUser: socketMessage.sender?.id === user.id,
-        text: socketMessage.text?.substring(0, 20) + '...',
-        chatId: socketMessage.chatId
-      });
       
-      // Only add message if it's for this chat
-      if (socketMessage.chatId === chatId) {
-        const newMessage: Message = {
-          id: socketMessage.id,
-          text: socketMessage.text || socketMessage.content,
-          isUser: socketMessage.sender?.id === user.id,
-          timestamp: fixServerTimestamp(socketMessage.timestamp) || formatMessageTime(new Date()),
-          status: socketMessage.sender?.id === user.id ? 'sent' : 'delivered', // Only delivered for incoming messages
-          sender: socketMessage.sender
-        };
-        // IMPROVED: Better duplicate check with temp message replacement
-        let shouldUpdateGlobalState = false;
-        let finalMessage: Message | null = null;
-        
-        setMessages(prev => {
-          console.log('🔍 [CHECK] Current messages count:', prev.length);
-          
-          // Check if this exact message ID already exists (prevent duplicates)
-          if (prev.some(msg => msg.id === newMessage.id)) {
-            console.log('❌ [SKIP] Message ID already exists:', newMessage.id);
-            return prev;
-          }
-          
-          // If this is from the current user, check if we already have a temp message
-          if (socketMessage.sender?.id === user.id) {
-            console.log('👤 [CURRENT USER] Message from current user, checking for temp message');
-            
-            // Check if a temp message exists with same tempMessageId (replace it)
-            if (socketMessage.tempMessageId) {
-              console.log('🔍 [TEMP ID] Looking for temp message:', socketMessage.tempMessageId);
+      // Check if this exact message ID already exists (prevent duplicates)
+      if (prev.some(msg => msg.id === newMessage.id)) {
+        console.log('❌ [SKIP] Message ID already exists:', newMessage.id);
+        return prev;
               const tempMsgIndex = prev.findIndex(msg => msg.id === socketMessage.tempMessageId);
               if (tempMsgIndex !== -1) {
                 console.log('✅ [REPLACE] Found temp message, replacing with real message');

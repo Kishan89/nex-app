@@ -156,12 +156,25 @@ class SocketService {
         }
 
         // Format message for socket emission
+        // Format timestamp to "11:42 pm" format before sending
+        const formattedTimestamp = message.timestamp 
+          ? new Date(message.timestamp).toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            })
+          : new Date().toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            });
+            
         const socketMessage = {
           id: message.id,
           text: message.content || message.text,
           content: message.content || message.text,
           isUser: false, // Will be determined by receiver
-          timestamp: message.timestamp,
+          timestamp: formattedTimestamp,
           status: MESSAGE_STATUS.DELIVERED, // Mark as delivered since saved to DB
           sender: message.sender,
           chatId,
@@ -180,12 +193,25 @@ class SocketService {
 
         // Send acknowledgment back to sender with delivery confirmation
         if (callback && typeof callback === 'function') {
+          // Format timestamp for callback response too
+          const formattedCallbackTimestamp = message.timestamp 
+            ? new Date(message.timestamp).toLocaleTimeString([], {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              })
+            : new Date().toLocaleTimeString([], {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              });
+              
           const ackResponse = {
             success: true,
             messageId: message.id,
             tempMessageId,
             status: MESSAGE_STATUS.DELIVERED,
-            timestamp: message.timestamp
+            timestamp: formattedCallbackTimestamp
           };
           callback(ackResponse);
           logger.debug('✅ [SOCKET] Acknowledgment sent to sender', { messageId: message.id });
