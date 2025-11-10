@@ -3,7 +3,7 @@
     "name": "Nexeed",
     "slug": "nexeed-social-app",
     "scheme": "boltnexeed",
-    "version": "1.1.9",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

@@ -100,18 +100,60 @@ class SocketService {
     socket.on('send_message', async (data, callback) => {
       try {
         const { chatId, content, tempMessageId } = data;
-        logger.info('Socket message send initiated', { userId, chatId, tempMessageId, contentPreview: content.substring(0, 50) + '...' });
-
-        // Save message to database
-        const message = await chatService.sendMessage({
-          content,
-          chatId,
-          senderId: userId
+        logger.info('📤 [SOCKET] Message send initiated', { 
+          userId, 
+          chatId, 
+          tempMessageId, 
+          contentLength: content?.length,
+          contentPreview: content?.substring(0, 50) + '...' 
         });
-        logger.info('Message saved to database', { messageId: message.id, chatId });
+
+        // Validate input
+        if (!content || !chatId) {
+          logger.error('❌ [SOCKET] Invalid message data', { content: !!content, chatId: !!chatId });
+          throw new Error('Invalid message data: content and chatId are required');
+        }
+
+        // Save message to database with comprehensive error handling
+        let message;
+        try {
+          message = await chatService.sendMessage({
+            content,
+            chatId,
+            senderId: userId
+          });
+          
+          if (!message || !message.id) {
+            logger.error('❌ [SOCKET] Message creation returned invalid result', { message });
+            throw new Error('Failed to create message - invalid response from database');
+          }
+          
+          logger.info('✅ [SOCKET] Message saved to database', { 
+            messageId: message.id, 
+            chatId,
+            timestamp: message.timestamp 
+          });
+        } catch (dbError) {
+          logger.error('❌ [SOCKET] Database error while saving message', { 
+            error: dbError.message, 
+            stack: dbError.stack,
+            chatId,
+            userId 
+          });
+          throw new Error(`Database error: ${dbError.message}`);
+        }
 
         // Update message status to DELIVERED since it's saved in DB
-        await this.updateMessageStatus(message.id, 'DELIVERED');
+        try {
+          await this.updateMessageStatus(message.id, 'DELIVERED');
+          logger.debug('✅ [SOCKET] Message status updated to DELIVERED', { messageId: message.id });
+        } catch (statusError) {
+          // Don't fail the whole operation if status update fails
+          logger.warn('⚠️ [SOCKET] Failed to update message status', { 
+            error: statusError.message, 
+            messageId: message.id 
+          });
+        }
 
         // Format message for socket emission
         const socketMessage = {
@@ -129,39 +171,74 @@ class SocketService {
         // Broadcast message to ALL users in the chat (including sender for consistency)
         // Sender's ChatScreen will handle duplicate detection
         // This ensures sender receives message even if they leave ChatScreen before callback
-        logger.info('Broadcasting message to chat room (including sender)', { chatId, messageId: message.id, senderId: userId });
+        logger.info('📡 [SOCKET] Broadcasting message to chat room (including sender)', { 
+          chatId, 
+          messageId: message.id, 
+          senderId: userId,
+          roomName: `chat:${chatId}`
+        });
         this.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
 
         // Send acknowledgment back to sender with delivery confirmation
         if (callback && typeof callback === 'function') {
-          callback({
+          const ackResponse = {
             success: true,
             messageId: message.id,
             tempMessageId,
             status: MESSAGE_STATUS.DELIVERED,
             timestamp: message.timestamp
-          });
-          logger.debug('Message acknowledgment sent', { messageId: message.id });
+          };
+          callback(ackResponse);
+          logger.debug('✅ [SOCKET] Acknowledgment sent to sender', { messageId: message.id });
         }
 
-        // Send FCM push notification to other chat participants
-        await this.sendFCMNotificationToOtherParticipants(chatId, userId, content, message);
+        // Send FCM push notification to other chat participants (non-blocking)
+        this.sendFCMNotificationToOtherParticipants(chatId, userId, content, message)
+          .catch(fcmError => {
+            logger.error('❌ [SOCKET] FCM notification error', { 
+              error: fcmError.message, 
+              chatId, 
+              messageId: message.id 
+            });
+          });
 
-        // Update chat's last message timestamp
-        await this.updateChatTimestamp(chatId);
+        // Update chat's last message timestamp (non-blocking)
+        this.updateChatTimestamp(chatId)
+          .catch(timestampError => {
+            logger.warn('⚠️ [SOCKET] Failed to update chat timestamp', { 
+              error: timestampError.message, 
+              chatId 
+            });
+          });
+          
+        logger.info('✅ [SOCKET] Message send completed successfully', { 
+          messageId: message.id, 
+          chatId 
+        });
       } catch (error) {
-        logger.error('Error sending message via socket', { error: error.message, userId, chatId: data.chatId });
+        logger.error('❌ [SOCKET] Error sending message via socket', { 
+          error: error.message, 
+          stack: error.stack,
+          userId, 
+          chatId: data?.chatId,
+          tempMessageId: data?.tempMessageId
+        });
         
         // Send error acknowledgment
         if (callback && typeof callback === 'function') {
           callback({
             success: false,
-            error: error.message,
+            error: error.message || 'Failed to send message',
             tempMessageId: data.tempMessageId
           });
         }
         
-        socket.emit('message_error', { error: error.message });
+        // Emit error event to sender
+        socket.emit('message_error', { 
+          error: error.message || 'Failed to send message',
+          chatId: data?.chatId,
+          tempMessageId: data?.tempMessageId
+        });
       }
     });
 

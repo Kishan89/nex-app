@@ -248,9 +248,21 @@ class ChatService {
    * @returns {Promise<Object>} - Created message
    */
   async sendMessage(messageData) {
+    const { createLogger } = require('../utils/logger');
+    const logger = createLogger('ChatService');
+    
     try {
       const { content, chatId, senderId } = messageData;
+      
+      logger.info('📤 [SEND MESSAGE] Starting message creation', { chatId, senderId, contentLength: content?.length });
 
+      // Validate input
+      if (!content || !chatId || !senderId) {
+        logger.error('❌ [SEND MESSAGE] Missing required fields', { content: !!content, chatId: !!chatId, senderId: !!senderId });
+        throw new Error('Missing required fields: content, chatId, or senderId');
+      }
+
+      // Check if user is a participant
       const chatParticipant = await prisma.chatParticipant.findFirst({
         where: {
           chatId,
@@ -259,9 +271,13 @@ class ChatService {
       });
 
       if (!chatParticipant) {
+        logger.error('❌ [SEND MESSAGE] User is not a participant', { chatId, senderId });
         throw new Error('User is not a participant in this chat');
       }
+      
+      logger.info('✅ [SEND MESSAGE] User verified as participant, creating message...');
   
+      // Create message with proper error handling
       const message = await prisma.message.create({
         data: {
           content,
@@ -279,10 +295,23 @@ class ChatService {
           }
         },
       });
+      
+      if (!message || !message.id) {
+        logger.error('❌ [SEND MESSAGE] Message creation failed - no message returned');
+        throw new Error('Failed to create message in database');
+      }
+      
+      logger.info('✅ [SEND MESSAGE] Message created successfully', { 
+        messageId: message.id, 
+        chatId, 
+        senderId,
+        timestamp: message.createdAt 
+      });
   
-      return {
+      const formattedMessage = {
         id: message.id,
         text: message.content,
+        content: message.content, // Include both for compatibility
         isUser: true,
         timestamp: message.createdAt.toISOString(),
         status: message.status.toLowerCase(),
@@ -292,7 +321,18 @@ class ChatService {
           avatar: message.sender.avatar,
         }
       };
+      
+      logger.info('✅ [SEND MESSAGE] Message formatted and ready to return', { messageId: message.id });
+      
+      return formattedMessage;
     } catch (error) {
+      const { createLogger } = require('../utils/logger');
+      const logger = createLogger('ChatService');
+      logger.error('❌ [SEND MESSAGE] Error in sendMessage', { 
+        error: error.message, 
+        stack: error.stack,
+        messageData 
+      });
       throw error;
     }
   }

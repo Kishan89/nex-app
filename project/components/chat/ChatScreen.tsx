@@ -16,7 +16,10 @@ import {
   FlatList,
   Modal,
   Linking,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, Send, MoreVertical, Trash2, UserX, Flag } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { Message } from '@/types';
@@ -77,6 +80,8 @@ const ChatScreen = React.memo(function ChatScreen({
   // Refs
   const flatListRef = useRef<FlatList>(null);
   const timeoutRefs = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const appState = useRef<AppStateStatus>(AppState.currentState);
+  const socketListenersRef = useRef<(() => void)[]>([]);
   
   // Helper function for memory-safe timeouts
   const safeSetTimeout = useCallback((callback: () => void, delay: number) => {
@@ -562,10 +567,13 @@ const ChatScreen = React.memo(function ChatScreen({
     setIsOnline(chatData.isOnline || false);
     setLastSeen(chatData.lastSeen || 'recently');
   }, [chatData]);
-  // ⚡ ULTRA-FAST INITIALIZATION
+  // ⚡ ULTRA-FAST INITIALIZATION WITH APP STATE HANDLING
   useEffect(() => {
     const initializeChat = async () => {
       const chatId = String(chatData.id);
+      
+      console.log('🚀 [INIT] Initializing chat:', chatId);
+      
       // 🚀 INSTANT: Initialize ultra-fast cache (if not already done)
       if (!ultraFastChatCache.getCacheStats().initialized) {
         ultraFastChatCache.initialize().catch(console.error);
@@ -587,7 +595,9 @@ const ChatScreen = React.memo(function ChatScreen({
       setTimeout(async () => {
         const socketInitialized = await socketService.initialize();
         if (socketInitialized) {
-          } else {
+          console.log('✅ [SOCKET] Socket initialized successfully');
+        } else {
+          console.log('⚠️ [SOCKET] Socket initialization failed, retrying...');
           // Retry connection after 3 seconds
           setTimeout(async () => {
             await socketService.initialize();
@@ -595,16 +605,47 @@ const ChatScreen = React.memo(function ChatScreen({
         }
       }, 0);
     };
+    
     initializeChat();
+    
+    // 🔄 APP STATE LISTENER: Reconnect socket when app returns from background
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      console.log('📱 [APP STATE] Changed from', appState.current, 'to', nextAppState);
+      
+      // App came back to foreground from background/inactive
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log('🔄 [RECONNECT] App returned to foreground, reconnecting socket...');
+        
+        // Force reconnect socket
+        if (!socketService.isSocketConnected()) {
+          console.log('🔌 [RECONNECT] Socket disconnected, reconnecting...');
+          await socketService.connect();
+        }
+        
+        // Reload messages from database to get any missed messages
+        console.log('📥 [RELOAD] Fetching fresh messages from database...');
+        await loadMessages(true); // Force refresh from server
+      }
+      
+      appState.current = nextAppState;
+    };
+    
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
     // Monitor socket connection status (background)
     const checkConnection = () => {
       const connected = socketService.isSocketConnected();
       if (!connected) {
+        console.log('⚠️ [MONITOR] Socket disconnected, reconnecting...');
         socketService.connect();
       }
     };
     const interval = setInterval(checkConnection, 15000); // Check every 15s
-    return () => clearInterval(interval);
+    
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
   }, [loadProfile, loadMessages]);
   // FCM Integration - Set current chat for notification suppression
   useEffect(() => {
@@ -629,12 +670,20 @@ const ChatScreen = React.memo(function ChatScreen({
       socketService.setCurrentChatId(null); // Add socket service cleanup
     };
   }, [chatData?.id, user?.id]);
-  // Socket Integration - Join chat room and handle real-time updates
+  // 🔌 SOCKET INTEGRATION - Join chat room and handle real-time updates
   useEffect(() => {
     if (!chatData?.id || !user?.id) return;
     const chatId = String(chatData.id);
+    
+    console.log('🔌 [SOCKET] Setting up socket listeners for chat:', chatId);
+    
+    // Clean up any existing listeners first
+    socketListenersRef.current.forEach(unsubscribe => unsubscribe());
+    socketListenersRef.current = [];
+    
     // Join chat room
     socketService.joinChat(chatId);
+    
     // Listen for new messages
     const handleNewMessage = (socketMessage: any) => {
       console.log('📨 [SOCKET] Received message:', {
@@ -755,19 +804,55 @@ const ChatScreen = React.memo(function ChatScreen({
     };
     // Use proper socket message listener
     const unsubscribe = socketService.onNewMessage(handleNewMessage);
+    socketListenersRef.current.push(unsubscribe);
+    
     // No status updates needed - keep only single tick
     const handleMessageStatusUpdate = (data: { messageId: string; status: string; userId?: string }) => {
       // Do nothing - we only want single tick
-      };
+    };
+    
     // Add status update listener using public method
     const unsubscribeStatusUpdates = socketService.onMessageStatusUpdate(handleMessageStatusUpdate);
+    socketListenersRef.current.push(unsubscribeStatusUpdates);
+    
+    console.log('✅ [SOCKET] Socket listeners attached for chat:', chatId);
+    
     // Cleanup
     return () => {
+      console.log('🧹 [SOCKET] Cleaning up socket listeners for chat:', chatId);
       socketService.leaveChat(chatId);
-      unsubscribe();
-      unsubscribeStatusUpdates();
+      socketListenersRef.current.forEach(unsub => unsub());
+      socketListenersRef.current = [];
     };
   }, [chatData?.id, user?.id]);
+  
+  // 🎯 FOCUS EFFECT: Reload messages when screen comes into focus (from notification or navigation)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🎯 [FOCUS] ChatScreen focused, checking for updates...');
+      
+      // If coming from notification or forceInitialRefresh is true, reload messages
+      if (forceInitialRefresh) {
+        console.log('🔄 [FOCUS] Force refresh enabled, reloading messages...');
+        loadMessages(true); // Force refresh from server
+      }
+      
+      // Ensure socket is connected
+      if (!socketService.isSocketConnected()) {
+        console.log('🔌 [FOCUS] Socket disconnected, reconnecting...');
+        socketService.connect();
+      }
+      
+      // Rejoin chat room in case we were disconnected
+      if (chatData?.id) {
+        socketService.joinChat(String(chatData.id));
+      }
+      
+      return () => {
+        console.log('👋 [FOCUS] ChatScreen unfocused');
+      };
+    }, [forceInitialRefresh, chatData?.id, loadMessages])
+  );
   
   // Helper function to render text with clickable links
   const renderTextWithLinks = useCallback((text: string, isUserMessage: boolean) => {
