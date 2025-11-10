@@ -779,65 +779,39 @@ const ChatScreen = React.memo(function ChatScreen({
         tempMessageId: socketMessage.tempMessageId,
         senderId: socketMessage.sender?.id,
         currentUserId: user.id,
+        isFromCurrentUser: socketMessage.sender?.id === user.id,
+        text: socketMessage.text?.substring(0, 20) + '...',
+        chatId: socketMessage.chatId
+      });
       
-      // Check if this exact message ID already exists (prevent duplicates)
-      if (prev.some(msg => msg.id === newMessage.id)) {
-        console.log('❌ [SKIP] Message ID already exists:', newMessage.id);
-        return prev;
-              const tempMsgIndex = prev.findIndex(msg => msg.id === socketMessage.tempMessageId);
-              if (tempMsgIndex !== -1) {
-                console.log('✅ [REPLACE] Found temp message, replacing with real message');
-                const updated = [...prev];
-                updated[tempMsgIndex] = newMessage;
-                // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
-                ultraFastChatCache.addMessageInstantly(chatId, newMessage);
-                // Mark for global state update (outside setState)
-                shouldUpdateGlobalState = true;
-                finalMessage = newMessage;
-                return updated;
-              } else {
-                console.log('⚠️ [NOT FOUND] Temp message not found with ID:', socketMessage.tempMessageId);
-              }
-            }
-            
-            // Check if a temp message exists with same content and recent timestamp (fallback replacement)
-            const recentTempMsg = prev.find(msg => 
-              msg.id.startsWith('temp-') &&
-              msg.text === newMessage.text && 
-              msg.sender?.id === newMessage.sender?.id
-            );
-            
-            if (recentTempMsg) {
-              console.log('✅ [REPLACE FALLBACK] Found temp message by content, replacing');
-              // Replace the temp message with the real one
-              const updated = prev.map(msg => 
-                msg.id === recentTempMsg.id ? newMessage : msg
-              );
-              // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
-              ultraFastChatCache.addMessageInstantly(chatId, newMessage);
-              // Mark for global state update (outside setState)
-              shouldUpdateGlobalState = true;
-              finalMessage = newMessage;
-              return updated;
-            }
-            
-            // If no temp message found, this might be a duplicate from socket broadcast
-            // Check if we have a very recent message with same text (within last 2 seconds)
-            const now = new Date().getTime();
-            const hasSimilarRecentMessage = prev.some(msg => 
-              msg.text === newMessage.text && 
-              msg.sender?.id === newMessage.sender?.id &&
-              !msg.id.startsWith('temp-') &&
-              (now - new Date(msg.timestamp).getTime() < 2000)
-            );
-            
-            if (hasSimilarRecentMessage) {
-              console.log('❌ [SKIP DUPLICATE] Found similar recent message, skipping');
-              // Skip this duplicate message
-              return prev;
-            }
-            
-            console.log('⚠️ [WARNING] No temp message found, but message is from current user - might be duplicate!');
+      // Only add message if it's for this chat
+      if (socketMessage.chatId === chatId) {
+        // CRITICAL FIX: Skip messages from current user in socket listener
+        // Sender receives their message via callback response only, NOT via broadcast
+        if (socketMessage.sender?.id === user.id) {
+          console.log('🔕 [SKIP] Message from current user - sender gets message via callback, not broadcast');
+          return;
+        }
+        
+        const newMessage: Message = {
+          id: socketMessage.id,
+          text: socketMessage.text || socketMessage.content,
+          isUser: false, // Always false since we skip current user's messages above
+          timestamp: fixServerTimestamp(socketMessage.timestamp) || formatMessageTime(new Date()),
+          status: 'delivered', // Always delivered for incoming messages
+          sender: socketMessage.sender
+        };
+        
+        let shouldUpdateGlobalState = false;
+        let finalMessage: Message | null = null;
+        
+        setMessages(prev => {
+          console.log('🔍 [CHECK] Current messages count:', prev.length);
+          
+          // Check if this exact message ID already exists (prevent duplicates)
+          if (prev.some(msg => msg.id === newMessage.id)) {
+            console.log('❌ [SKIP] Message ID already exists:', newMessage.id);
+            return prev;
           }
           
           // New message from another user - add it

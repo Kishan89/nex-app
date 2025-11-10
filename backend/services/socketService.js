@@ -187,9 +187,18 @@ class SocketService {
           chatId, 
           messageId: message.id, 
           senderId: userId,
+          socketId: socket.id,
           roomName: `chat:${chatId}`
         });
-        socket.to(`chat:${chatId}`).emit('new_message', socketMessage);
+        
+        // Use broadcast flag to exclude the sender's socket
+        socket.broadcast.to(`chat:${chatId}`).emit('new_message', socketMessage);
+        logger.info('✅ [SOCKET] Message broadcasted (sender excluded)', { 
+          messageId: message.id,
+          senderId: userId,
+          senderSocketId: socket.id,
+          chatRoom: `chat:${chatId}`
+        });
 
         // Send acknowledgment back to sender with delivery confirmation
         if (callback && typeof callback === 'function') {
@@ -214,7 +223,11 @@ class SocketService {
             timestamp: formattedCallbackTimestamp
           };
           callback(ackResponse);
-          logger.debug('✅ [SOCKET] Acknowledgment sent to sender', { messageId: message.id });
+          logger.info('✅ [CALLBACK] Acknowledgment sent to SENDER ONLY (not broadcast)', { 
+            messageId: message.id,
+            senderId: userId,
+            tempMessageId
+          });
         }
 
         // Send FCM push notification to other chat participants (non-blocking)

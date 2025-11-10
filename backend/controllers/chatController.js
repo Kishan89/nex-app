@@ -231,13 +231,19 @@ class ChatController {
               chatId
             };
             
-            // Get sender's socket ID to exclude them from broadcast
+            // Get sender's socket to use broadcast (excludes sender automatically)
             const senderSocketId = socketService.getUserSocketId(senderId);
             
             if (senderSocketId) {
-              // Broadcast to OTHER users in the chat (excluding sender to prevent duplicates)
-              // Sender already has the message from HTTP response
-              socketService.io.to(`chat:${chatId}`).except(senderSocketId).emit('new_message', socketMessage);
+              // Get the sender's socket instance
+              const senderSocket = socketService.io.sockets.sockets.get(senderSocketId);
+              if (senderSocket) {
+                // Use broadcast to exclude sender's socket
+                senderSocket.broadcast.to(`chat:${chatId}`).emit('new_message', socketMessage);
+              } else {
+                // Fallback: broadcast to all if socket not found
+                socketService.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
+              }
             } else {
               // If sender not connected via socket, broadcast to all in the room
               socketService.io.to(`chat:${chatId}`).emit('new_message', socketMessage);
