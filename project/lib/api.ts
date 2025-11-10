@@ -388,10 +388,11 @@ class ApiService {
             return [];
         }
         
-        // Include userId in query params for backend authentication
-        const url = `${API_ENDPOINTS.CHAT_MESSAGES(chatId)}?userId=${userId}`;
+        // Include userId AND limit in query params
+        // Use high limit (500) to get all messages when app reopens
+        const url = `${API_ENDPOINTS.CHAT_MESSAGES(chatId)}?userId=${userId}&limit=500`;
         
-        console.log('📡 [API] Fetching messages with userId:', userId, 'for chat:', chatId);
+        console.log('📡 [API] Fetching messages with userId:', userId, 'limit: 500, for chat:', chatId);
         return this.get<Message[]>(url);
     }
     sendMessage(chatId: string, messageData: MessageData) { return this.post<Message>(API_ENDPOINTS.SEND_MESSAGE(chatId), messageData); }
