@@ -156,25 +156,13 @@ class SocketService {
         }
 
         // Format message for socket emission
-        // Format timestamp to "11:42 pm" format before sending
-        const formattedTimestamp = message.timestamp 
-          ? new Date(message.timestamp).toLocaleTimeString([], {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            })
-          : new Date().toLocaleTimeString([], {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            });
-            
+        // Send raw ISO timestamp - let frontend format it in user's timezone
         const socketMessage = {
           id: message.id,
           text: message.content || message.text,
           content: message.content || message.text,
           isUser: false, // Will be determined by receiver
-          timestamp: formattedTimestamp,
+          timestamp: message.timestamp, // Send raw timestamp
           status: MESSAGE_STATUS.DELIVERED, // Mark as delivered since saved to DB
           sender: message.sender,
           chatId,
@@ -202,25 +190,13 @@ class SocketService {
 
         // Send acknowledgment back to sender with delivery confirmation
         if (callback && typeof callback === 'function') {
-          // Format timestamp for callback response too
-          const formattedCallbackTimestamp = message.timestamp 
-            ? new Date(message.timestamp).toLocaleTimeString([], {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-              })
-            : new Date().toLocaleTimeString([], {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-              });
-              
+          // Send raw timestamp - let frontend format it
           const ackResponse = {
             success: true,
             messageId: message.id,
             tempMessageId,
             status: MESSAGE_STATUS.DELIVERED,
-            timestamp: formattedCallbackTimestamp
+            timestamp: message.timestamp // Send raw ISO timestamp
           };
           callback(ackResponse);
           logger.info('✅ [CALLBACK] Acknowledgment sent to SENDER ONLY (not broadcast)', { 

@@ -185,47 +185,20 @@ class ChatController {
       
       const message = await chatService.sendMessage({ content, chatId, senderId });
       
-      // Format timestamp for HTTP response
-      const responseMessage = {
-        ...message,
-        timestamp: message.timestamp 
-          ? new Date(message.timestamp).toLocaleTimeString([], {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            })
-          : new Date().toLocaleTimeString([], {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            })
-      };
-      
-      res.status(HTTP_STATUS.CREATED).json(responseMessage);
+      // Send raw timestamp - let frontend format it in user's timezone
+      res.status(HTTP_STATUS.CREATED).json(message);
       
       setImmediate(async () => {
         try {
           const socketService = require('../services/socketService');
           if (socketService.io) {
-            // Format timestamp to "11:42 pm" format
-            const formattedTimestamp = message.timestamp 
-              ? new Date(message.timestamp).toLocaleTimeString([], {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                })
-              : new Date().toLocaleTimeString([], {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                });
-                
+            // Send raw timestamp - let frontend format it
             const socketMessage = {
               id: message.id,
               text: message.text,
               content: message.text,
               isUser: false,
-              timestamp: formattedTimestamp,
+              timestamp: message.timestamp, // Send raw ISO timestamp
               status: message.status,
               sender: message.sender,
               chatId

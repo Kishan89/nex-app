@@ -417,7 +417,7 @@ const ChatScreen = React.memo(function ChatScreen({
     ultraFastChatCache.addMessageInstantly(chatId, tempMessage);
     // Also add to global state for persistence across screen changes (deferred to avoid React warning)
     setTimeout(() => {
-      addMessageToChat(chatId, tempMessage, true);
+      addMessageToChat(chatId, tempMessage, false); // Enable duplicate check
     }, 0);
     // Tell FCM service that user is sending a message (to suppress notifications)
     fcmService.setUserIsSendingMessage(chatId);
@@ -442,15 +442,24 @@ const ChatScreen = React.memo(function ChatScreen({
         
         // Replace temp message with server message (sender doesn't receive broadcast)
         if (serverResponse && serverResponse.success && serverResponse.messageId) {
+          // Format timestamp from server (ISO) to local time
+          const formattedTimestamp = serverResponse.timestamp 
+            ? new Date(serverResponse.timestamp).toLocaleTimeString([], {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              })
+            : new Date().toLocaleTimeString([], {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              });
+              
           const serverMessage: Message = {
             id: serverResponse.messageId,
             text: messageText,
             isUser: true,
-            timestamp: serverResponse.timestamp || new Date().toLocaleTimeString([], {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            }),
+            timestamp: formattedTimestamp,
             status: 'sent',
             sender: { id: user.id, username: user.username || 'You' }
           };
@@ -463,9 +472,9 @@ const ChatScreen = React.memo(function ChatScreen({
           // Update cache
           ultraFastChatCache.replaceMessageInstantly(chatId, tempId, serverMessage);
           
-          // Update global state
+          // Update global state with server message (duplicate check enabled)
           setTimeout(() => {
-            addMessageToChat(chatId, serverMessage, true);
+            addMessageToChat(chatId, serverMessage, false);
           }, 0);
         }
         
@@ -482,15 +491,25 @@ const ChatScreen = React.memo(function ChatScreen({
           // HTTP API fallback - also need to replace temp message if successful
           if (serverResponse && (serverResponse.messageId || serverResponse.id)) {
             const realMessageId = serverResponse.messageId || serverResponse.id;
+            
+            // Format timestamp from server (ISO) to local time
+            const formattedTimestamp = serverResponse.timestamp 
+              ? new Date(serverResponse.timestamp).toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                })
+              : new Date().toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                });
+                
             const serverMessage: Message = {
               id: realMessageId,
               text: messageText,
               isUser: true,
-              timestamp: new Date().toLocaleTimeString([], {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-              }),
+              timestamp: formattedTimestamp,
               status: 'sent',
               sender: { id: user.id, username: user.username || 'You' }
             };
@@ -503,9 +522,9 @@ const ChatScreen = React.memo(function ChatScreen({
             // Update cache
             ultraFastChatCache.replaceMessageInstantly(chatId, tempId, serverMessage);
             
-            // Update global state
+            // Update global state with server message (duplicate check enabled)
             setTimeout(() => {
-              addMessageToChat(chatId, serverMessage, true);
+              addMessageToChat(chatId, serverMessage, false);
             }, 0);
           }
         }
@@ -824,9 +843,11 @@ const ChatScreen = React.memo(function ChatScreen({
         });
         
         // Update global state AFTER setState completes (avoids React warning)
+        // Note: Global ChatContext listener already handles this for incoming messages
+        // No need to add here since we skip current user messages in socket listener
         if (shouldUpdateGlobalState && finalMessage) {
           setTimeout(() => {
-            addMessageToChat(chatId, finalMessage!, true);
+            addMessageToChat(chatId, finalMessage!, false); // Enable duplicate check
           }, 0);
         }
         // 🚀 IMPROVED: Auto-scroll to bottom with multiple attempts
