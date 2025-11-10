@@ -345,7 +345,55 @@ class ApiService {
         }
     }
     getChatById(chatId: string) { return this.get<Chat>(`/chats/chat/${chatId}`); }
-    getChatMessages(chatId: string) { return this.get<Message[]>(API_ENDPOINTS.CHAT_MESSAGES(chatId)); }
+    async getChatMessages(chatId: string) {
+        // Get current user ID from storage - try multiple sources
+        let userId = null;
+        
+        try {
+            // Try authUser first (correct key used by AuthContext)
+            const authUserStr = await AsyncStorage.getItem('authUser');
+            if (authUserStr) {
+                const authUser = JSON.parse(authUserStr);
+                userId = authUser.id;
+                console.log('✅ [API] Found userId from authUser:', userId);
+            }
+            
+            // Fallback: Try userData
+            if (!userId) {
+                const userDataStr = await AsyncStorage.getItem('userData');
+                if (userDataStr) {
+                    const userData = JSON.parse(userDataStr);
+                    userId = userData.id;
+                    console.log('✅ [API] Found userId from userData:', userId);
+                }
+            }
+            
+            // Fallback: Try authData
+            if (!userId) {
+                const authDataStr = await AsyncStorage.getItem('authData');
+                if (authDataStr) {
+                    const authData = JSON.parse(authDataStr);
+                    userId = authData.user?.id || authData.id;
+                    console.log('✅ [API] Found userId from authData:', userId);
+                }
+            }
+        } catch (e) {
+            console.error('❌ [API] Failed to get userId from storage:', e);
+        }
+        
+        if (!userId) {
+            console.error('❌ [API] No userId found in storage! Cannot fetch messages.');
+            console.error('❌ [API] This will cause backend to reject the request.');
+            // Return empty array instead of making request without userId
+            return [];
+        }
+        
+        // Include userId in query params for backend authentication
+        const url = `${API_ENDPOINTS.CHAT_MESSAGES(chatId)}?userId=${userId}`;
+        
+        console.log('📡 [API] Fetching messages with userId:', userId, 'for chat:', chatId);
+        return this.get<Message[]>(url);
+    }
     sendMessage(chatId: string, messageData: MessageData) { return this.post<Message>(API_ENDPOINTS.SEND_MESSAGE(chatId), messageData); }
     deleteChat(chatId: string) { return this.delete(`/chats/${chatId}`); }
     getUserNotifications(userId: string, forceRefresh = false) {

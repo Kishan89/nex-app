@@ -196,7 +196,11 @@ class ChatService {
    */
   async getChatMessages(chatId, options = {}) {
     try {
-      const { page = PAGINATION.DEFAULT_PAGE, limit = PAGINATION.MAX_LIMIT, userId, cursor } = options;
+      // Use a much higher limit to get all messages (500 instead of 50)
+      // This ensures we get all messages when app reopens
+      const { page = PAGINATION.DEFAULT_PAGE, limit = 500, userId, cursor } = options;
+      
+      logger.info('📥 [GET MESSAGES] Fetching messages', { chatId, userId, limit, cursor });
       
       const whereClause = { chatId };
       if (cursor) {
@@ -224,10 +228,18 @@ class ChatService {
         },
         take: limit,
       });
+      
+      logger.info('✅ [GET MESSAGES] Retrieved messages', { 
+        chatId, 
+        count: messages.length,
+        firstMessageId: messages[0]?.id,
+        lastMessageId: messages[messages.length - 1]?.id
+      });
   
-      return messages.map(message => ({
+      const formattedMessages = messages.map(message => ({
         id: message.id,
         text: message.content,
+        content: message.content, // Include both for compatibility
         isUser: message.senderId === userId,
         timestamp: message.createdAt.toISOString(),
         status: message.status.toLowerCase(),
@@ -237,7 +249,17 @@ class ChatService {
           avatar: message.sender.avatar,
         }
       }));
+      
+      logger.info('✅ [GET MESSAGES] Formatted messages ready to return', { count: formattedMessages.length });
+      
+      return formattedMessages;
     } catch (error) {
+      logger.error('❌ [GET MESSAGES] Error fetching messages', { 
+        error: error.message, 
+        stack: error.stack,
+        chatId,
+        userId: options.userId
+      });
       throw error;
     }
   }

@@ -18,11 +18,38 @@ export default function IndividualChatScreen() {
   const [chatData, setChatData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isFromNotification, setIsFromNotification] = useState(false);
+  const [forceRefresh, setForceRefresh] = useState(false);
   const lastAppStateRef = useRef(AppState.currentState);
   
   // Check if this is a new chat (id = 'new' with user data in params)
   const isNewChat = id === 'new' && !!params.userId;
   const [actualChatId, setActualChatId] = useState<string | null>(null);
+
+  // 🔄 APP STATE LISTENER: Detect when app returns from background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: any) => {
+      console.log('📱 [CHAT SCREEN] App state changed:', lastAppStateRef.current, '->', nextAppState);
+      
+      // App came back to foreground from background/inactive
+      if (lastAppStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log('🔄 [CHAT SCREEN] App returned to foreground, triggering refresh...');
+        setForceRefresh(true);
+        // Reset after ChatScreen has had time to consume it (3 seconds)
+        setTimeout(() => {
+          console.log('🔄 [CHAT SCREEN] Resetting forceRefresh flag');
+          setForceRefresh(false);
+        }, 3000);
+      }
+      
+      lastAppStateRef.current = nextAppState;
+    };
+    
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     // Track current chat for notification suppression
@@ -37,7 +64,9 @@ export default function IndividualChatScreen() {
         const isNowActive = currentAppState === 'active';
         // If app just became active from background, or we can't go back, it's likely from notification
         if ((wasInBackground && isNowActive) || !router.canGoBack()) {
+          console.log('🔔 [CHAT SCREEN] Opened from notification, enabling force refresh');
           setIsFromNotification(true);
+          setForceRefresh(true);
         }
         lastAppStateRef.current = currentAppState;
       };
@@ -60,6 +89,7 @@ export default function IndividualChatScreen() {
         }, 500);
       }
       setIsFromNotification(false);
+      setForceRefresh(false);
     };
   }, [id, user]);
 
@@ -307,7 +337,7 @@ export default function IndividualChatScreen() {
           chatData={chatData}
           onBack={handleBack}
           onUserProfile={handleUserProfile}
-          forceInitialRefresh={isFromNotification}
+          forceInitialRefresh={isFromNotification || forceRefresh}
           isNewChat={isNewChat}
           onFirstMessage={isNewChat ? handleFirstMessage : undefined}
           onChatDeleted={handleChatDeleted}

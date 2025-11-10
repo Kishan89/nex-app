@@ -112,7 +112,21 @@ class ChatController {
       const { page, limit, cursor } = req.query;
       const userId = req.user?.userId || req.query.userId;
       
+      logger.info('📨 [CONTROLLER] getChatMessages request', { 
+        chatId, 
+        userId, 
+        page, 
+        limit,
+        hasAuthUser: !!req.user,
+        queryUserId: req.query.userId
+      });
+      
       if (!userId) {
+        logger.error('❌ [CONTROLLER] No userId provided', { 
+          chatId,
+          hasAuthUser: !!req.user,
+          queryParams: req.query
+        });
         throw new BadRequestError(ERROR_MESSAGES.USER_ID_REQUIRED);
       }
       
@@ -123,6 +137,11 @@ class ChatController {
         cursor 
       });
       
+      logger.info('✅ [CONTROLLER] Sending messages response', { 
+        chatId, 
+        messageCount: messages.length 
+      });
+      
       res.set({
         'Cache-Control': `private, max-age=${CACHE.MESSAGES_MAX_AGE}`,
         'ETag': `"messages-${chatId}-${messages.length}"`,
@@ -130,6 +149,11 @@ class ChatController {
       
       res.status(HTTP_STATUS.OK).json(messages);
     } catch (error) {
+      logger.error('❌ [CONTROLLER] Error in getChatMessages', { 
+        error: error.message,
+        stack: error.stack,
+        chatId: req.params.chatId
+      });
       next(error);
     }
   }

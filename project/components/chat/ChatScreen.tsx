@@ -132,10 +132,14 @@ const ChatScreen = React.memo(function ChatScreen({
   const loadMessages = useCallback(async (forceRefresh = false) => {
     if (!user || !chatData?.id) return;
     const chatId = String(chatData.id);
+    
+    console.log('📥 [LOAD MESSAGES] Starting...', { chatId, forceRefresh, currentMessageCount: messages.length });
+    
     // 🚀 INSTANT LOADING: Check ultra-fast cache first (0ms delay)
     if (!forceRefresh) {
       const instantMessages = ultraFastChatCache.getInstantMessages(chatId);
       if (instantMessages.length > 0) {
+        console.log('⚡ [CACHE HIT] Loaded from ultra-fast cache:', instantMessages.length, 'messages');
         // Filter out temp messages to prevent showing duplicates with stuck "sending" status
         const filteredMessages = instantMessages.filter(msg => !msg.id.startsWith('temp-'));
         setMessages(filteredMessages);
@@ -150,6 +154,8 @@ const ChatScreen = React.memo(function ChatScreen({
         }, 100);
         return;
       }
+    } else {
+      console.log('🔄 [FORCE REFRESH] Bypassing all caches, fetching from database...');
     }
     // Initialize persistence for this chat (background)
     messagePersistence.initializeChatPersistence(chatId).catch(console.error);
@@ -215,10 +221,23 @@ const ChatScreen = React.memo(function ChatScreen({
     }
     try {
       // Fetch messages from database
+      console.log('🌐 [API] Fetching messages from database for chat:', chatId);
+      console.log('🔍 [API] Current user ID:', user.id);
+      
       const messagesResponse = await apiService.getChatMessages(chatId);
+      
+      console.log('📦 [API] Raw response received:', {
+        isArray: Array.isArray(messagesResponse),
+        type: typeof messagesResponse,
+        length: Array.isArray(messagesResponse) ? messagesResponse.length : 'N/A'
+      });
+      
       const chatMessages = Array.isArray(messagesResponse) 
         ? messagesResponse 
         : (messagesResponse as any)?.data || [];
+      
+      console.log('✅ [API] Received', chatMessages.length, 'messages from database');
+      
       if (chatMessages.length > 0) {
         const formattedMessages: Message[] = chatMessages.map((msg: any) => {
           // Use the original timestamp from server or create a unique timestamp based on message ID
@@ -257,9 +276,13 @@ const ChatScreen = React.memo(function ChatScreen({
         });
         // IMPROVED: Merge server messages with global state and local messages
         const finalMessages = mergeServerMessages(chatId, formattedMessages);
+        console.log('✅ [MESSAGES] Setting', finalMessages.length, 'messages in state');
         setMessages(finalMessages);
+        
         // 🚀 ULTRA-FAST: Cache messages for instant future access
         ultraFastChatCache.cacheMessages(chatId, finalMessages, chatData);
+        console.log('✅ [CACHE] Messages cached successfully');
+        
         // Background: Cache in old system and persist
         setTimeout(() => {
           chatMessageCache.cacheMessages(chatId, formattedMessages, chatData);
@@ -269,6 +292,7 @@ const ChatScreen = React.memo(function ChatScreen({
         // Auto scroll to last message after loading
         setTimeout(() => scrollToBottom(false), 200);
       } else {
+        console.log('⚠️ [API] No messages received from database');
         // Don't clear messages if we have temp messages
         setMessages(prev => {
           const tempMessages = prev.filter(msg => msg.id.startsWith('temp_'));
@@ -829,13 +853,7 @@ const ChatScreen = React.memo(function ChatScreen({
   // 🎯 FOCUS EFFECT: Reload messages when screen comes into focus (from notification or navigation)
   useFocusEffect(
     useCallback(() => {
-      console.log('🎯 [FOCUS] ChatScreen focused, checking for updates...');
-      
-      // If coming from notification or forceInitialRefresh is true, reload messages
-      if (forceInitialRefresh) {
-        console.log('🔄 [FOCUS] Force refresh enabled, reloading messages...');
-        loadMessages(true); // Force refresh from server
-      }
+      console.log('🎯 [FOCUS] ChatScreen focused, checking for updates...', { forceInitialRefresh });
       
       // Ensure socket is connected
       if (!socketService.isSocketConnected()) {
@@ -848,11 +866,27 @@ const ChatScreen = React.memo(function ChatScreen({
         socketService.joinChat(String(chatData.id));
       }
       
+      // If coming from notification or forceInitialRefresh is true, reload messages
+      if (forceInitialRefresh) {
+        console.log('🔄 [FOCUS] Force refresh enabled, reloading messages from server...');
+        setTimeout(() => {
+          loadMessages(true); // Force refresh from server
+        }, 100);
+      }
+      
       return () => {
         console.log('👋 [FOCUS] ChatScreen unfocused');
       };
     }, [forceInitialRefresh, chatData?.id, loadMessages])
   );
+  
+  // 🔄 WATCH forceInitialRefresh: Reload messages when prop changes
+  useEffect(() => {
+    if (forceInitialRefresh && chatData?.id) {
+      console.log('🔄 [FORCE REFRESH] forceInitialRefresh changed to true, reloading messages...');
+      loadMessages(true); // Force refresh from server
+    }
+  }, [forceInitialRefresh, chatData?.id, loadMessages]);
   
   // Helper function to render text with clickable links
   const renderTextWithLinks = useCallback((text: string, isUserMessage: boolean) => {
