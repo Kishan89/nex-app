@@ -415,10 +415,8 @@ const ChatScreen = React.memo(function ChatScreen({
     });
     // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
     ultraFastChatCache.addMessageInstantly(chatId, tempMessage);
-    // Also add to global state for persistence across screen changes (deferred to avoid React warning)
-    setTimeout(() => {
-      addMessageToChat(chatId, tempMessage, false); // Enable duplicate check
-    }, 0);
+    // DON'T add temp message to global state - only add final server message
+    // This prevents duplicate messages (temp + server) in global state
     // Tell FCM service that user is sending a message (to suppress notifications)
     fcmService.setUserIsSendingMessage(chatId);
     // Clear input immediately after message appears in UI
@@ -465,16 +463,28 @@ const ChatScreen = React.memo(function ChatScreen({
           };
           
           // Replace temp message with real message
-          setMessages(prev => prev.map(msg => 
-            msg.id === tempId ? serverMessage : msg
-          ));
+          console.log('🔄 [REPLACE] Replacing temp message with server message', {
+            tempId,
+            serverMessageId: serverMessage.id,
+            timestamp: serverMessage.timestamp
+          });
+          
+          setMessages(prev => {
+            const replaced = prev.map(msg => 
+              msg.id === tempId ? serverMessage : msg
+            );
+            console.log('✅ [REPLACE] Temp message replaced in local state');
+            return replaced;
+          });
           
           // Update cache
           ultraFastChatCache.replaceMessageInstantly(chatId, tempId, serverMessage);
+          console.log('✅ [REPLACE] Temp message replaced in cache');
           
           // Update global state with server message (duplicate check enabled)
           setTimeout(() => {
             addMessageToChat(chatId, serverMessage, false);
+            console.log('✅ [GLOBAL] Server message added to global state');
           }, 0);
         }
         
@@ -515,16 +525,28 @@ const ChatScreen = React.memo(function ChatScreen({
             };
             
             // Replace temp message with real message
-            setMessages(prev => prev.map(msg => 
-              msg.id === tempId ? serverMessage : msg
-            ));
+            console.log('🔄 [REPLACE HTTP] Replacing temp message with server message', {
+              tempId,
+              serverMessageId: serverMessage.id,
+              timestamp: serverMessage.timestamp
+            });
+            
+            setMessages(prev => {
+              const replaced = prev.map(msg => 
+                msg.id === tempId ? serverMessage : msg
+              );
+              console.log('✅ [REPLACE HTTP] Temp message replaced in local state');
+              return replaced;
+            });
             
             // Update cache
             ultraFastChatCache.replaceMessageInstantly(chatId, tempId, serverMessage);
+            console.log('✅ [REPLACE HTTP] Temp message replaced in cache');
             
             // Update global state with server message (duplicate check enabled)
             setTimeout(() => {
               addMessageToChat(chatId, serverMessage, false);
+              console.log('✅ [GLOBAL HTTP] Server message added to global state');
             }, 0);
           }
         }
