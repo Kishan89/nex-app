@@ -80,7 +80,7 @@
         "android.permission.READ_MEDIA_IMAGES"
       ],
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.mycompany.nexeed1",
-      "versionCode": 21
+      "versionCode": 22
     },
     "web": {
       "favicon": "./assets/favicon.png"

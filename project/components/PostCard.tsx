@@ -209,9 +209,9 @@ const PostCard = React.memo(function PostCard({
                   </Text>
                 </TouchableOpacity>
                 {post.isPinned && (
-                  <View style={[styles.pinnedBadge, { backgroundColor: '#004aad15', borderColor: '#004aad30' }]}>
-                    <Pin size={13} color="#004aad" strokeWidth={2.8} fill="#004aad" />
-                    <Text style={[styles.pinnedText, { color: '#004aad' }]}>Pinned</Text>
+                  <View style={[styles.pinnedBadge, { backgroundColor: '#3B8FE815', borderColor: '#3B8FE830' }]}>
+                    <Pin size={13} color="#3B8FE8" strokeWidth={2.8} fill="#3B8FE8" />
+                    <Text style={[styles.pinnedText, { color: '#3B8FE8' }]}>Pinned</Text>
                   </View>
                 )}
                 {post.isLive && (
@@ -310,7 +310,7 @@ const PostCard = React.memo(function PostCard({
       <View style={styles.postActions}>
         {/* Left side - Reply button */}
         <TouchableOpacity style={styles.replyButton} onPress={handleComment}>
-          <Text style={[styles.replyText, { color: '#004aad' }]}>
+          <Text style={[styles.replyText, { color: '#3B8FE8' }]}>
             {localCommentsCount === 0 ? '0 replies' : localCommentsCount === 1 ? '1 reply' : `${localCommentsCount} replies`}
           </Text>
         </TouchableOpacity>
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     gap: 3,
     borderWidth: 1,
-    borderColor: '#004aad40',
+    borderColor: '#3B8FE840',
   },
   pinnedText: {
     fontSize: 10,
@@ -502,7 +502,6 @@ const styles = StyleSheet.create({
   postContent: { 
     fontSize: 16,
     lineHeight: 24,
-    color: Colors.text, 
     marginBottom: Spacing.sm,
     fontWeight: FontWeights.regular,
     marginTop: Spacing.xs,

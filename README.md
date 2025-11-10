@@ -299,7 +299,7 @@ nexapp/
 
 ### Brand Colors
 
-- **Primary Blue:** `#004aad`
+- **Primary Blue:** `#3B8FE8`
 - **Secondary Purple:** `#e385ec`
 - **Gradient:** Blue → Purple (135deg)
 

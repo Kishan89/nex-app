@@ -171,8 +171,8 @@ export default function EditProfileScreen() {
                 onError={(e) => console.log('Banner image error:', e.nativeEvent.error)}
                 onLoad={() => console.log('Banner image loaded successfully')}
               />
-              <TouchableOpacity onPress={() => pickImage('banner')} style={[styles.bannerIcon, { borderColor: '#004aad' }]} disabled={loading}>
-                <View style={[styles.iconGradient, { backgroundColor: '#004aad' }]}>
+              <TouchableOpacity onPress={() => pickImage('banner')} style={[styles.bannerIcon, { borderColor: '#3B8FE8' }]} disabled={loading}>
+                <View style={[styles.iconGradient, { backgroundColor: '#3B8FE8' }]}>
                   <ImageIcon size={20} color="#ffffff" />
                 </View>
               </TouchableOpacity>
@@ -217,7 +217,7 @@ export default function EditProfileScreen() {
             </View>
             {/* Save Button */}
             <TouchableOpacity onPress={handleSaveChanges} style={styles.saveButton} disabled={loading}>
-              <View style={[styles.buttonGradient, {backgroundColor: '#004aad'}]}>
+              <View style={[styles.buttonGradient, {backgroundColor: '#3B8FE8'}]}>
                 <Text style={[styles.saveButtonText, { color: '#ffffff' }]}>{loading ? 'Saving...' : 'Save Changes'}</Text>
               </View>
             </TouchableOpacity>
@@ -299,7 +299,7 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: BorderRadius.round,
-      backgroundColor: '#004aad',
+      backgroundColor: '#3B8FE8',
     },
     // Avatar
     profileImageContainer: {
@@ -320,7 +320,7 @@ const createStyles = (colors: any) =>
       position: 'absolute',
       bottom: 0,
       right: 0,
-      backgroundColor: '#004aad',
+      backgroundColor: '#3B8FE8',
       padding: Spacing.sm,
       borderRadius: BorderRadius.round,
       borderWidth: 2,

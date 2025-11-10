@@ -927,7 +927,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   viewRepliesText: {
     fontSize: FontSizes.sm,
-    color: "#004aad",
+    color: "#3B8FE8",
     fontWeight: FontWeights.semibold,
   },
   repliesContainer: {

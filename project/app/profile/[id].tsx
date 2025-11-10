@@ -630,7 +630,7 @@ export default function ProfileScreen() {
       {isMyProfile && (
         <TouchableOpacity style={styles.fab} onPress={handleCreatePostPress}>
           <View style={styles.fabContent}>
-            <PenTool size={24} color="#ffffff" />
+            <PenTool size={26} color="#ffffff" />
           </View>
         </TouchableOpacity>
       )}
@@ -947,18 +947,18 @@ const createStyles = (colors: any) => StyleSheet.create({
     position: 'absolute', 
     bottom: 20, 
     right: 20, 
-    width: 56, 
-    height: 56, 
-    borderRadius: 28,
-    // Removed shadow to prevent octagon-like appearance
+    width: 60, 
+    height: 60, 
+    borderRadius: 30,
+    overflow: 'hidden'
   },
   fabContent: { 
-    width: 56, 
-    height: 56, 
-    borderRadius: 28, 
+    width: 60, 
+    height: 60, 
+    borderRadius: 30, 
     alignItems: 'center', 
     justifyContent: 'center',
-    backgroundColor: '#004aad'
+    backgroundColor: '#3B8FE8'
   },
   centered: { 
     flex: 1, 

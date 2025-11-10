@@ -501,7 +501,7 @@ export default function HomeScreen() {
             {/* Top Bar */}
             <View style={[styles.topBar, { backgroundColor: colors.background }]}>
               <TouchableOpacity
-                style={[styles.profileButton, { borderColor: colors.primary }]}
+                style={styles.profileButton}
                 onPress={handleProfilePress}
               >
                 <Image
@@ -614,7 +614,7 @@ export default function HomeScreen() {
           onPress={handleCreatePostPress}
         >
           <View style={styles.fabContent}>
-            <PenTool size={24} color="#ffffff" />
+            <PenTool size={26} color="#ffffff" />
           </View>
         </TouchableOpacity>
       </RNAnimated.View>
@@ -668,8 +668,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.background,
     ...Shadows.small,
   },
-  profileButton: { width: 50, height: 50, borderRadius: 25, overflow: 'visible', borderWidth: 1.5, borderColor: colors.primary, position: 'relative' },
-  profileImage: { width: '100%', height: '100%', borderRadius: ComponentStyles.avatar.medium / 2 },
+  profileButton: { width: 50, height: 50, borderRadius: 25, overflow: 'hidden', position: 'relative' },
+  profileImage: { width: '100%', height: '100%', borderRadius: 25 },
   profileIncompleteBadge: { 
     position: 'absolute', 
     top: -4, 
@@ -735,9 +735,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  fab: { position: 'absolute', right: 16, bottom: 80, height: 52, width: 52, borderRadius: 26, overflow: 'hidden' },
+  fab: { position: 'absolute', right: 16, bottom: 80, height: 60, width: 60, borderRadius: 30, overflow: 'hidden' },
   fabTouchable: { width: '100%', height: '100%' },
-  fabContent: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#004aad' },
+  fabContent: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3B8FE8' },
   errorText: { color: colors.error, textAlign: 'center', marginTop: Spacing.lg, fontSize: FontSizes.md, fontWeight: FontWeights.medium },
   loadingFooter: {
     paddingVertical: Spacing.md,

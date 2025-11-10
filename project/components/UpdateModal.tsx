@@ -36,10 +36,10 @@ export default function UpdateModal({ visible, versionInfo, onDismiss }: UpdateM
       <View style={styles.overlay}>
         <View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
           {/* Icon */}
-          <View style={[styles.iconContainer, { backgroundColor: versionInfo.updateRequired ? '#ff000020' : '#004aad20' }]}>
+          <View style={[styles.iconContainer, { backgroundColor: versionInfo.updateRequired ? '#ff000020' : '#3B8FE820' }]}>
             <AlertCircle 
               size={48} 
-              color={versionInfo.updateRequired ? '#ff0000' : '#004aad'} 
+              color={versionInfo.updateRequired ? '#ff0000' : '#3B8FE8'} 
             />
           </View>
           
@@ -85,7 +85,7 @@ export default function UpdateModal({ visible, versionInfo, onDismiss }: UpdateM
               style={[
                 styles.button, 
                 styles.updateButton, 
-                { backgroundColor: versionInfo.updateRequired ? '#ff0000' : '#004aad' },
+                { backgroundColor: versionInfo.updateRequired ? '#ff0000' : '#3B8FE8' },
                 !versionInfo.updateRequired && { flex: 1 }
               ]}
               onPress={handleUpdate}

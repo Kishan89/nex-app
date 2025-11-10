@@ -42,11 +42,11 @@ const lightColors = {
   success: '#137333',
   error: '#d93025',
   warning: '#ea8600',
-  info: '#1967d2',
+  info: '#4A9EFF',
   // Social interaction colors
   like: '#e385ec',      // Purple for likes
   repost: '#137333',    // Green for reposts
-  bookmark: '#1967d2',  // Blue for bookmarks
+  bookmark: '#3B8FE8',  // Blue for bookmarks
   comment: '#e385ec',   // Purple for comments
   // Gradient colors
   gradientStart: '#6a00f4',
@@ -97,7 +97,7 @@ const darkColors = {
   // Social interaction colors
   like: '#e385ec',      // Purple for likes
   repost: '#4caf50',    // Green for reposts
-  bookmark: '#004aad',  // Blue for bookmarks
+  bookmark: '#3B8FE8',  // Blue for bookmarks
   comment: '#e385ec',   // Purple for comments
   // Gradient colors
   gradientStart: '#6a00f4',

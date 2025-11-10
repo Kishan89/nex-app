@@ -807,7 +807,7 @@ const ChatScreen = React.memo(function ChatScreen({
       parts.push(
         <Text key={`link-${i}`}>
           <Text
-            style={[styles.linkText, { color: isUserMessage ? '#ffffff' : '#004aad' }]}
+            style={[styles.linkText, { color: isUserMessage ? '#ffffff' : '#3B8FE8' }]}
             onPress={() => {
               console.log('🔗 Opening URL:', fullUrl);
               Linking.openURL(fullUrl).catch(err => {

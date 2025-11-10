@@ -51,7 +51,7 @@ export default function LoginScreen() {
     }
   };
   return (
-    <LinearGradient colors={isDark ? ['#004aad', '#e385ec'] : ['#004aad', '#e385ec']} style={styles.safeArea}>
+    <LinearGradient colors={isDark ? ['#3B8FE8', '#e385ec'] : ['#3B8FE8', '#e385ec']} style={styles.safeArea}>
       <View style={styles.outer}>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           {/* Logo Section */}

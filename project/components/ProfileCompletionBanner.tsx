@@ -289,10 +289,10 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: FontSizes.md,
     fontWeight: FontWeights.bold,
-    color: '#004aad',
+    color: '#3B8FE8',
   },
   actionButtonArrow: {
-    backgroundColor: '#004aad15',
+    backgroundColor: '#3B8FE815',
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -302,6 +302,6 @@ const styles = StyleSheet.create({
   arrowText: {
     fontSize: 16,
     fontWeight: FontWeights.bold,
-    color: '#004aad',
+    color: '#3B8FE8',
   },
 });

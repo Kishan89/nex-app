@@ -412,7 +412,7 @@ Notifications are handled by `lib/fcmService.ts`:
 ### Colors
 
 Primary colors defined in `constants/theme.ts`:
-- Blue: `#004aad`
+- Blue: `#3B8FE8`
 - Purple: `#e385ec`
 - Background (Dark): `#000000`
 - Background (Light): `#ffffff`
@@ -422,7 +422,7 @@ Primary colors defined in `constants/theme.ts`:
 ```typescript
 // constants/theme.ts
 export const Colors = {
-  primary: '#004aad',
+  primary: '#3B8FE8',
   secondary: '#e385ec',
   // ... more colors
 };
