@@ -30,7 +30,7 @@ import PostCard from './PostCard';
 import { useRouter } from 'expo-router';
 import { CommentsSkeleton } from './skeletons';
 import { commentCache } from '@/store/commentCache';
-import { getDisplayUser, ANONYMOUS_AVATAR } from '@/lib/commentUtils';
+import { getDisplayUser, ANONYMOUS_AVATAR, DEFAULT_AVATAR } from '@/lib/commentUtils';
 interface CommentsModalProps {
   visible: boolean;
   onClose: () => void;
@@ -224,6 +224,14 @@ export default function CommentsModal({
       .on('broadcast', { event: 'comment_added' }, (payload) => {
         const { postId, comment } = payload.payload;
         if (postId === post.id) {
+          // Debug logging
+          console.log('📥 [Comments] Received comment from server:', {
+            commentId: comment.id,
+            avatar: comment.avatar,
+            userAvatar: comment.user?.avatar,
+            isAnonymous: comment.isAnonymous
+          });
+          
           // Apply display masking to the new comment
           const processedComment = {
             ...comment,
@@ -231,6 +239,12 @@ export default function CommentsModal({
             avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
             user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous)
           };
+          
+          console.log('✅ [Comments] Processed comment avatar:', {
+            commentId: processedComment.id,
+            avatar: processedComment.avatar,
+            avatarType: typeof processedComment.avatar
+          });
           
           // Check if this is a reply (has parentId)
           if (processedComment.parentId) {
@@ -583,7 +597,14 @@ export default function CommentsModal({
             activeOpacity={comment.isAnonymous ? 1 : 0.7}
           >
             <Image 
-              source={comment.isAnonymous ? ANONYMOUS_AVATAR : (getDisplayUser(comment, comment.isAnonymous).avatar ? { uri: getDisplayUser(comment, comment.isAnonymous).avatar } : require('@/assets/images/default-avatar.png'))} 
+              source={
+                comment.isAnonymous 
+                  ? ANONYMOUS_AVATAR 
+                  : (() => {
+                      const avatarValue = getDisplayUser(comment, comment.isAnonymous).avatar;
+                      return typeof avatarValue === 'string' ? { uri: avatarValue } : avatarValue;
+                    })()
+              } 
               style={isReply ? styles.replyAvatar : styles.commentAvatar} 
             />
           </TouchableOpacity>

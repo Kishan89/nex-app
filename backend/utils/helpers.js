@@ -109,14 +109,14 @@ function transformComment(comment) {
         return {
             id: comment.id,
             username: 'Anonymous',
-            avatar: 'https://placehold.co/40',
+            avatar: null,
             text: comment.text,
             time: formatTimeAgo(comment.createdAt),
             parentId: comment.parentId,
             user: {
                 id: comment.userId, // Keep real userId for backend operations
                 username: 'Anonymous',
-                avatar: 'https://placehold.co/40'
+                avatar: null
             },
             userId: comment.userId, // Keep real userId for backend operations
             isAnonymous: true
@@ -127,7 +127,7 @@ function transformComment(comment) {
     const userObj = comment.user || comment.author || {};
     let userId = userObj.id || comment.userId || comment.authorId;
     let username = userObj.username || comment.username || 'Unknown';
-    const avatar = userObj.avatar || comment.avatar || 'https://placehold.co/40';
+    const avatar = userObj.avatar || comment.avatar || null;
     
     if (!userId && comment.userId) {
         userId = comment.userId;

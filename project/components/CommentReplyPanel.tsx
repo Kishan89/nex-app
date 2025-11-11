@@ -38,7 +38,7 @@ import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles } from '
 import { useTheme } from '@/context/ThemeContext';
 import { apiService } from '@/lib/api';
 import { ReplySkeleton } from './skeletons';
-import { getDisplayUser, ANONYMOUS_AVATAR } from '@/lib/commentUtils';
+import { getDisplayUser, ANONYMOUS_AVATAR, DEFAULT_AVATAR } from '@/lib/commentUtils';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -186,6 +186,14 @@ export default function CommentReplyPanel({
         if (broadcastPostId === postId && comment?.parentId === parentComment?.id) {
           console.log('✅ [ReplyPanel] Match found! Adding new reply from broadcast');
           
+          // Debug logging
+          console.log('📥 [ReplyPanel] Received reply from server:', {
+            replyId: comment.id,
+            avatar: comment.avatar,
+            userAvatar: comment.user?.avatar,
+            isAnonymous: comment.isAnonymous
+          });
+          
           // Apply display masking to the new reply
           const processedReply = {
             ...comment,
@@ -193,6 +201,12 @@ export default function CommentReplyPanel({
             avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
             user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous)
           };
+          
+          console.log('✅ [ReplyPanel] Processed reply avatar:', {
+            replyId: processedReply.id,
+            avatar: processedReply.avatar,
+            avatarType: typeof processedReply.avatar
+          });
 
           setReplies(prev => {
             // Check if reply already exists (prevent duplicates)
@@ -476,7 +490,14 @@ export default function CommentReplyPanel({
             activeOpacity={reply.isAnonymous ? 1 : 0.7}
           >
             <Image 
-              source={reply.isAnonymous ? ANONYMOUS_AVATAR : (getDisplayUser(reply, reply.isAnonymous).avatar ? { uri: getDisplayUser(reply, reply.isAnonymous).avatar } : require('@/assets/images/default-avatar.png'))} 
+              source={
+                reply.isAnonymous 
+                  ? ANONYMOUS_AVATAR 
+                  : (() => {
+                      const avatarValue = getDisplayUser(reply, reply.isAnonymous).avatar;
+                      return typeof avatarValue === 'string' ? { uri: avatarValue } : avatarValue;
+                    })()
+              } 
               style={styles.replyAvatar} 
             />
           </TouchableOpacity>
@@ -598,7 +619,14 @@ export default function CommentReplyPanel({
                     activeOpacity={parentComment.isAnonymous ? 1 : 0.7}
                   >
                     <Image 
-                      source={parentComment.isAnonymous ? ANONYMOUS_AVATAR : (getDisplayUser(parentComment, parentComment.isAnonymous).avatar ? { uri: getDisplayUser(parentComment, parentComment.isAnonymous).avatar } : require('@/assets/images/default-avatar.png'))} 
+                      source={
+                        parentComment.isAnonymous 
+                          ? ANONYMOUS_AVATAR 
+                          : (() => {
+                              const avatarValue = getDisplayUser(parentComment, parentComment.isAnonymous).avatar;
+                              return typeof avatarValue === 'string' ? { uri: avatarValue } : avatarValue;
+                            })()
+                      } 
                       style={styles.parentAvatar} 
                     />
                   </TouchableOpacity>
