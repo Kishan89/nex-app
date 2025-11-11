@@ -349,7 +349,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       >
         <View style={styles.avatarContainer}>
           <Image 
-            source={{ uri: (item.avatar && item.avatar.trim() !== '') ? item.avatar : 'https://placehold.co/50' }} 
+            source={(item.avatar && item.avatar.trim() !== '') ? { uri: item.avatar } : require('@/assets/images/default-avatar.png')} 
             style={styles.avatar}
             onError={(error) => {
               }}

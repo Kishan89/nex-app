@@ -476,7 +476,7 @@ export default function CommentReplyPanel({
             activeOpacity={reply.isAnonymous ? 1 : 0.7}
           >
             <Image 
-              source={reply.isAnonymous ? ANONYMOUS_AVATAR : { uri: getDisplayUser(reply, reply.isAnonymous).avatar || 'https://placehold.co/40' }} 
+              source={reply.isAnonymous ? ANONYMOUS_AVATAR : (getDisplayUser(reply, reply.isAnonymous).avatar ? { uri: getDisplayUser(reply, reply.isAnonymous).avatar } : require('@/assets/images/default-avatar.png'))} 
               style={styles.replyAvatar} 
             />
           </TouchableOpacity>
@@ -598,7 +598,7 @@ export default function CommentReplyPanel({
                     activeOpacity={parentComment.isAnonymous ? 1 : 0.7}
                   >
                     <Image 
-                      source={parentComment.isAnonymous ? ANONYMOUS_AVATAR : { uri: getDisplayUser(parentComment, parentComment.isAnonymous).avatar || 'https://placehold.co/40' }} 
+                      source={parentComment.isAnonymous ? ANONYMOUS_AVATAR : (getDisplayUser(parentComment, parentComment.isAnonymous).avatar ? { uri: getDisplayUser(parentComment, parentComment.isAnonymous).avatar } : require('@/assets/images/default-avatar.png'))} 
                       style={styles.parentAvatar} 
                     />
                   </TouchableOpacity>

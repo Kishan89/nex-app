@@ -152,7 +152,7 @@ const findOrCreateUserByGoogleEmail = async (googleEmail, googleProfile = {}) =>
 
     if (user) {
       logger.info('Existing user found', { id: user.id, email: user.email, username: user.username });
-      if (!user.avatar && googleProfile.picture) user = await updateUser(user.id, { avatar: googleProfile.picture });
+      // Don't set Google profile picture - let user upload their own to incentivize profile completion
       return user;
     } else {
       const tempPassword = `google_temp_${Date.now()}`;
@@ -171,12 +171,8 @@ const findOrCreateUserByGoogleEmail = async (googleEmail, googleProfile = {}) =>
           logger.info('User created successfully', { id: newUser.id, email: newUser.email, username: newUser.username });
           
           let createdUser = await findUserById(newUser.id);
-          if (createdUser) {
-            const profileUpdates = {};
-            if (googleProfile.picture && !createdUser.avatar) profileUpdates.avatar = googleProfile.picture;
-            if (Object.keys(profileUpdates).length > 0) createdUser = await updateUser(createdUser.id, profileUpdates);
-          }
-
+          // Don't set Google profile picture - leave avatar as null to show default avatar
+          // This incentivizes users to upload their own profile picture
           return createdUser;
         } catch (createError) {
           if (createError.message?.includes('Username already taken')) {

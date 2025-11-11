@@ -39,12 +39,16 @@ export default function ProfileCompletionBanner({
   
   // 🚀 NEW: Check if user is new (within 7 days of account creation)
   const isNewUser = () => {
-    if (!userCreatedAt) return false; // If no creation date, assume old user
+    if (!userCreatedAt) {
+      console.log('⚠️ [BANNER] No userCreatedAt provided, assuming NEW user to show banner');
+      return true; // If no creation date, assume new user to be safe and show banner
+    }
     
     const createdDate = new Date(userCreatedAt);
     const now = new Date();
     const daysSinceCreation = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
     
+    console.log(`📅 [BANNER] User created ${daysSinceCreation.toFixed(1)} days ago`);
     return daysSinceCreation <= 7; // Show banner only for users created within last 7 days
   };
 

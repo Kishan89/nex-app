@@ -583,7 +583,7 @@ export default function CommentsModal({
             activeOpacity={comment.isAnonymous ? 1 : 0.7}
           >
             <Image 
-              source={comment.isAnonymous ? ANONYMOUS_AVATAR : { uri: getDisplayUser(comment, comment.isAnonymous).avatar || 'https://placehold.co/40' }} 
+              source={comment.isAnonymous ? ANONYMOUS_AVATAR : (getDisplayUser(comment, comment.isAnonymous).avatar ? { uri: getDisplayUser(comment, comment.isAnonymous).avatar } : require('@/assets/images/default-avatar.png'))} 
               style={isReply ? styles.replyAvatar : styles.commentAvatar} 
             />
           </TouchableOpacity>

@@ -155,7 +155,7 @@ export default function SearchScreen() {
         </View>
       )}
       <Image
-        source={{ uri: user.avatar || 'https://placehold.co/50' }}
+        source={user.avatar ? { uri: user.avatar } : require('@/assets/images/default-avatar.png')}
         style={styles.xpUserAvatar}
       />
       <View style={styles.xpUserContent}>
@@ -258,7 +258,7 @@ export default function SearchScreen() {
                   onPress={() => router.push(`/profile/${user.id}` as any)}
                 >
                   <Image
-                    source={{ uri: user.avatar_url || 'https://placehold.co/50' }}
+                    source={user.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/default-avatar.png')}
                     style={styles.userAvatar}
                   />
                   <View style={styles.userContent}>

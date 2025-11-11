@@ -94,7 +94,7 @@ class UltraFastChatCache {
         chatData: {
           id: chatData.id || chatId,
           name: chatData.name || chatData.username || 'Chat',
-          avatar: chatData.avatar || 'https://via.placeholder.com/40',
+          avatar: chatData.avatar || '',
           username: chatData.username,
           isOnline: chatData.isOnline,
           lastSeen: chatData.lastSeen,

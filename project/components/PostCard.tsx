@@ -194,7 +194,7 @@ const PostCard = React.memo(function PostCard({
       <View style={styles.postHeader}>
         <TouchableOpacity onPress={post.isAnonymous ? undefined : onUserPress} activeOpacity={post.isAnonymous ? 1 : 0.7}>
           <Image 
-            source={post.isAnonymous ? ANONYMOUS_AVATAR : { uri: post.avatar || 'https://placehold.co/40' }} 
+            source={post.isAnonymous ? ANONYMOUS_AVATAR : (post.avatar ? { uri: post.avatar } : require('@/assets/images/default-avatar.png'))} 
             style={styles.userAvatar} 
           />
         </TouchableOpacity>

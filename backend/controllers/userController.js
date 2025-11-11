@@ -36,8 +36,8 @@ const register = async (req, res, next) => {
                 email: newUser.email,
                 username: newUser.username,
                 bio: newUser.bio || '',
-                avatar_url: newUser.avatar || 'https://via.placeholder.com/150',
-                banner_url: newUser.banner_url || 'https://via.placeholder.com/600x200',
+                avatar_url: newUser.avatar || null,
+                banner_url: newUser.banner_url || null,
             },
         });
 
@@ -92,8 +92,8 @@ const login = async (req, res, next) => {
                 email: user.email,
                 username: user.username,
                 bio: user.bio || '',
-                avatar_url: user.avatar || 'https://via.placeholder.com/150',
-                banner_url: user.banner_url || 'https://via.placeholder.com/600x200',
+                avatar_url: user.avatar || null,
+                banner_url: user.banner_url || null,
             },
         });
 
@@ -177,8 +177,8 @@ const googleLogin = async (req, res, next) => {
                 email: user.email,
                 username: user.username,
                 bio: user.bio || '',
-                avatar_url: user.avatar || googlePicture || 'https://via.placeholder.com/150', 
-                banner_url: user.banner_url || 'https://via.placeholder.com/600x200',
+                avatar_url: user.avatar || null, 
+                banner_url: user.banner_url || null,
             },
         });
 
@@ -234,8 +234,8 @@ const googleLogin = async (req, res, next) => {
                             email: retryUser.email,
                             username: retryUser.username,
                             bio: retryUser.bio || '',
-                            avatar_url: retryUser.avatar || googlePicture || 'https://via.placeholder.com/150', 
-                            banner_url: retryUser.banner_url || 'https://via.placeholder.com/600x200',
+                            avatar_url: retryUser.avatar || null, 
+                            banner_url: retryUser.banner_url || null,
                         },
                     });
                 }
@@ -293,8 +293,8 @@ const getMeProfile = async (req, res, next) => {
             username: user.username,
             name: user.name || '',
             bio: user.bio || '',
-            avatar_url: user.avatar || 'https://via.placeholder.com/150',
-            banner_url: user.banner_url || 'https://via.placeholder.com/600x200',
+            avatar_url: user.avatar || null,
+            banner_url: user.banner_url || null,
             xp: user.xp || 0,
             followers_count: followCounts.followers,
             following_count: followCounts.following,
@@ -349,8 +349,8 @@ const getUserProfile = async (req, res, next) => {
             email: user.email,
             username: user.username,
             bio: user.bio || '',
-            avatar_url: user.avatar || 'https://via.placeholder.com/150',
-            banner_url: user.banner_url || 'https://via.placeholder.com/600x200',
+            avatar_url: user.avatar || null,
+            banner_url: user.banner_url || null,
             website: user.website || '',
             location: user.location || '',
             verified: user.verified || false,
@@ -396,8 +396,8 @@ const updateUserProfile = async (req, res, next) => {
             email: updatedUser.email,
             username: updatedUser.username,
             bio: updatedUser.bio || '',
-            avatar_url: updatedUser.avatar || 'https://via.placeholder.com/150',
-            banner_url: updatedUser.banner_url || 'https://via.placeholder.com/600x200',
+            avatar_url: updatedUser.avatar || null,
+            banner_url: updatedUser.banner_url || null,
         };
 
         res.status(HTTP_STATUS.OK).json({ message: 'Profile updated successfully.', user: userProfile });

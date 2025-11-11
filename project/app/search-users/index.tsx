@@ -234,7 +234,7 @@ export default function SearchUsersScreen() {
       activeOpacity={0.7}
     >
       <Image
-        source={{ uri: item.avatar || 'https://placehold.co/50' }}
+        source={item.avatar ? { uri: item.avatar } : require('@/assets/images/default-avatar.png')}
         style={styles.avatar}
       />
       <View style={styles.userInfo}>

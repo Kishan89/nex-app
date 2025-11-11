@@ -2,6 +2,9 @@ import React from 'react';
 import { View, Image, Text, StyleSheet } from 'react-native';
 import { Colors, BorderRadius, FontSizes, FontWeights } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
+
+const DEFAULT_AVATAR = require('@/assets/images/default-avatar.png');
+
 interface AvatarProps {
   uri?: string;
   name?: string;
@@ -17,34 +20,19 @@ export default function Avatar({
   isOnline = false,
 }: AvatarProps) {
   const { colors } = useTheme();
-  const getInitials = (name?: string) => {
-    if (!name) return '?';
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
+  
   const containerStyle = {
     width: size,
     height: size,
     borderRadius: size / 2,
   };
-  const textStyle = {
-    fontSize: size * 0.3,
-  };
+  
   return (
     <View style={[styles.container, containerStyle]}>
-      {uri ? (
-        <Image source={{ uri }} style={[styles.image, containerStyle, { backgroundColor: colors.backgroundSecondary }]} />
-      ) : (
-        <View style={[styles.placeholder, containerStyle, { backgroundColor: colors.backgroundSecondary }]}>
-          <Text style={[styles.placeholderText, textStyle, { color: colors.text }]}>
-            {getInitials(name)}
-          </Text>
-        </View>
-      )}
+      <Image 
+        source={uri ? { uri } : DEFAULT_AVATAR} 
+        style={[styles.image, containerStyle, { backgroundColor: colors.backgroundSecondary }]} 
+      />
       {showOnlineStatus && (
         <View
           style={[

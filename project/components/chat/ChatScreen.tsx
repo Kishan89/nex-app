@@ -1073,7 +1073,7 @@ const ChatScreen = React.memo(function ChatScreen({
             onPress={() => chatData?.userId && onUserProfile?.(chatData.userId)}
           >
             <Image 
-              source={{ uri: chatData?.avatar || 'https://via.placeholder.com/40' }} 
+              source={chatData?.avatar ? { uri: chatData.avatar } : require('@/assets/images/default-avatar.png')} 
               style={styles.avatar}
             />
             <View style={styles.profileInfo}>

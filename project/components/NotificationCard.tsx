@@ -84,7 +84,7 @@ export const NotificationCard = ({
       <View style={styles.leftSection}>
         <View style={styles.avatarContainer}>
           <Image
-            source={{ uri: notification.userAvatar || 'https://placehold.co/40' }}
+            source={notification.userAvatar ? { uri: notification.userAvatar } : require('@/assets/images/default-avatar.png')}
             style={styles.avatar}
           />
           <View style={[styles.iconBadge, { backgroundColor: getIconColor() }]}>

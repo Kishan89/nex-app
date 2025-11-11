@@ -50,7 +50,7 @@ const getUserPollVotesKey = (userId: string | null) =>
   userId ? `${POLL_VOTES_STORAGE_KEY_PREFIX}_${userId}` : `${POLL_VOTES_STORAGE_KEY_PREFIX}_guest`;
 const normalizePost = (p: any): NormalizedPost => {
   const id = String(p.id ?? p._id ?? p.postId ?? Math.random());
-  const avatar = p.avatar ?? p.author?.avatar ?? 'https://placehold.co/40';
+  const avatar = p.avatar ?? p.author?.avatar ?? '';
   const username = p.username ?? p.author?.username ?? 'Unknown';
   const createdAt = p.createdAt ?? p.time ?? '';
   const content = p.content ?? p.body ?? '';
@@ -113,12 +113,12 @@ const normalizeComment = (c: any): Comment => {
     return {
       id: String(c.id ?? c._id ?? Date.now()),
       username: 'Anonymous',
-      avatar: 'https://placehold.co/40',
+      avatar: '',
       text: c.text ?? c.body ?? '',
       time: c.createdAt ?? c.time ?? 'now',
       parentId: c.parentId ? String(c.parentId) : undefined,
       replyTo: c.replyTo ?? undefined,
-      user: { id: c.userId, username: 'Anonymous', avatar: 'https://placehold.co/40' },
+      user: { id: c.userId, username: 'Anonymous', avatar: '' },
       userId: c.userId, // Keep real userId for backend operations
       isAnonymous: true,
       replies: replies,
@@ -136,7 +136,7 @@ const normalizeComment = (c: any): Comment => {
   return {
     id: String(c.id ?? c._id ?? Date.now()),
     username: c.username ?? userInfo.username ?? 'User',
-    avatar: c.avatar ?? userInfo.avatar ?? 'https://placehold.co/40',
+    avatar: c.avatar ?? userInfo.avatar ?? '',
     text: c.text ?? c.body ?? '',
     time: c.createdAt ?? c.time ?? 'now',
     parentId: c.parentId ? String(c.parentId) : undefined,
