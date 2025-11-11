@@ -59,11 +59,15 @@ export default function ProfileCompletionBanner({
   }, [userId, isProfileIncomplete]); // Only check when userId changes or profile becomes incomplete
 
   const checkBannerStatus = async () => {
-    if (!isProfileIncomplete) return;
+    // ✅ STRICT CHECK: Profile must be incomplete
+    if (!isProfileIncomplete) {
+      console.log('✅ [BANNER] Profile is complete - NOT showing banner');
+      return;
+    }
     
-    // 🚀 FIX: Only show banner for new users (within 7 days of account creation)
+    // ✅ STRICT CHECK: User must be new (within 7 days)
     if (!isNewUser()) {
-      console.log('🚫 [BANNER] User is not new (>7 days old), skipping banner');
+      console.log('🚫 [BANNER] User is old (>7 days) - NOT showing banner');
       return;
     }
     
@@ -72,7 +76,8 @@ export default function ProfileCompletionBanner({
       const hasShownBefore = await AsyncStorage.getItem(`${BANNER_DISMISSED_KEY}_shown_${userId}`);
       
       if (!dismissedData && !hasShownBefore) {
-        console.log('✅ [BANNER] Showing banner for new user with incomplete profile');
+        console.log('✅ [BANNER] Showing banner - User is NEW (<7 days) AND profile is INCOMPLETE');
+        console.log(`   hasAvatar: ${hasAvatar}, hasBio: ${hasBio}, hasName: ${hasName}, hasBanner: ${hasBanner}`);
         await AsyncStorage.setItem(`${BANNER_DISMISSED_KEY}_shown_${userId}`, 'true');
         setVisible(true);
         // Animate in
@@ -143,7 +148,13 @@ export default function ProfileCompletionBanner({
     });
   };
 
+  // ✅ FINAL SAFETY CHECK: Don't render if profile is complete OR user is old OR banner was dismissed
   if (!visible || !isProfileIncomplete || dismissed) {
+    return null;
+  }
+  
+  // ✅ DOUBLE CHECK: User must be new (within 7 days)
+  if (!isNewUser()) {
     return null;
   }
 
