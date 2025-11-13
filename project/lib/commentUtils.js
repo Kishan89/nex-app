@@ -12,19 +12,13 @@ export const getDisplayUser = (user, isAnonymous) => {
     };
   }
   
-  // For non-anonymous users, ensure we always have a valid avatar
-  // Check for null, undefined, empty string, or whitespace
+  // For non-anonymous users, ensure we always have a valid avatar and username
   const hasValidAvatar = user?.avatar && typeof user.avatar === 'string' && user.avatar.trim() !== '';
-  
-  console.log('🔍 [getDisplayUser] Processing avatar:', {
-    inputAvatar: user?.avatar,
-    avatarType: typeof user?.avatar,
-    hasValidAvatar,
-    willUseDefault: !hasValidAvatar
-  });
+  const hasValidUsername = user?.username && typeof user.username === 'string' && user.username.trim() !== '';
   
   return {
     ...user,
+    username: hasValidUsername ? user.username : 'User',
     avatar: hasValidAvatar ? user.avatar : DEFAULT_AVATAR
   };
 };

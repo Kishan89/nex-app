@@ -41,6 +41,7 @@ import { ReplySkeleton } from './skeletons';
 import { getDisplayUser, ANONYMOUS_AVATAR, DEFAULT_AVATAR } from '@/lib/commentUtils';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PANEL_WIDTH = SCREEN_WIDTH; // Full width like YouTube
 const PANEL_HEIGHT = SCREEN_HEIGHT; // Full height like YouTube
@@ -72,6 +73,7 @@ export default function CommentReplyPanel({
   commentY = 0,
 }: CommentReplyPanelProps) {
   const { colors, isDark } = useTheme();
+  const { user: currentUser } = useAuth();
   const [replies, setReplies] = useState<Comment[]>([]);
   const [newReply, setNewReply] = useState('');
   const [loading, setLoading] = useState(false);
@@ -199,7 +201,8 @@ export default function CommentReplyPanel({
             ...comment,
             username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
             avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
-            user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous)
+            user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous),
+            isOptimistic: false // Mark as real from server
           };
           
           console.log('✅ [ReplyPanel] Processed reply avatar:', {
@@ -209,19 +212,29 @@ export default function CommentReplyPanel({
           });
 
           setReplies(prev => {
-            // Check if reply already exists (prevent duplicates)
+            // Check if this is replacing an optimistic reply
+            const optimisticIndex = prev.findIndex(r => 
+              r.isOptimistic && r.text === processedReply.text && r.userId === processedReply.userId
+            );
+            
+            if (optimisticIndex !== -1) {
+              // Replace optimistic reply with real one
+              console.log('🔄 [ReplyPanel] Replacing optimistic reply with real one');
+              const newReplies = [...prev];
+              newReplies[optimisticIndex] = processedReply;
+              return newReplies;
+            }
+            
+            // Check if reply already exists (by ID)
             const exists = prev.some(r => r.id === processedReply.id);
             if (exists) {
               console.log('⚠️ [ReplyPanel] Reply already exists, skipping');
               return prev;
             }
             
-            // Remove any optimistic reply with temp ID
-            const withoutOptimistic = prev.filter(r => !r.isOptimistic);
-            
             // Add new reply at the end (oldest-to-latest order)
             console.log('✅ [ReplyPanel] Reply added to list');
-            return [...withoutOptimistic, processedReply];
+            return [...prev, processedReply];
           });
 
           // Scroll to bottom to show new reply
@@ -331,67 +344,41 @@ export default function CommentReplyPanel({
     setSending(true);
     setIsOperating(true);
 
-    // Create optimistic reply for instant UI feedback
-    const optimisticReply: Comment = {
+    // Create instant reply with proper user data (no "You" text)
+    const currentUserData = {
+      id: currentUserId || '',
+      username: isAnonymous ? 'Anonymous' : (currentUser?.username || 'User'),
+      avatar: isAnonymous ? ANONYMOUS_AVATAR : (currentUser?.avatar_url || currentUserAvatar || DEFAULT_AVATAR)
+    };
+    
+    const instantReply: Comment = {
       id: `temp-reply-${Date.now()}`,
       text: finalText,
-      username: getDisplayUser({ username: 'You' }, isAnonymous).username,
-      avatar: getDisplayUser({ avatar: currentUserAvatar || '' }, isAnonymous).avatar,
+      username: currentUserData.username,
+      avatar: currentUserData.avatar,
       time: 'now',
       userId: currentUserId || '',
-      isOptimistic: true,
       isAnonymous: isAnonymous,
       createdAt: new Date().toISOString(),
+      user: currentUserData
     };
 
-    // Add optimistic reply at the end for oldest-to-latest order
-    setReplies(prev => [...prev, optimisticReply]);
+    // Add instant reply at the end for oldest-to-latest order
+    setReplies(prev => [...prev, instantReply]);
     
     // Scroll to bottom to show the new reply
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
-    try {
-      // All replies to this panel should have parentComment.id as their parentId
-      // This ensures they're nested under the original comment
-      console.log('📤 [ReplyPanel] Sending reply:', {
-        postId,
-        parentCommentId: parentComment.id,
-        replyText: finalText.substring(0, 50)
-      });
-      
-      const response = await apiService.addComment(postId, finalText, parentComment.id, isAnonymous);
-      console.log('✅ [ReplyPanel] Reply sent, response:', response);
-      
-      // Update optimistic reply with real data from API response
-      // This ensures avatar, username, and all fields are correct
-      setReplies(prev => prev.map(r => 
-        r.id === optimisticReply.id 
-          ? { 
-              ...response.data,
-              isOptimistic: false,
-              username: getDisplayUser(response.data.user || response.data, response.data.isAnonymous).username,
-              avatar: getDisplayUser(response.data.user || response.data, response.data.isAnonymous).avatar,
-              user: getDisplayUser(response.data.user || { 
-                id: response.data.userId, 
-                username: response.data.username, 
-                avatar: response.data.avatar 
-              }, response.data.isAnonymous)
-            } 
-          : r
-      ));
-      
-      console.log('✅ [ReplyPanel] Reply sent successfully, updated with API data, waiting for broadcast');
-    } catch (error) {
-      // Remove optimistic reply on error and restore text
-      setReplies(prev => prev.filter(reply => reply.id !== optimisticReply.id));
-      setNewReply(replyText);
+    // Reset states immediately
+    setSending(false);
+    setIsOperating(false);
+    
+    // Fire-and-forget API call - don't wait for response
+    apiService.addComment(postId, finalText, parentComment.id, isAnonymous).catch(error => {
       console.error('Error sending reply:', error);
-    } finally {
-      setSending(false);
-      setIsOperating(false);
-    }
+    });
   };
 
   const handleReplyToReply = (reply: Comment) => {

@@ -237,7 +237,8 @@ export default function CommentsModal({
             ...comment,
             username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
             avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
-            user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous)
+            user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous),
+            isOptimistic: false // Mark as real from server
           };
           
           console.log('✅ [Comments] Processed comment avatar:', {
@@ -268,12 +269,22 @@ export default function CommentsModal({
           } else {
             // This is a TOP-LEVEL COMMENT - add to main comments list
             setLocalComments(prev => {
-              // Remove optimistic comments (temp IDs)
-              const withoutOptimistic = prev.filter(c => !c.isOptimistic);
-              // Check if this comment already exists
-              const exists = withoutOptimistic.some(c => c.id === processedComment.id);
+              // Check if this is replacing an optimistic comment
+              const optimisticIndex = prev.findIndex(c => 
+                c.isOptimistic && c.text === processedComment.text && c.userId === processedComment.userId
+              );
+              
+              if (optimisticIndex !== -1) {
+                // Replace optimistic comment with real one
+                const newComments = [...prev];
+                newComments[optimisticIndex] = processedComment;
+                return newComments;
+              }
+              
+              // Check if this comment already exists (by ID)
+              const exists = prev.some(c => c.id === processedComment.id);
               if (exists) return prev; // Already added, skip
-              return [...withoutOptimistic, processedComment]; // Add to end for oldest-to-latest
+              return [...prev, processedComment]; // Add to end for oldest-to-latest
             });
           }
         }
@@ -303,88 +314,81 @@ export default function CommentsModal({
   }, [post?.id, visible, onLoadComments]);
   const addComment = React.useCallback((newComment: Comment) => {
     setLocalComments(prev => {
-      // Check if comment already exists (prevent duplicates from broadcast)
-      const exists = prev.some(c => c.id === newComment.id);
-      if (exists && !newComment.isOptimistic) {
-        // Comment already exists, don't add duplicate
-        return prev;
-      }
-      
       if (!newComment.parentId) {
-        // Top-level comment - check for duplicates
-        if (exists) {
-          // Replace existing (optimistic -> real)
-          return prev.map(c => c.id === newComment.id ? newComment : c);
+        // Top-level comment handling
+        if (newComment.isOptimistic) {
+          // Add optimistic comment immediately
+          const newComments = [...prev, newComment];
+          // Auto-scroll to bottom for new comments
+          setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+          return newComments;
+        } else {
+          // Real comment from server - check if replacing optimistic
+          const optimisticIndex = prev.findIndex(c => 
+            c.isOptimistic && c.text === newComment.text && c.userId === newComment.userId
+          );
+          
+          if (optimisticIndex !== -1) {
+            // Replace optimistic with real
+            const newComments = [...prev];
+            newComments[optimisticIndex] = newComment;
+            return newComments;
+          }
+          
+          // Check if comment already exists by ID
+          const exists = prev.some(c => c.id === newComment.id);
+          if (exists) return prev;
+          
+          // Add new real comment
+          return [...prev, newComment];
         }
-        // Add to end for oldest-to-latest order
-        return [...prev, newComment];
       }
       
-      // Reply - find parent and add to its replies
-      return prev.map(comment => {
-        if (comment.id === newComment.parentId) {
-          // Check if reply already exists in this parent's replies
-          const replyExists = comment.replies.some(r => r.id === newComment.id);
-          if (replyExists) {
-            // Replace existing reply
-            return {
-              ...comment,
-              replies: comment.replies.map(r => r.id === newComment.id ? newComment : r)
-            };
-          }
-          // Add to end for oldest-to-latest order
-          return { ...comment, replies: [...comment.replies, newComment] };
-        }
-        return comment;
-      });
+      // Reply handling - this shouldn't happen in Comments.tsx as replies go through ReplyPanel
+      return prev;
     });
   }, []);
 
   const handleSendComment = async () => {
     const text = newComment.trim();
     if (text) {
-      // Create optimistic comment for instant UI feedback
-      const optimisticComment: Comment = {
+      // Create instant comment with proper user data (no "You" text)
+      const currentUserData = {
+        id: currentUserId || '',
+        username: isAnonymous ? 'Anonymous' : (currentUser?.username || 'User'),
+        avatar: isAnonymous ? ANONYMOUS_AVATAR : (currentUser?.avatar_url || DEFAULT_AVATAR)
+      };
+      
+      const instantComment: Comment = {
         id: `temp-${Date.now()}`, // Temporary ID
         text: text,
         userId: currentUserId || '',
-        username: getDisplayUser({ username: 'You' }, isAnonymous).username,
-        avatar: getDisplayUser({ avatar: '' }, isAnonymous).avatar,
-        time: 'now', // Time display
+        username: currentUserData.username,
+        avatar: currentUserData.avatar,
+        time: 'now',
         createdAt: new Date().toISOString(),
         parentId: undefined,
         replies: [],
-        isOptimistic: true, // Flag to identify optimistic comments
         isAnonymous: isAnonymous,
+        user: currentUserData
       };
 
-      // Add optimistic comment immediately using the new function
-      addComment(optimisticComment);
+      // Add instant comment immediately
+      addComment(instantComment);
       setNewComment('');
       // Don't reset anonymous state - let user control it
       
       // Scroll to bottom immediately to show the optimistic comment
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 50);
+      }, 100);
 
-      // Call the actual API
-      try {
-        console.log('🔥 [Comments] Sending comment with isAnonymous:', isAnonymous);
-        console.log('🔥 [Comments] onAddComment parameters:', { text, parentId: undefined, isAnonymous });
-        const result = await onAddComment(text, undefined, isAnonymous);
-        console.log('🔥 [Comments] API result:', result);
-        
-        // Remove optimistic comment - real-time broadcast will add the server version
-        setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
-      } catch (error) {
-        // Remove optimistic comment on error
-        setLocalComments(prev => prev.filter(comment => comment.id !== optimisticComment.id));
-        // Restore the comment text and anonymous state
-        setNewComment(text);
-        setIsAnonymous(optimisticComment.isAnonymous);
+      // Fire-and-forget API call - don't wait for response
+      onAddComment(text, undefined, isAnonymous).catch(error => {
         console.error('Error adding comment:', error);
-      }
+      });
     }
   };
   const handleDeleteComment = async (commentId: string) => {
