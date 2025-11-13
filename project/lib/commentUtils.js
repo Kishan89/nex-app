@@ -3,7 +3,7 @@
 export const ANONYMOUS_AVATAR = require('@/assets/images/anonymous-avatar.png');
 export const DEFAULT_AVATAR = require('@/assets/images/default-avatar.png');
 
-export const getDisplayUser = (user: any, isAnonymous: boolean) => {
+export const getDisplayUser = (user, isAnonymous) => {
   if (isAnonymous) {
     return {
       ...user,

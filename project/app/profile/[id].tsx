@@ -15,8 +15,9 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Info, Heart, MessageCircle, Bookmark, Edit, ArrowLeft, PenTool, UserPlus, UserMinus } from 'lucide-react-native';
+import { Info, Heart, MessageCircle, Bookmark, Edit, ArrowLeft, PenTool, UserPlus, UserMinus, UserCircle, X } from 'lucide-react-native';
 import PostCard from '../../components/PostCard';
+import ProfileCompletionBanner from '../../components/ProfileCompletionBanner';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import apiService, { ProfileData as ApiProfileData } from '@/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -55,6 +56,7 @@ export default function ProfileScreen() {
   const [userXPRank, setUserXPRank] = useState<number | null>(null);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<NormalizedPost | null>(null);
+  const [showBanner, setShowBanner] = useState(true);
   const isMyProfile = user?.id === userId;
 
   // Function to get medal emoji for top 3 XP users
@@ -498,6 +500,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <Stack.Screen options={{ headerShown: false }} />
+      
       <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
@@ -517,6 +520,92 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.floatingBackButton} onPress={handleBackPress}>
             <ArrowLeft size={24} color="#ffffff" />
           </TouchableOpacity>
+          
+          {/* Profile Completion Banner - Floating on banner image */}
+          {isMyProfile && showBanner && !profile.avatar_url && !profile.bio && !profile.banner_url && (
+            <View style={{
+              position: 'absolute',
+              top: 30,
+              left: 16,
+              right: 16,
+              borderRadius: 12,
+              overflow: 'hidden',
+              zIndex: 5,
+            }}>
+              <LinearGradient
+                colors={[colors.primary, colors.secondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  padding: 16,
+                  borderRadius: 12,
+                }}
+              >
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  marginBottom: 12,
+                }}>
+                  <View style={{
+                    marginRight: 12,
+                  }}>
+                    <UserCircle size={32} color="#ffffff" strokeWidth={2} />
+                  </View>
+                  <View style={{
+                    flex: 1,
+                    marginRight: 8,
+                  }}>
+                    <Text style={{
+                      fontSize: 18,
+                      fontWeight: 'bold',
+                      color: '#ffffff',
+                      marginBottom: 4,
+                    }}>Complete Your Profile ✨</Text>
+                    <Text style={{
+                      fontSize: 14,
+                      color: '#ffffffcc',
+                      marginBottom: 12,
+                      lineHeight: 18,
+                    }}>
+                      Add your photo, name, bio, and cover banner to make your profile shine.
+                    </Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={{
+                      padding: 4,
+                      backgroundColor: '#ffffff20',
+                      borderRadius: 16,
+                    }}
+                    onPress={() => setShowBanner(false)}
+                  >
+                    <X size={20} color="#ffffff" strokeWidth={2.5} />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity 
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#ffffff',
+                    paddingVertical: 12,
+                    paddingHorizontal: 20,
+                    borderRadius: 8,
+                  }}
+                  onPress={() => {
+                    setShowBanner(false);
+                    router.push('/edit-profile');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{
+                    fontSize: 16,
+                    fontWeight: 'bold',
+                    color: colors.primary,
+                  }}>Complete Now</Text>
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
+          )}
         </View>
         {/* Profile Image Section - Separate from banner */}
         <View style={styles.profileImageSection}>
