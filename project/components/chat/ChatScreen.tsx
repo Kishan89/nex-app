@@ -362,7 +362,11 @@ const ChatScreen = React.memo(function ChatScreen({
             hour12: true
           }),
           status: 'sending',
-          sender: { id: user.id, username: user.username || 'You' }
+          sender: {
+            id: user.id,
+            username: user.username || 'You',
+            avatar: user.avatar || null,
+          },
         };
         
         setMessages(prev => [...prev, tempMessage]);
@@ -406,7 +410,11 @@ const ChatScreen = React.memo(function ChatScreen({
         hour12: true
       }),
       status: 'sending', // Gray clock icon 🕓
-      sender: { id: user.id, username: user.username || 'You' }
+      sender: {
+        id: user.id,
+        username: user.username || 'You',
+        avatar: user.avatar || null,
+      },
     };
     
     console.log('✅ [OPTIMISTIC] Adding temp message to UI:', tempId);
@@ -461,7 +469,11 @@ const ChatScreen = React.memo(function ChatScreen({
             isUser: true,
             timestamp: formattedTimestamp,
             status: 'sent',
-            sender: { id: user.id, username: user.username || 'You' }
+            sender: {
+              id: user.id,
+              username: user.username || 'You',
+              avatar: user.avatar || null,
+            },
           };
           
           // Replace temp message with real message
@@ -523,7 +535,11 @@ const ChatScreen = React.memo(function ChatScreen({
               isUser: true,
               timestamp: formattedTimestamp,
               status: 'sent',
-              sender: { id: user.id, username: user.username || 'You' }
+              sender: {
+                id: user.id,
+                username: user.username || 'You',
+                avatar: user.avatar || null,
+              },
             };
             
             // Replace temp message with real message
@@ -1011,57 +1027,91 @@ const ChatScreen = React.memo(function ChatScreen({
   // Render message item
   const renderMessage = useCallback(({ item }: { item: Message }) => {
     const isUserMessage = item.isUser;
+    const isGroupChat = chatData?.isGroup;
+
     return (
       <View style={[
         styles.messageContainer,
         isUserMessage ? styles.userMessage : styles.otherMessage
       ]}>
-        <View style={[
-          styles.messageBubble,
-          isUserMessage 
-            ? [styles.userBubble, { backgroundColor: colors.primary }]
-            : [styles.otherBubble, { backgroundColor: colors.backgroundSecondary }]
-        ]}>
-          <Text style={[
-            styles.messageText,
-            { color: isUserMessage ? '#ffffff' : colors.text }
+        <View style={styles.messageInnerRow}>
+          {/* Avatar only for LEFT (other users') messages in group chats */}
+          {isGroupChat && !isUserMessage && item.sender && (
+            item.sender.avatar ? (
+              <Image
+                source={{ uri: item.sender.avatar }}
+                style={styles.senderAvatar}
+              />
+            ) : (
+              <Image
+                source={require('@/assets/images/default-avatar.png')}
+                style={styles.senderAvatar}
+              />
+            )
+          )}
+
+          <View style={[
+            styles.messageBubble,
+            isUserMessage 
+              ? [styles.userBubble, { backgroundColor: colors.primary }]
+              : [styles.otherBubble, { backgroundColor: colors.backgroundSecondary }]
           ]}>
-            {renderTextWithLinks(item.text, isUserMessage)}
-          </Text>
-          <View style={styles.messageFooter}>
-            <Text style={[
-              styles.messageTime,
-              { color: isUserMessage ? 'rgba(255,255,255,0.7)' : colors.textMuted }
-            ]}>
-              {typeof item.timestamp === 'string' ? item.timestamp : formatMessageTime(item.timestamp)}
-            </Text>
-            {isUserMessage && (
-              <View style={styles.messageStatusContainer}>
-                <Text style={[
-                  styles.messageTicks,
-                  { color: item.status === 'sending' ? '#9e9e9e' : 
-                           item.status === 'failed' ? '#f44336' : 
-                           '#000000' }
-                ]}>
-                  {item.status === 'sending' ? '🕓' : 
-                   item.status === 'sent' ? '✓' : 
-                   item.status === 'failed' ? '❌' : '✓'}
+            {/* Sender name only for LEFT messages in group chats, inside bubble */}
+            {isGroupChat && !isUserMessage && item.sender && (
+              <View style={styles.senderInfoContainer}>
+                <Text
+                  style={[
+                    styles.senderName,
+                    // Use app's light blue color for username (same as links)
+                    { color: '#3B8FE8' }
+                  ]}
+                >
+                  {item.sender.username || 'Unknown'}
                 </Text>
-                {item.status === 'failed' && (
-                  <TouchableOpacity 
-                    style={styles.retryButton}
-                    onPress={() => retryMessage(item)}
-                  >
-                    <Text style={styles.retryText}>Retry</Text>
-                  </TouchableOpacity>
-                )}
               </View>
             )}
+
+            <Text style={[
+              styles.messageText,
+              { color: isUserMessage ? '#ffffff' : colors.text }
+            ]}>
+              {renderTextWithLinks(item.text, isUserMessage)}
+            </Text>
+            <View style={styles.messageFooter}>
+              <Text style={[
+                styles.messageTime,
+                { color: isUserMessage ? 'rgba(255,255,255,0.7)' : colors.textMuted }
+              ]}>
+                {typeof item.timestamp === 'string' ? item.timestamp : formatMessageTime(item.timestamp)}
+              </Text>
+              {isUserMessage && (
+                <View style={styles.messageStatusContainer}>
+                  <Text style={[
+                    styles.messageTicks,
+                    { color: item.status === 'sending' ? '#9e9e9e' : 
+                             item.status === 'failed' ? '#f44336' : 
+                             '#000000' }
+                  ]}>
+                    {item.status === 'sending' ? '🕓' : 
+                     item.status === 'sent' ? '✓' : 
+                     item.status === 'failed' ? '❌' : '✓'}
+                  </Text>
+                  {item.status === 'failed' && (
+                    <TouchableOpacity 
+                      style={styles.retryButton}
+                      onPress={() => retryMessage(item)}
+                    >
+                      <Text style={styles.retryText}>Retry</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
           </View>
         </View>
       </View>
     );
-  }, [colors]);
+  }, [colors, chatData?.isGroup]);
   // Header component - render directly without useMemo to avoid undefined issues
   const renderHeader = () => {
     try {
@@ -1295,6 +1345,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   messageContainer: {
     marginVertical: Spacing.xs,
   },
+  messageInnerRow: {
+    flexDirection: 'row',
+    // Align avatar with top of bubble, not bottom
+    alignItems: 'flex-start',
+  },
   userMessage: {
     alignItems: 'flex-end',
   },
@@ -1388,6 +1443,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: FontSizes.md,
     marginLeft: Spacing.md,
     fontWeight: FontWeights.medium,
+    // Make menu text (e.g. "Add Members") clearly visible
+    color: '#ffffff',
   },
   destructiveText: {
     color: '#ff4444',
@@ -1408,6 +1465,23 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: '#ffffff',
     fontSize: FontSizes.xs,
     fontWeight: FontWeights.medium,
+  },
+  senderInfoContainer: {
+    flexDirection: 'row',
+    // Keep name row tight to left inside bubble
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+    paddingLeft: 0,
+  },
+  senderAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: Spacing.xs,
+  },
+  senderName: {
+    fontSize: FontSizes.xs,
+    fontWeight: FontWeights.semibold,
   },
 });
 export default ChatScreen;
