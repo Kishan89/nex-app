@@ -879,9 +879,16 @@ class ChatService {
 
   async updateGroupAvatar(chatId, avatar, userId) {
     const chat = await prisma.chat.findFirst({
-      where: { id: chatId, isGroup: true, participants: { some: { userId, isAdmin: true } } }
+      where: { id: chatId, isGroup: true },
+      include: { participants: true }
     });
-    if (!chat) throw new ForbiddenError('Only admins can update group avatar');
+    
+    if (!chat) throw new NotFoundError('Group not found');
+    
+    const userParticipant = chat.participants.find(p => p.userId === userId);
+    if (!userParticipant || !userParticipant.isAdmin) {
+      throw new ForbiddenError('Only group admins can update group avatar');
+    }
     
     return await prisma.chat.update({
       where: { id: chatId },
@@ -892,9 +899,16 @@ class ChatService {
 
   async updateGroupName(chatId, name, userId) {
     const chat = await prisma.chat.findFirst({
-      where: { id: chatId, isGroup: true, participants: { some: { userId, isAdmin: true } } }
+      where: { id: chatId, isGroup: true },
+      include: { participants: true }
     });
-    if (!chat) throw new ForbiddenError('Only admins can update group name');
+    
+    if (!chat) throw new NotFoundError('Group not found');
+    
+    const userParticipant = chat.participants.find(p => p.userId === userId);
+    if (!userParticipant || !userParticipant.isAdmin) {
+      throw new ForbiddenError('Only group admins can update group name');
+    }
     
     return await prisma.chat.update({
       where: { id: chatId },
@@ -905,9 +919,16 @@ class ChatService {
 
   async updateGroupDescription(chatId, description, userId) {
     const chat = await prisma.chat.findFirst({
-      where: { id: chatId, isGroup: true, participants: { some: { userId, isAdmin: true } } }
+      where: { id: chatId, isGroup: true },
+      include: { participants: true }
     });
-    if (!chat) throw new ForbiddenError('Only admins can update group description');
+    
+    if (!chat) throw new NotFoundError('Group not found');
+    
+    const userParticipant = chat.participants.find(p => p.userId === userId);
+    if (!userParticipant || !userParticipant.isAdmin) {
+      throw new ForbiddenError('Only group admins can update group description');
+    }
     
     return await prisma.chat.update({
       where: { id: chatId },
