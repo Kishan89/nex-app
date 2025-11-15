@@ -13,6 +13,7 @@ const followRoutes = require('./followRoutes');
 const searchRoutes = require('./searchRoutes');
 const xpRoutes = require('./xpRoutes');
 const versionRoutes = require('./version');
+const groupsRouter = require('./groups');
 
 const userController = require('../controllers/userController'); 
 
@@ -43,5 +44,6 @@ router.use('/follow', followRoutes);
 router.use('/search', searchRoutes);
 router.use('/xp', xpRoutes);
 router.use('/version', versionRoutes);
+router.use('/groups', groupsRouter);
 
 module.exports = router;

@@ -36,6 +36,7 @@ type Chat = {
   userId?: string;
   lastSeen?: string;
   lastSeenText?: string;
+  isGroup?: boolean;
 };
 const ChatsScreen = React.memo(function ChatsScreen() {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -307,6 +308,9 @@ const ChatsScreen = React.memo(function ChatsScreen() {
     setRefreshing(true);
     loadChats(true); // Force refresh on pull to refresh
   }, [loadChats]);
+  const handleGroupsPress = () => {
+    router.push('/groups');
+  };
   const handleChatPress = async (chat: Chat) => {
     // Mark chat as read using context (pass current unread count)
     const currentUnreadCount = chat.unread || 0;
@@ -396,6 +400,9 @@ const ChatsScreen = React.memo(function ChatsScreen() {
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.actionButton} onPress={handleSearchPress}>
             <Search size={20} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={handleGroupsPress}>
+            <MessageCircle size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>

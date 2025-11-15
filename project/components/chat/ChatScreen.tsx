@@ -35,6 +35,7 @@ import { fcmService } from '@/lib/fcmService';
 import { socketService } from '@/lib/socketService';
 import { messagePersistence } from '@/lib/messagePersistence';
 import { ultraFastChatCache } from '@/lib/ChatCache';
+import { router } from 'expo-router';
 interface ChatData {
   id: string | number;
   name: string;
@@ -43,6 +44,7 @@ interface ChatData {
   lastSeen?: string;
   userId?: string;
   username?: string;
+  isGroup?: boolean;
 }
 interface ChatScreenProps {
   chatData: ChatData;
@@ -1185,6 +1187,24 @@ const ChatScreen = React.memo(function ChatScreen({
           onPress={() => setShowOptionsMenu(false)}
         >
           <View style={[styles.optionsMenu, { backgroundColor: colors.backgroundSecondary }]}>
+            {chatData?.isGroup && (
+              <TouchableOpacity 
+                style={styles.optionItem}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  const groupId = String(chatData.id);
+                  router.push({
+                    pathname: `/groups/${groupId}/add-members`,
+                    params: {
+                      name: chatData.name || 'Group',
+                    },
+                  });
+                }}
+              >
+                <UserX size={20} color={colors.text} />
+                <Text style={styles.optionText}>Add Members</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity 
               style={styles.optionItem}
               onPress={() => {

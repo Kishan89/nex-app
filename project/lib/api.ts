@@ -33,6 +33,9 @@ const API_ENDPOINTS = {
     CHAT_MESSAGES: (chatId: string) => `/chats/${chatId}/messages`,
     SEND_MESSAGE: (chatId: string) => `/chats/${chatId}/messages`,
     CREATE_CHAT: "/chats",
+    GROUPS: "/groups",
+    GROUP_ADD_MEMBER: (groupId: string) => `/groups/${groupId}/members`,
+    GROUP_REMOVE_MEMBER: (groupId: string, userId: string) => `/groups/${groupId}/members/${userId}`,
     POST_COMMENTS: (postId: string) => `/posts/${postId}/comments`,
     DELETE_COMMENT: (postId: string, commentId: string) => `/posts/${postId}/comments/${commentId}`,
     REPORT_COMMENT: (postId: string, commentId: string) => `/posts/${postId}/comments/${commentId}/report`,
@@ -560,6 +563,38 @@ class ApiService {
             participantIds: [this.userId, userId],
             isGroup: false
         });
+    }
+    // Group chat methods
+    async getUserGroups(): Promise<any[]> {
+        try {
+            const resp = await this.get<any>(API_ENDPOINTS.GROUPS);
+            if (Array.isArray(resp)) return resp;
+            if (resp && typeof resp === 'object') {
+                return (resp as any).data || (resp as any).groups || [];
+            }
+            return [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    async createGroup(name: string, description: string | null, memberIds: string[]): Promise<any> {
+        const payload: any = {
+            name,
+            memberIds,
+        };
+        if (description && description.trim() !== '') {
+            payload.description = description.trim();
+        }
+        return this.post(API_ENDPOINTS.GROUPS, payload);
+    }
+
+    async addGroupMember(groupId: string, userId: string): Promise<any> {
+        return this.post(API_ENDPOINTS.GROUP_ADD_MEMBER(groupId), { userId });
+    }
+
+    async removeGroupMember(groupId: string, userId: string): Promise<any> {
+        return this.delete(API_ENDPOINTS.GROUP_REMOVE_MEMBER(groupId, userId));
     }
     // XP System methods
     async getXPRules() {

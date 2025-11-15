@@ -2,7 +2,7 @@ const { prisma } = require('../config/database');
 const { formatTimeAgo } = require('../utils/helpers');
 const { createLogger } = require('../utils/logger');
 const { MESSAGE_STATUS, PAGINATION } = require('../constants');
-const { NotFoundError } = require('../utils/errors');
+const { NotFoundError, ForbiddenError, BadRequestError } = require('../utils/errors');
 
 const logger = createLogger('ChatService');
 
@@ -31,6 +31,8 @@ class ChatService {
           },
           select: {
             id: true,
+            name: true,
+            isGroup: true,
             updatedAt: true,
             participants: {
               select: {
@@ -82,32 +84,54 @@ class ChatService {
         });
 
       const formattedChats = chats.map((chat) => {
-        const otherParticipant = chat.participants[0]?.user;
         const lastMessage = chat.messages[0];
         const unreadCount = chat._count?.messages || 0;
-        
-        let lastSeenText = 'Last seen recently';
-        if (otherParticipant?.isOnline) {
-          lastSeenText = 'Online';
-        } else if (otherParticipant?.lastSeen) {
-          const timeAgo = formatTimeAgo(otherParticipant.lastSeen);
-          lastSeenText = timeAgo === 'now' ? 'Last seen just now' : `Last seen ${timeAgo} ago`;
+
+        let name = 'Unknown';
+        let username = 'Unknown';
+        let userIdForChat = 'unknown';
+        let avatar = null;
+        let isOnline = false;
+        let lastSeen = null;
+        let lastSeenText = '';
+
+        if (chat.isGroup) {
+          name = chat.name || 'Group';
+          username = name;
+        } else {
+          const otherParticipant = chat.participants[0]?.user;
+
+          name = otherParticipant?.username || 'Unknown';
+          username = otherParticipant?.username || 'Unknown';
+          userIdForChat = otherParticipant?.id || 'unknown';
+          avatar = otherParticipant?.avatar || null;
+          isOnline = otherParticipant?.isOnline || false;
+          lastSeen = otherParticipant?.lastSeen;
+
+          lastSeenText = 'Last seen recently';
+          if (otherParticipant?.isOnline) {
+            lastSeenText = 'Online';
+          } else if (otherParticipant?.lastSeen) {
+            const timeAgo = formatTimeAgo(otherParticipant.lastSeen);
+            lastSeenText = timeAgo === 'now' ? 'Last seen just now' : `Last seen ${timeAgo} ago`;
+          }
         }
-        
+
         return {
           id: chat.id,
-          name: otherParticipant?.username || 'Unknown',
-          username: otherParticipant?.username || 'Unknown',
-          userId: otherParticipant?.id || 'unknown',
+          name,
+          username,
+          userId: userIdForChat,
           lastMessage: lastMessage?.content || 'No messages yet',
           time: lastMessage ? formatTimeAgo(lastMessage.createdAt) : '',
-          avatar: otherParticipant?.avatar || null,
-          isOnline: otherParticipant?.isOnline || false,
-          lastSeen: otherParticipant?.lastSeen,
-          lastSeenText: lastSeenText,
+          avatar,
+          isOnline,
+          lastSeen,
+          lastSeenText,
           unread: unreadCount,
           lastUpdated: chat.updatedAt,
           lastMessageId: lastMessage?.id,
+          isGroup: chat.isGroup,
         };
       });
       
@@ -166,22 +190,44 @@ class ChatService {
         throw new NotFoundError('Chat not found');
       }
 
-      // Find the other participant
-      const otherParticipant = chat.participants.find(p => p.userId !== userId);
+      const isGroup = chat.isGroup;
       const lastMessage = chat.messages[0];
+
+      let name = 'Unknown';
+      let username = 'Unknown';
+      let userIdForChat = 'unknown';
+      let avatar = null;
+      let isOnline = false;
+      let lastSeen = null;
+      let lastSeenText = '';
+
+      if (isGroup) {
+        name = chat.name || 'Group';
+        username = name;
+      } else {
+        const otherParticipant = chat.participants.find(p => p.userId !== userId);
+        name = otherParticipant?.user?.username || 'Unknown';
+        username = otherParticipant?.user?.username || 'Unknown';
+        userIdForChat = otherParticipant?.user?.id || 'unknown';
+        avatar = otherParticipant?.user?.avatar || null;
+        isOnline = otherParticipant?.user?.isOnline || false;
+        lastSeen = otherParticipant?.user?.lastSeen;
+        lastSeenText = otherParticipant?.user?.isOnline ? 'Online' : 'Last seen recently';
+      }
 
       return {
         id: chat.id,
-        name: otherParticipant?.user?.username || 'Unknown',
-        username: otherParticipant?.user?.username || 'Unknown',
-        userId: otherParticipant?.user?.id || 'unknown',
-        avatar: otherParticipant?.user?.avatar || null,
-        isOnline: otherParticipant?.user?.isOnline || false,
-        lastSeen: otherParticipant?.user?.lastSeen,
-        lastSeenText: otherParticipant?.user?.isOnline ? 'Online' : 'Last seen recently',
+        name,
+        username,
+        userId: userIdForChat,
+        avatar,
+        isOnline,
+        lastSeen,
+        lastSeenText,
         lastMessage: lastMessage?.content || 'No messages yet',
         time: lastMessage ? formatTimeAgo(lastMessage.createdAt) : '',
-        participants: chat.participants
+        participants: chat.participants,
+        isGroup,
       };
     } catch (error) {
       throw error;
@@ -366,17 +412,19 @@ class ChatService {
    */
   async createChat(chatData) {
     try {
-      const { name, isGroup = false, participantIds, currentUserId } = chatData;
+      const { name, description, isGroup = false, participantIds, currentUserId } = chatData;
+
+      const uniqueParticipantIds = Array.from(new Set(participantIds || []));
 
       // Check if chat already exists for 1-on-1 conversations
-      if (!isGroup && participantIds.length === 2) {
+      if (!isGroup && uniqueParticipantIds.length === 2) {
         const existingChat = await prisma.chat.findFirst({
           where: {
             isGroup: false,
             participants: {
               every: {
                 userId: {
-                  in: participantIds
+                  in: uniqueParticipantIds
                 }
               }
             }
@@ -404,9 +452,14 @@ class ChatService {
       const chat = await prisma.chat.create({
         data: {
           name,
+          description,
           isGroup,
+          createdById: isGroup ? (currentUserId || uniqueParticipantIds[0] || null) : null,
           participants: {
-            create: participantIds.map(userId => ({ userId }))
+            create: uniqueParticipantIds.map(userId => ({
+              userId,
+              isAdmin: isGroup && (userId === (currentUserId || uniqueParticipantIds[0]))
+            }))
           }
         },
         include: {
@@ -425,6 +478,236 @@ class ChatService {
       });
   
       return chat;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's group chats
+   * @param {string} userId - User ID
+   * @returns {Promise<Array>} - Array of group chats
+   */
+  async getUserGroupChats(userId) {
+    try {
+      logger.debug(`Getting group chats for user: ${userId}`);
+
+      if (!userId || userId === 'undefined' || userId === 'null') {
+        logger.warn('Invalid userId provided for getUserGroupChats:', userId);
+        return [];
+      }
+
+      const chats = await prisma.chat.findMany({
+        where: {
+          isGroup: true,
+          participants: {
+            some: { userId }
+          }
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          isGroup: true,
+          createdAt: true,
+          updatedAt: true,
+          participants: {
+            select: {
+              userId: true,
+              isAdmin: true,
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  avatar: true,
+                }
+              }
+            }
+          },
+          messages: {
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              senderId: true,
+              status: true,
+              sender: {
+                select: {
+                  username: true
+                }
+              }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+          _count: {
+            select: {
+              messages: {
+                where: {
+                  senderId: { not: userId },
+                  status: { not: MESSAGE_STATUS.READ }
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          updatedAt: 'desc'
+        }
+      });
+
+      return chats.map(chat => {
+        const lastMessage = chat.messages[0];
+        const unreadCount = chat._count?.messages || 0;
+        const memberCount = chat.participants.length;
+
+        return {
+          id: chat.id,
+          name: chat.name || 'Group',
+          description: chat.description || '',
+          isGroup: true,
+          lastMessage: lastMessage?.content || 'No messages yet',
+          time: lastMessage ? formatTimeAgo(lastMessage.createdAt) : '',
+          unread: unreadCount,
+          memberCount,
+          lastUpdated: chat.updatedAt,
+          lastMessageId: lastMessage?.id,
+        };
+      });
+    } catch (error) {
+      logger.error('Error getting user group chats:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Add a participant to a group chat
+   * @param {string} chatId - Chat ID
+   * @param {string} userId - User ID to add
+   * @param {string} actingUserId - Acting user ID
+   * @returns {Promise<Object>} - Updated chat
+   */
+  async addParticipantToChat(chatId, userId, actingUserId) {
+    try {
+      const chat = await prisma.chat.findUnique({
+        where: { id: chatId },
+        include: {
+          participants: true,
+        }
+      });
+
+      if (!chat) {
+        throw new NotFoundError('Chat not found');
+      }
+
+      if (!chat.isGroup) {
+        throw new BadRequestError('Cannot add participants to a 1-on-1 chat');
+      }
+
+      const actingParticipant = chat.participants.find(p => p.userId === actingUserId);
+      if (!actingParticipant || !actingParticipant.isAdmin) {
+        throw new ForbiddenError('Only group admins can add members');
+      }
+
+      const existingParticipant = chat.participants.find(p => p.userId === userId);
+      if (existingParticipant) {
+        return chat;
+      }
+
+      await prisma.chatParticipant.create({
+        data: {
+          chatId,
+          userId,
+          isAdmin: false,
+        }
+      });
+
+      const updatedChat = await prisma.chat.findUnique({
+        where: { id: chatId },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  avatar: true,
+                  isOnline: true,
+                  lastSeen: true,
+                }
+              }
+            }
+          }
+        }
+      });
+
+      return updatedChat;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Remove a participant from a group chat
+   * @param {string} chatId - Chat ID
+   * @param {string} userId - User ID to remove
+   * @param {string} actingUserId - Acting user ID
+   * @returns {Promise<Object>} - Updated chat
+   */
+  async removeParticipantFromChat(chatId, userId, actingUserId) {
+    try {
+      const chat = await prisma.chat.findUnique({
+        where: { id: chatId },
+        include: {
+          participants: true,
+        }
+      });
+
+      if (!chat) {
+        throw new NotFoundError('Chat not found');
+      }
+
+      if (!chat.isGroup) {
+        throw new BadRequestError('Cannot remove participants from a 1-on-1 chat');
+      }
+
+      const actingParticipant = chat.participants.find(p => p.userId === actingUserId);
+      const targetParticipant = chat.participants.find(p => p.userId === userId);
+
+      if (!targetParticipant) {
+        throw new NotFoundError('User is not a participant in this chat');
+      }
+
+      if (actingUserId !== userId) {
+        if (!actingParticipant || !actingParticipant.isAdmin) {
+          throw new ForbiddenError('Only group admins can remove other members');
+        }
+      }
+
+      await prisma.chatParticipant.delete({
+        where: { id: targetParticipant.id }
+      });
+
+      const updatedChat = await prisma.chat.findUnique({
+        where: { id: chatId },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  avatar: true,
+                  isOnline: true,
+                  lastSeen: true,
+                }
+              }
+            }
+          }
+        }
+      });
+
+      return updatedChat;
     } catch (error) {
       throw error;
     }
