@@ -92,16 +92,30 @@ const ChatScreen = React.memo(function ChatScreen({
   const [editDescInput, setEditDescInput] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
   const [isSavingDesc, setIsSavingDesc] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<any[]>([]);
+  const [showMentionModal, setShowMentionModal] = useState(false);
   
   useEffect(() => {
     if (chatData && chatData.isGroup) {
-      console.log('Syncing group data:', { name: chatData.name, description: chatData.description, avatar: chatData.avatar });
-      // Always sync group data, even if empty
+      console.log('Syncing group data:', { name: chatData.name, description: chatData.description, avatar: chatData.avatar, createdById: chatData.createdById });
       setGroupName(chatData.name || '');
       setGroupDescription(chatData.description || '');
       setGroupAvatar(chatData.avatar || '');
+      
+      // Check if current user is admin (group creator)
+      if (user?.id && chatData.createdById) {
+        const isCreator = user.id === chatData.createdById;
+        setIsAdmin(isCreator);
+        console.log('Admin check:', { userId: user.id, createdById: chatData.createdById, isAdmin: isCreator });
+      }
+      
+      // Load group members for mentions
+      if (chatData.participants) {
+        setGroupMembers(chatData.participants.filter((p: any) => p.userId !== user?.id));
+      }
     }
-  }, [chatData?.name, chatData?.description, chatData?.avatar, chatData?.isGroup]);
+  }, [chatData?.name, chatData?.description, chatData?.avatar, chatData?.isGroup, chatData?.createdById, chatData?.participants, user?.id]);
   // Refs
   const flatListRef = useRef<FlatList>(null);
   const timeoutRefs = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
@@ -1265,6 +1279,14 @@ const ChatScreen = React.memo(function ChatScreen({
       style={styles.inputContainer}
     >
       <View style={[styles.inputWrapper, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+        {chatData?.isGroup && groupMembers.length > 0 && (
+          <TouchableOpacity 
+            onPress={() => setShowMentionModal(true)}
+            style={styles.mentionButton}
+          >
+            <Text style={[styles.mentionButtonText, { color: colors.primary }]}>@</Text>
+          </TouchableOpacity>
+        )}
         <TextInput
           style={[styles.textInput, { color: colors.text }]}
           value={message}
@@ -1405,19 +1427,21 @@ const ChatScreen = React.memo(function ChatScreen({
                         <Users size={50} color="#ffffff" />
                       </LinearGradient>
                     )}
-                    <LinearGradient
-                      colors={['#3B8FE8', '#e385ec']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.groupAvatarEditButton}
-                    >
-                      <TouchableOpacity 
-                        onPress={handleSetGroupAvatar}
-                        style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                    {isAdmin && (
+                      <LinearGradient
+                        colors={['#3B8FE8', '#e385ec']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.groupAvatarEditButton}
                       >
-                        <Camera size={18} color="#ffffff" />
-                      </TouchableOpacity>
-                    </LinearGradient>
+                        <TouchableOpacity 
+                          onPress={handleSetGroupAvatar}
+                          style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Camera size={18} color="#ffffff" />
+                        </TouchableOpacity>
+                      </LinearGradient>
+                    )}
                   </View>
                   
                   {/* Group Name Card */}
@@ -1427,15 +1451,17 @@ const ChatScreen = React.memo(function ChatScreen({
                       <Text style={[styles.infoCardValue, { color: colors.text, flex: 1 }]}>
                         {groupName || chatData?.name || 'Group'}
                       </Text>
-                      <TouchableOpacity 
-                        onPress={() => {
-                          setEditNameInput(groupName);
-                          setShowEditNameModal(true);
-                        }}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        <Edit3 size={18} color={colors.primary} />
-                      </TouchableOpacity>
+                      {isAdmin && (
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setEditNameInput(groupName);
+                            setShowEditNameModal(true);
+                          }}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Edit3 size={18} color={colors.primary} />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                   
@@ -1446,15 +1472,17 @@ const ChatScreen = React.memo(function ChatScreen({
                       <Text style={[styles.infoCardValue, { color: colors.text, flex: 1 }]}>
                         {groupDescription || 'No description'}
                       </Text>
-                      <TouchableOpacity 
-                        onPress={() => {
-                          setEditDescInput(groupDescription);
-                          setShowEditDescModal(true);
-                        }}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        <Edit3 size={18} color={colors.secondary} />
-                      </TouchableOpacity>
+                      {isAdmin && (
+                        <TouchableOpacity 
+                          onPress={() => {
+                            setEditDescInput(groupDescription);
+                            setShowEditDescModal(true);
+                          }}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Edit3 size={18} color={colors.secondary} />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                   
@@ -1462,19 +1490,8 @@ const ChatScreen = React.memo(function ChatScreen({
                 
                 {/* Group Actions */}
                 <View style={styles.groupActionsSection}>
-                  <TouchableOpacity 
-                    style={[styles.actionCard, { backgroundColor: colors.backgroundSecondary }]}
-                    onPress={() => {
-                      setShowGroupInfo(false);
-                      const groupId = String(chatData.id);
-                      router.push({
-                        pathname: `/groups/${groupId}/add-members`,
-                        params: {
-                          name: chatData.name || 'Group',
-                        },
-                      });
-                    }}
-                  >
+                  {/* View Members - Always visible */}
+                  <View style={[styles.actionCard, { backgroundColor: colors.backgroundSecondary }]}>
                     <LinearGradient
                       colors={['#3B8FE8', '#e385ec']}
                       start={{ x: 0, y: 0 }}
@@ -1484,13 +1501,74 @@ const ChatScreen = React.memo(function ChatScreen({
                       <Users size={22} color="#ffffff" />
                     </LinearGradient>
                     <View style={styles.actionCardContent}>
-                      <Text style={[styles.actionCardTitle, { color: colors.text }]}>Add Members</Text>
-                      <Text style={[styles.actionCardSubtitle, { color: colors.textMuted }]}>Invite people to this group</Text>
+                      <Text style={[styles.actionCardTitle, { color: colors.text }]}>Members</Text>
+                      <Text style={[styles.actionCardSubtitle, { color: colors.textMuted }]}>{chatData.memberCount || 0} members in this group</Text>
                     </View>
-                    <Text style={[styles.memberCountText, { color: colors.textMuted }]}>
-                      {chatData.memberCount || 0}
-                    </Text>
-                  </TouchableOpacity>
+                  </View>
+                  
+                  {/* Members List */}
+                  <View style={styles.membersList}>
+                    {chatData.participants?.map((participant: any) => (
+                      <TouchableOpacity
+                        key={participant.userId}
+                        style={[styles.memberItem, { backgroundColor: colors.backgroundSecondary }]}
+                        onPress={() => {
+                          if (participant.userId !== user?.id) {
+                            setShowGroupInfo(false);
+                            router.push(`/profile/${participant.userId}`);
+                          }
+                        }}
+                      >
+                        {participant.user?.avatar ? (
+                          <Image source={{ uri: participant.user.avatar }} style={styles.memberAvatar} />
+                        ) : (
+                          <View style={[styles.memberAvatar, { backgroundColor: colors.primary + '20' }]}>
+                            <Text style={{ fontSize: 16 }}>👤</Text>
+                          </View>
+                        )}
+                        <View style={styles.memberInfo}>
+                          <Text style={[styles.memberName, { color: colors.text }]}>
+                            {participant.user?.username || 'User'}
+                            {participant.userId === user?.id && ' (You)'}
+                            {participant.userId === chatData.createdById && ' 👑'}
+                          </Text>
+                          {participant.userId === chatData.createdById && (
+                            <Text style={[styles.memberRole, { color: colors.primary }]}>Admin</Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  {/* Add Members - Only for admin */}
+                  {isAdmin && (
+                    <TouchableOpacity 
+                      style={[styles.actionCard, { backgroundColor: colors.backgroundSecondary, marginTop: Spacing.md }]}
+                      onPress={() => {
+                        setShowGroupInfo(false);
+                        const groupId = String(chatData.id);
+                        router.push({
+                          pathname: `/groups/${groupId}/add-members`,
+                          params: {
+                            name: chatData.name || 'Group',
+                          },
+                        });
+                      }}
+                    >
+                      <LinearGradient
+                        colors={['#3B8FE8', '#e385ec']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.actionCardIcon}
+                      >
+                        <Text style={{ fontSize: 20, color: '#ffffff' }}>+</Text>
+                      </LinearGradient>
+                      <View style={styles.actionCardContent}>
+                        <Text style={[styles.actionCardTitle, { color: colors.text }]}>Add Members</Text>
+                        <Text style={[styles.actionCardSubtitle, { color: colors.textMuted }]}>Invite people to this group</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
                 </View>
             </View>
           </View>
@@ -1605,6 +1683,53 @@ const ChatScreen = React.memo(function ChatScreen({
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Mention Modal */}
+      <Modal
+        visible={showMentionModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMentionModal(false)}
+      >
+        <View style={styles.mentionModalOverlay}>
+          <View style={[styles.mentionModalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.mentionModalHeader}>
+              <Text style={[styles.mentionModalTitle, { color: colors.text }]}>Mention Someone</Text>
+              <TouchableOpacity onPress={() => setShowMentionModal(false)}>
+                <Text style={[styles.mentionModalClose, { color: colors.textMuted }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={groupMembers}
+              keyExtractor={(item) => item.userId}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.mentionItem, { backgroundColor: colors.backgroundSecondary }]}
+                  onPress={() => {
+                    const username = item.user?.username || 'User';
+                    setMessage(prev => prev + `@${username} `);
+                    setShowMentionModal(false);
+                  }}
+                >
+                  {item.user?.avatar ? (
+                    <Image source={{ uri: item.user.avatar }} style={styles.mentionAvatar} />
+                  ) : (
+                    <View style={[styles.mentionAvatar, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={{ color: colors.primary }}>👤</Text>
+                    </View>
+                  )}
+                  <Text style={[styles.mentionUsername, { color: colors.text }]}>
+                    {item.user?.username || 'User'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={[styles.mentionEmpty, { color: colors.textMuted }]}>No members to mention</Text>
+              }
+            />
           </View>
         </View>
       </Modal>
@@ -1755,6 +1880,18 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: FontSizes.md,
     maxHeight: 100,
     marginRight: Spacing.sm,
+  },
+  mentionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.xs,
+  },
+  mentionButtonText: {
+    fontSize: 20,
+    fontWeight: FontWeights.bold,
   },
   sendButton: {
     width: 36,
@@ -2064,6 +2201,85 @@ const createStyles = (colors: any) => StyleSheet.create({
   nameButtonText: {
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
+  },
+  // Mention Modal Styles
+  mentionModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  mentionModalContent: {
+    height: '50%',
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+  },
+  mentionModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  mentionModalTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
+  },
+  mentionModalClose: {
+    fontSize: FontSizes.xl,
+  },
+  mentionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.xs,
+  },
+  mentionAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mentionUsername: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.medium,
+  },
+  mentionEmpty: {
+    textAlign: 'center',
+    padding: Spacing.xl,
+  },
+  // Members List Styles
+  membersList: {
+    marginTop: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  memberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.medium,
+  },
+  memberRole: {
+    fontSize: FontSizes.xs,
+    fontWeight: FontWeights.semibold,
+    marginTop: 2,
   },
 });
 export default ChatScreen;

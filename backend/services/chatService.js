@@ -236,6 +236,7 @@ class ChatService {
         isGroup,
         description: chat.description || '',
         memberCount: chat.participants?.length || 0,
+        createdById: chat.createdById || null,
       };
       
       logger.info('getChatById result:', { 
