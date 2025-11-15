@@ -190,7 +190,7 @@ export default function SettingsScreen() {
             ]}
           >
             <Text style={[styles.aboutTitle, { color: colors.text }]}>Nexeed Social</Text>
-            <Text style={[styles.aboutVersion, { color: colors.textMuted }]}>Version 1.2.0</Text>
+            <Text style={[styles.aboutVersion, { color: colors.textMuted }]}>Version 1.2.1</Text>
             <Text style={[styles.aboutDescription, { color: colors.textSecondary }]}>
               Connect, share, and discover with friends in a beautiful social experience.
             </Text>
@@ -255,7 +255,7 @@ export default function SettingsScreen() {
       onPress: handleShareApp,
       section: 'App',
     },
-    { icon: Download, title: 'App Version', subtitle: 'v1.2.0', section: 'App' },
+    { icon: Download, title: 'App Version', subtitle: 'v1.2.1', section: 'App' },
     // Support Section
     {
       icon: Info,

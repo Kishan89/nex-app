@@ -523,85 +523,46 @@ export default function ProfileScreen() {
           
           {/* Profile Completion Banner - Floating on banner image */}
           {isMyProfile && showBanner && !profile.avatar_url && !profile.bio && !profile.banner_url && (
-            <View style={{
-              position: 'absolute',
-              top: 30,
-              left: 16,
-              right: 16,
-              borderRadius: 12,
-              overflow: 'hidden',
-              zIndex: 5,
-            }}>
+            <View style={styles.floatingBanner}>
               <LinearGradient
                 colors={[colors.primary, colors.secondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={{
-                  padding: 16,
-                  borderRadius: 12,
-                }}
+                style={styles.bannerGradient}
               >
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'flex-start',
-                  marginBottom: 12,
-                }}>
-                  <View style={{
-                    marginRight: 12,
-                  }}>
-                    <UserCircle size={32} color="#ffffff" strokeWidth={2} />
+                <View style={styles.bannerContent}>
+                  <View style={styles.bannerIconContainer}>
+                    <UserCircle size={28} color="#ffffff" strokeWidth={2} />
+                    <View style={styles.bannerSparkle}>
+                      <Text style={styles.sparkleEmoji}>✨</Text>
+                    </View>
                   </View>
-                  <View style={{
-                    flex: 1,
-                    marginRight: 8,
-                  }}>
-                    <Text style={{
-                      fontSize: 18,
-                      fontWeight: 'bold',
-                      color: '#ffffff',
-                      marginBottom: 4,
-                    }}>Complete Your Profile ✨</Text>
-                    <Text style={{
-                      fontSize: 14,
-                      color: '#ffffffcc',
-                      marginBottom: 12,
-                      lineHeight: 18,
-                    }}>
-                      Add your photo, name, bio, and cover banner to make your profile shine.
+                  <View style={styles.bannerTextContainer}>
+                    <Text style={styles.bannerTitle}>Complete Your Profile</Text>
+                    <Text style={styles.bannerSubtitle}>
+                      Add photo, bio & banner to shine
                     </Text>
                   </View>
                   <TouchableOpacity 
-                    style={{
-                      padding: 4,
-                      backgroundColor: '#ffffff20',
-                      borderRadius: 16,
-                    }}
+                    style={styles.bannerCloseButton}
                     onPress={() => setShowBanner(false)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <X size={20} color="#ffffff" strokeWidth={2.5} />
+                    <X size={18} color="#ffffff" strokeWidth={2.5} />
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity 
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#ffffff',
-                    paddingVertical: 12,
-                    paddingHorizontal: 20,
-                    borderRadius: 8,
-                  }}
+                  style={styles.bannerActionButton}
                   onPress={() => {
                     setShowBanner(false);
                     router.push('/edit-profile');
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={{
-                    fontSize: 16,
-                    fontWeight: 'bold',
-                    color: colors.primary,
-                  }}>Complete Now</Text>
+                  <Text style={styles.bannerActionText}>Complete Now</Text>
+                  <View style={styles.bannerArrow}>
+                    <Text style={styles.bannerArrowText}>→</Text>
+                  </View>
                 </TouchableOpacity>
               </LinearGradient>
             </View>
@@ -1117,5 +1078,109 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   xpMedal: {
     fontSize: FontSizes.md,
+  },
+  // Floating banner styles
+  floatingBanner: {
+    position: 'absolute',
+    top: '37%',
+    left: Spacing.lg,
+    right: Spacing.lg,
+    transform: [{ translateY: -50 }],
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+    zIndex: 5,
+    ...Shadows.large,
+    elevation: 8,
+  },
+  bannerGradient: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+  },
+  bannerContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.md,
+  },
+  bannerIconContainer: {
+    position: 'relative',
+    marginRight: Spacing.md,
+    marginTop: 2,
+  },
+  bannerSparkle: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ffffff25',
+    borderRadius: 12,
+    padding: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  sparkleEmoji: {
+    fontSize: 12,
+  },
+  bannerTextContainer: {
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  bannerTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
+    color: '#ffffff',
+    marginBottom: 4,
+    letterSpacing: 0.3,
+  },
+  bannerSubtitle: {
+    fontSize: FontSizes.sm,
+    color: '#ffffffdd',
+    lineHeight: 18,
+    letterSpacing: 0.2,
+  },
+  bannerCloseButton: {
+    padding: 6,
+    backgroundColor: '#ffffff25',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  bannerActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  bannerActionText: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.bold,
+    color: '#3B8FE8',
+    letterSpacing: 0.3,
+  },
+  bannerArrow: {
+    backgroundColor: '#3B8FE820',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerArrowText: {
+    fontSize: 16,
+    fontWeight: FontWeights.bold,
+    color: '#3B8FE8',
   },
 });

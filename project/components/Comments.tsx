@@ -36,7 +36,7 @@ interface CommentsModalProps {
   onClose: () => void;
   post: NormalizedPost | null;
   comments: Comment[];
-  onAddComment: (text: string, parentId?: string, isAnonymous?: boolean) => void;
+  onAddComment: (text: string, parentId?: string, isAnonymous?: boolean) => Promise<void>;
   onLoadComments: (postId: string, forceRefresh?: boolean) => void;
   onDeleteComment?: (commentId: string) => void;
   forceRefresh?: boolean;
