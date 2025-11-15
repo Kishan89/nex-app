@@ -35,6 +35,7 @@ class ChatService {
             avatar: true,
             description: true,
             isGroup: true,
+            createdById: true,
             updatedAt: true,
             participants: {
               select: {
@@ -136,6 +137,7 @@ class ChatService {
           lastUpdated: chat.updatedAt,
           lastMessageId: lastMessage?.id,
           isGroup: chat.isGroup,
+          createdById: chat.createdById || null,
         };
       });
       

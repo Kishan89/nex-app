@@ -98,21 +98,34 @@ const ChatScreen = React.memo(function ChatScreen({
   
   useEffect(() => {
     if (chatData && chatData.isGroup) {
-      console.log('Syncing group data:', { name: chatData.name, description: chatData.description, avatar: chatData.avatar, createdById: chatData.createdById });
+      console.log('🔍 Syncing group data:', { 
+        name: chatData.name, 
+        description: chatData.description, 
+        avatar: chatData.avatar, 
+        createdById: chatData.createdById,
+        participants: chatData.participants?.length
+      });
+      
+      // Always set from chatData first
       setGroupName(chatData.name || '');
       setGroupDescription(chatData.description || '');
       setGroupAvatar(chatData.avatar || '');
       
-      // Check if current user is admin (group creator)
+      // Check admin status
       if (user?.id && chatData.createdById) {
         const isCreator = user.id === chatData.createdById;
         setIsAdmin(isCreator);
-        console.log('Admin check:', { userId: user.id, createdById: chatData.createdById, isAdmin: isCreator });
+        console.log('👑 Admin check:', { userId: user.id, createdById: chatData.createdById, isAdmin: isCreator });
+      } else {
+        setIsAdmin(false);
+        console.log('⚠️ Not admin - missing createdById or userId');
       }
       
       // Load group members for mentions
-      if (chatData.participants) {
-        setGroupMembers(chatData.participants.filter((p: any) => p.userId !== user?.id));
+      if (chatData.participants && Array.isArray(chatData.participants)) {
+        const members = chatData.participants.filter((p: any) => p.userId !== user?.id);
+        console.log('📋 Group members loaded:', members.length);
+        setGroupMembers(members);
       }
     }
   }, [chatData?.name, chatData?.description, chatData?.avatar, chatData?.isGroup, chatData?.createdById, chatData?.participants, user?.id]);
@@ -1281,7 +1294,11 @@ const ChatScreen = React.memo(function ChatScreen({
       <View style={[styles.inputWrapper, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
         {chatData?.isGroup && groupMembers.length > 0 && (
           <TouchableOpacity 
-            onPress={() => setShowMentionModal(true)}
+            onPress={() => {
+              console.log('@ button clicked, opening mention modal');
+              console.log('Group members:', groupMembers.length);
+              setShowMentionModal(true);
+            }}
             style={styles.mentionButton}
           >
             <Text style={[styles.mentionButtonText, { color: colors.primary }]}>@</Text>
@@ -1697,20 +1714,25 @@ const ChatScreen = React.memo(function ChatScreen({
         <View style={styles.mentionModalOverlay}>
           <View style={[styles.mentionModalContent, { backgroundColor: colors.background }]}>
             <View style={styles.mentionModalHeader}>
-              <Text style={[styles.mentionModalTitle, { color: colors.text }]}>Mention Someone</Text>
+              <Text style={[styles.mentionModalTitle, { color: colors.text }]}>Mention Someone ({groupMembers.length})</Text>
               <TouchableOpacity onPress={() => setShowMentionModal(false)}>
                 <Text style={[styles.mentionModalClose, { color: colors.textMuted }]}>✕</Text>
               </TouchableOpacity>
             </View>
             <FlatList
               data={groupMembers}
-              keyExtractor={(item) => item.userId}
+              keyExtractor={(item, index) => item.userId || `member-${index}`}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[styles.mentionItem, { backgroundColor: colors.backgroundSecondary }]}
                   onPress={() => {
                     const username = item.user?.username || 'User';
-                    setMessage(prev => prev + `@${username} `);
+                    console.log('Member selected:', username);
+                    setMessage(prev => {
+                      const newMessage = prev + `@${username} `;
+                      console.log('New message:', newMessage);
+                      return newMessage;
+                    });
                     setShowMentionModal(false);
                   }}
                 >
