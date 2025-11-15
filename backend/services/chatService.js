@@ -400,15 +400,23 @@ class ChatService {
 
       // Parse mentions from message content
       const mentionRegex = /@(\w+)/g;
-      const mentions = [];
+      const mentionedUsernames = [];
       let match;
       while ((match = mentionRegex.exec(content)) !== null) {
-        mentions.push(match[1]);
+        mentionedUsernames.push(match[1]);
+      }
+
+      // Update message with mentions
+      if (mentionedUsernames.length > 0) {
+        await prisma.message.update({
+          where: { id: message.id },
+          data: { mentions: mentionedUsernames }
+        });
       }
 
       // Send notifications to mentioned users
-      if (mentions.length > 0) {
-        logger.info('📢 [MENTIONS] Found mentions:', mentions);
+      if (mentionedUsernames.length > 0) {
+        logger.info('📢 [MENTIONS] Found mentions:', mentionedUsernames);
         
         // Get chat participants with user details
         const participants = await prisma.chatParticipant.findMany({
@@ -418,17 +426,27 @@ class ChatService {
 
         // Find mentioned users
         const mentionedUsers = participants.filter(p => 
-          mentions.includes(p.user.username) && p.userId !== senderId
+          mentionedUsernames.includes(p.user.username) && p.userId !== senderId
         );
 
         // Send notifications (background task)
         if (mentionedUsers.length > 0) {
           setTimeout(async () => {
             const fcmService = require('./fcmService');
+            const notificationService = require('./notificationService');
             const sender = await prisma.user.findUnique({ where: { id: senderId } });
             
             for (const participant of mentionedUsers) {
               try {
+                // Create in-app notification
+                await notificationService.createNotification({
+                  userId: participant.userId,
+                  fromUserId: senderId,
+                  type: 'MENTION',
+                  message: `${sender.username} mentioned you in a group chat`
+                });
+                
+                // Send push notification
                 await fcmService.sendMentionNotification(
                   participant.userId,
                   sender.username || 'Someone',

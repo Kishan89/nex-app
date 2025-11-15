@@ -1,6 +1,7 @@
 const express = require('express');
 const groupChatController = require('../controllers/groupChatController');
 const { verifyAuthToken } = require('../middleware/auth');
+const { requireGroupAdmin } = require('../middleware/groupAdmin');
 
 const router = express.Router();
 
@@ -12,19 +13,22 @@ router.get('/', verifyAuthToken, groupChatController.getMyGroups.bind(groupChatC
 // Create a new group
 router.post('/', verifyAuthToken, groupChatController.createGroup.bind(groupChatController));
 
-// Add a member to a group
-router.post('/:groupId/members', verifyAuthToken, groupChatController.addMember.bind(groupChatController));
+// Get group details
+router.get('/:groupId', verifyAuthToken, groupChatController.getGroupDetails.bind(groupChatController));
 
-// Remove a member from a group
-router.delete('/:groupId/members/:userId', verifyAuthToken, groupChatController.removeMember.bind(groupChatController));
+// Add a member to a group (admin only)
+router.post('/:groupId/members', verifyAuthToken, requireGroupAdmin, groupChatController.addMember.bind(groupChatController));
 
-// Update group avatar
-router.put('/:groupId/avatar', verifyAuthToken, groupChatController.updateGroupAvatar.bind(groupChatController));
+// Remove a member from a group (admin only)
+router.delete('/:groupId/members/:userId', verifyAuthToken, requireGroupAdmin, groupChatController.removeMember.bind(groupChatController));
 
-// Update group name
-router.put('/:groupId/name', verifyAuthToken, groupChatController.updateGroupName.bind(groupChatController));
+// Update group avatar (admin only)
+router.put('/:groupId/avatar', verifyAuthToken, requireGroupAdmin, groupChatController.updateGroupAvatar.bind(groupChatController));
 
-// Update group description
-router.put('/:groupId/description', verifyAuthToken, groupChatController.updateGroupDescription.bind(groupChatController));
+// Update group name (admin only)
+router.put('/:groupId/name', verifyAuthToken, requireGroupAdmin, groupChatController.updateGroupName.bind(groupChatController));
+
+// Update group description (admin only)
+router.put('/:groupId/description', verifyAuthToken, requireGroupAdmin, groupChatController.updateGroupDescription.bind(groupChatController));
 
 module.exports = router;

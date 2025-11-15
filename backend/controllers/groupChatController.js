@@ -130,6 +130,22 @@ class GroupChatController {
     }
   }
 
+  async getGroupDetails(req, res, next) {
+    try {
+      const { userId } = req.user || {};
+      const { groupId } = req.params;
+
+      if (!userId) {
+        throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED || 'Unauthorized');
+      }
+
+      const groupDetails = await chatService.getChatById(groupId, userId);
+      return res.status(HTTP_STATUS.OK).json(successResponse(groupDetails, 'Group details retrieved'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async updateGroupAvatar(req, res, next) {
     try {
       const { userId } = req.user || {};
@@ -140,6 +156,7 @@ class GroupChatController {
         throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED || 'Unauthorized');
       }
 
+      // Admin check already done by middleware
       const updatedChat = await chatService.updateGroupAvatar(groupId, avatar, userId);
       return res.status(HTTP_STATUS.OK).json(successResponse(updatedChat, 'Group avatar updated'));
     } catch (error) {
@@ -157,6 +174,7 @@ class GroupChatController {
         throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED || 'Unauthorized');
       }
 
+      // Admin check already done by middleware
       const updatedChat = await chatService.updateGroupName(groupId, name, userId);
       return res.status(HTTP_STATUS.OK).json(successResponse(updatedChat, 'Group name updated'));
     } catch (error) {
@@ -174,6 +192,7 @@ class GroupChatController {
         throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED || 'Unauthorized');
       }
 
+      // Admin check already done by middleware
       const updatedChat = await chatService.updateGroupDescription(groupId, description, userId);
       return res.status(HTTP_STATUS.OK).json(successResponse(updatedChat, 'Group description updated'));
     } catch (error) {

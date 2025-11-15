@@ -166,7 +166,8 @@ class SocketService {
           status: MESSAGE_STATUS.DELIVERED, // Mark as delivered since saved to DB
           sender: message.sender,
           chatId,
-          tempMessageId // Include temp ID for replacement
+          tempMessageId, // Include temp ID for replacement
+          mentions: message.mentions || [] // Include mentions for highlighting
         };
 
         // Broadcast message to OTHER users in the chat (excluding sender to prevent duplicates)
