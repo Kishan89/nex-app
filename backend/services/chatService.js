@@ -99,11 +99,12 @@ class ChatService {
           name = chat.name || 'Group';
           username = name;
         } else {
-          const otherParticipant = chat.participants[0]?.user;
+          const otherParticipantData = chat.participants[0];
+          const otherParticipant = otherParticipantData?.user;
 
           name = otherParticipant?.username || 'Unknown';
           username = otherParticipant?.username || 'Unknown';
-          userIdForChat = otherParticipant?.id || 'unknown';
+          userIdForChat = otherParticipantData?.userId || otherParticipant?.id || 'unknown';
           avatar = otherParticipant?.avatar || null;
           isOnline = otherParticipant?.isOnline || false;
           lastSeen = otherParticipant?.lastSeen;
@@ -206,13 +207,15 @@ class ChatService {
         username = name;
       } else {
         const otherParticipant = chat.participants.find(p => p.userId !== userId);
-        name = otherParticipant?.user?.username || 'Unknown';
-        username = otherParticipant?.user?.username || 'Unknown';
-        userIdForChat = otherParticipant?.user?.id || 'unknown';
-        avatar = otherParticipant?.user?.avatar || null;
-        isOnline = otherParticipant?.user?.isOnline || false;
-        lastSeen = otherParticipant?.user?.lastSeen;
-        lastSeenText = otherParticipant?.user?.isOnline ? 'Online' : 'Last seen recently';
+        if (otherParticipant) {
+          name = otherParticipant.user?.username || 'Unknown';
+          username = otherParticipant.user?.username || 'Unknown';
+          userIdForChat = otherParticipant.userId || otherParticipant.user?.id || 'unknown';
+          avatar = otherParticipant.user?.avatar || null;
+          isOnline = otherParticipant.user?.isOnline || false;
+          lastSeen = otherParticipant.user?.lastSeen;
+          lastSeenText = otherParticipant.user?.isOnline ? 'Online' : 'Last seen recently';
+        }
       }
 
       return {
