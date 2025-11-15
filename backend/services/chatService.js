@@ -397,6 +397,52 @@ class ChatService {
         senderId,
         timestamp: message.createdAt 
       });
+
+      // Parse mentions from message content
+      const mentionRegex = /@(\w+)/g;
+      const mentions = [];
+      let match;
+      while ((match = mentionRegex.exec(content)) !== null) {
+        mentions.push(match[1]);
+      }
+
+      // Send notifications to mentioned users
+      if (mentions.length > 0) {
+        logger.info('📢 [MENTIONS] Found mentions:', mentions);
+        
+        // Get chat participants with user details
+        const participants = await prisma.chatParticipant.findMany({
+          where: { chatId },
+          include: { user: { select: { id: true, username: true } } }
+        });
+
+        // Find mentioned users
+        const mentionedUsers = participants.filter(p => 
+          mentions.includes(p.user.username) && p.userId !== senderId
+        );
+
+        // Send notifications (background task)
+        if (mentionedUsers.length > 0) {
+          setTimeout(async () => {
+            const fcmService = require('./fcmService');
+            const sender = await prisma.user.findUnique({ where: { id: senderId } });
+            
+            for (const participant of mentionedUsers) {
+              try {
+                await fcmService.sendMentionNotification(
+                  participant.userId,
+                  sender.username || 'Someone',
+                  content,
+                  chatId
+                );
+                logger.info('✅ [MENTION] Notification sent to:', participant.user.username);
+              } catch (error) {
+                logger.error('❌ [MENTION] Failed to send notification:', error);
+              }
+            }
+          }, 0);
+        }
+      }
   
       const formattedMessage = {
         id: message.id,

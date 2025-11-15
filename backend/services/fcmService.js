@@ -564,12 +564,40 @@ async function getFCMTokensByUserIds(userIds) {
     return [];
   }
 }
+/**
+ * Send notification when a user is mentioned in a group chat
+ * @param {string} mentionedUserId - ID of the mentioned user
+ * @param {string} senderUsername - Username of the sender
+ * @param {string} messageContent - Content of the message
+ * @param {string} chatId - ID of the chat
+ */
+async function sendMentionNotification(mentionedUserId, senderUsername, messageContent, chatId) {
+  const truncatedMessage = messageContent.length > 50 
+    ? messageContent.substring(0, 50) + '...' 
+    : messageContent;
+
+  const notification = {
+    title: `${senderUsername} mentioned you`,
+    body: truncatedMessage
+  };
+
+  const data = {
+    type: 'mention',
+    chatId: chatId.toString(),
+    username: senderUsername,
+    action: 'open_chat'
+  };
+
+  return await sendFCMNotification([mentionedUserId], notification, data);
+}
+
 module.exports = {
   sendFCMNotification,
   sendLikeNotification,
   sendCommentNotification,
   sendFollowNotification,
   sendMessageNotification,
+  sendMentionNotification,
   saveFCMToken,
   removeFCMToken,
   getFCMTokensByUserIds,

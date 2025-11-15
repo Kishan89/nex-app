@@ -1049,18 +1049,19 @@ const ChatScreen = React.memo(function ChatScreen({
     }
   }, [forceInitialRefresh, chatData?.id, loadMessages]);
   
-  // Helper function to render text with clickable links
+  // Helper function to render text with clickable links and mentions
   const renderTextWithLinks = useCallback((text: string, isUserMessage: boolean) => {
-    // URL regex pattern - improved to catch more URLs
-    const urlPattern = /(https?:\/\/[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[^\s]{2,})/g;
+    // Combined regex for URLs and mentions
+    const urlPattern = /(https?:\/\/[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[^\s]{2,})|(@\w+)/g;
     const matches = [];
     let match;
     
     while ((match = urlPattern.exec(text)) !== null) {
       matches.push({
-        url: match[0],
+        content: match[0],
         index: match.index,
-        length: match[0].length
+        length: match[0].length,
+        isMention: match[0].startsWith('@')
       });
     }
     
@@ -1072,7 +1073,7 @@ const ChatScreen = React.memo(function ChatScreen({
     let lastIndex = 0;
     
     matches.forEach((matchInfo, i) => {
-      // Add text before the URL
+      // Add text before the match
       if (matchInfo.index > lastIndex) {
         parts.push(
           <Text key={`text-${i}-before`}>
@@ -1081,25 +1082,40 @@ const ChatScreen = React.memo(function ChatScreen({
         );
       }
       
-      // Add clickable URL using TouchableOpacity
-      const url = matchInfo.url;
-      const fullUrl = url.startsWith('http') ? url : `https://${url}`;
-      parts.push(
-        <Text key={`link-${i}`}>
+      if (matchInfo.isMention) {
+        // Render mention with highlight
+        parts.push(
           <Text
-            style={[styles.linkText, { color: isUserMessage ? '#ffffff' : '#3B8FE8' }]}
-            onPress={() => {
-              console.log('🔗 Opening URL:', fullUrl);
-              Linking.openURL(fullUrl).catch(err => {
-                console.error('Failed to open URL:', err);
-                Alert.alert('Error', 'Could not open link');
-              });
-            }}
+            key={`mention-${i}`}
+            style={[styles.mentionText, { 
+              color: isUserMessage ? '#ffffff' : '#3B8FE8',
+              fontWeight: '700'
+            }]}
           >
-            {url}
+            {matchInfo.content}
           </Text>
-        </Text>
-      );
+        );
+      } else {
+        // Render clickable URL
+        const url = matchInfo.content;
+        const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+        parts.push(
+          <Text key={`link-${i}`}>
+            <Text
+              style={[styles.linkText, { color: isUserMessage ? '#ffffff' : '#3B8FE8' }]}
+              onPress={() => {
+                console.log('🔗 Opening URL:', fullUrl);
+                Linking.openURL(fullUrl).catch(err => {
+                  console.error('Failed to open URL:', err);
+                  Alert.alert('Error', 'Could not open link');
+                });
+              }}
+            >
+              {url}
+            </Text>
+          </Text>
+        );
+      }
       
       lastIndex = matchInfo.index + matchInfo.length;
     });
