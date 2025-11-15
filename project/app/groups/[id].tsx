@@ -46,14 +46,16 @@ const GroupChatScreen = () => {
       const group = (resp as any)?.data || resp;
       
       if (group) {
-        setChatData({
+        const groupData = {
           id: group?.id || (id as string),
           name: group?.name || name || 'Group',
-          avatar: group?.avatar || group?.icon || '',
+          avatar: group?.avatar || '',
           isGroup: true,
           description: group?.description || '',
           memberCount: group?.memberCount || group?.members?.length || group?.participants?.length,
-        });
+        };
+        console.log('Group data loaded with avatar:', groupData.avatar);
+        setChatData(groupData);
       }
     } catch (error) {
       // Keep optimistic data on error

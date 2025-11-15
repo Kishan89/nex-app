@@ -89,9 +89,10 @@ const ChatScreen = React.memo(function ChatScreen({
   
   useEffect(() => {
     if (chatData && chatData.isGroup) {
-      setGroupName(chatData.name || '');
-      setGroupDescription(chatData.description || '');
-      setGroupAvatar(chatData.avatar || '');
+      console.log('Syncing group data:', { name: chatData.name, description: chatData.description, avatar: chatData.avatar });
+      if (chatData.name) setGroupName(chatData.name);
+      if (chatData.description) setGroupDescription(chatData.description);
+      if (chatData.avatar) setGroupAvatar(chatData.avatar);
     }
   }, [chatData?.name, chatData?.description, chatData?.avatar, chatData?.isGroup]);
   // Refs
@@ -1210,68 +1211,79 @@ const ChatScreen = React.memo(function ChatScreen({
   }, [colors, chatData?.isGroup]);
   // Header component - render directly without useMemo to avoid undefined issues
   const renderHeader = () => {
-    try {
-      return (
-        <View style={[styles.header, { backgroundColor: colors?.background || '#000', borderBottomColor: colors?.border || '#333' }]}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <ArrowLeft size={24} color={colors?.text || '#fff'} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.profileSection}
-            onPress={() => {
-              if (chatData?.isGroup) {
-                setShowGroupInfo(true);
-              } else if (chatData?.userId && chatData.userId !== 'unknown' && chatData.userId !== 'loading') {
-                onUserProfile?.(chatData.userId);
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            {(groupAvatar || chatData?.avatar) ? (
-              <Image 
-                source={{ uri: groupAvatar || chatData.avatar }} 
-                style={styles.avatar}
-              />
-            ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: colors?.primary + (colors?.background === '#ffffff' ? '15' : '20') || '#e385ec20' }]}>
-                {chatData?.isGroup ? (
-                  <Users size={20} color={colors?.primary || '#e385ec'} />
-                ) : (
-                  <Image 
-                    source={require('@/assets/images/default-avatar.png')} 
-                    style={styles.avatar}
-                  />
-                )}
-              </View>
-            )}
-            <View style={styles.profileInfo}>
-              <Text style={[styles.name, { color: colors?.text || '#fff' }]} numberOfLines={1}>
-                {chatData?.isGroup ? (chatData?.name || 'Group') : (chatData?.username || chatData?.name || 'User')}
-              </Text>
-              {chatData?.isGroup && (
-                <Text style={[styles.status, { color: colors?.textMuted || '#999' }]} numberOfLines={1}>
-                  {chatData?.memberCount ? `${chatData.memberCount} members` : 'Group'}
-                </Text>
+    // Ensure we always have chatData to prevent disappearing header
+    if (!chatData) return null;
+    
+    // Use stable values - prefer existing state over potentially incomplete chatData
+    const displayName = chatData.isGroup 
+      ? (groupName || chatData.name || 'Group') 
+      : (chatData.username || chatData.name || 'User');
+    
+    const displayAvatar = chatData.isGroup 
+      ? (groupAvatar || chatData.avatar) 
+      : chatData.avatar;
+    
+    const displayUserId = chatData.userId || 'unknown';
+    
+    return (
+      <View style={[styles.header, { backgroundColor: colors?.background || '#000', borderBottomColor: colors?.border || '#333' }]}>
+        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+          <ArrowLeft size={24} color={colors?.text || '#fff'} />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.profileSection}
+          onPress={() => {
+            console.log('Header clicked', { isGroup: chatData.isGroup, userId: displayUserId, name: displayName });
+            if (chatData.isGroup) {
+              setShowGroupInfo(true);
+            } else if (displayUserId && displayUserId !== 'unknown' && displayUserId !== 'loading') {
+              console.log('Navigating to profile:', displayUserId);
+              router.push(`/profile/${displayUserId}`);
+            } else {
+              console.log('Cannot navigate - invalid userId:', displayUserId);
+            }
+          }}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          {displayAvatar ? (
+            <Image 
+              source={{ uri: displayAvatar }} 
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: colors?.primary + (colors?.background === '#ffffff' ? '15' : '20') || '#e385ec20' }]}>
+              {chatData.isGroup ? (
+                <Users size={20} color={colors?.primary || '#e385ec'} />
+              ) : (
+                <Image 
+                  source={require('@/assets/images/default-avatar.png')} 
+                  style={styles.avatar}
+                />
               )}
             </View>
-          </TouchableOpacity>
-          <View style={styles.headerActions}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => setShowOptionsMenu(true)}
-            >
-              <MoreVertical size={20} color={colors?.text || '#fff'} />
-            </TouchableOpacity>
+          )}
+          <View style={styles.profileInfo}>
+            <Text style={[styles.name, { color: colors?.text || '#fff' }]} numberOfLines={1}>
+              {displayName}
+            </Text>
+            {chatData.isGroup && (
+              <Text style={[styles.status, { color: colors?.textMuted || '#999' }]} numberOfLines={1}>
+                {chatData.memberCount ? `${chatData.memberCount} members` : 'Group'}
+              </Text>
+            )}
           </View>
+        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => setShowOptionsMenu(true)}
+          >
+            <MoreVertical size={20} color={colors?.text || '#fff'} />
+          </TouchableOpacity>
         </View>
-      );
-    } catch (error) {
-      return (
-        <View style={{ height: 60, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: '#fff' }}>Chat Header</Text>
-        </View>
-      );
-    }
+      </View>
+    );
   };
   // Input component - render directly to avoid undefined issues
   const renderMessageInput = () => (
@@ -1396,7 +1408,7 @@ const ChatScreen = React.memo(function ChatScreen({
                 <View style={styles.groupAvatarContainer}>
                   {(groupAvatar || chatData?.avatar) ? (
                     <Image 
-                      source={{ uri: groupAvatar || chatData.avatar }} 
+                      source={{ uri: groupAvatar || chatData?.avatar }} 
                       style={styles.groupAvatarLarge}
                     />
                   ) : (

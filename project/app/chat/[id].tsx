@@ -130,8 +130,10 @@ export default function IndividualChatScreen() {
     const cachedName = params.cachedName as string;
     const cachedAvatar = params.cachedAvatar as string;
     const cachedIsOnline = params.cachedIsOnline === 'true';
+    const cachedUserId = params.cachedUserId as string;
     
     if (cachedName) {
+      console.log('Using cached data:', { cachedName, cachedUserId });
       setChatData({
         id: id as string,
         name: cachedName,
@@ -140,7 +142,8 @@ export default function IndividualChatScreen() {
         isOnline: cachedIsOnline || false,
         lastSeen: 'recently',
         lastSeenText: cachedIsOnline ? 'Online' : 'Last seen recently',
-        userId: 'loading',
+        userId: cachedUserId || 'loading',
+        isGroup: false,
       });
       setLoading(false);
     }
@@ -149,10 +152,15 @@ export default function IndividualChatScreen() {
       // Strategy 1: Try to get chat by ID directly (most reliable for new chats)
       try {
         const chat = await apiService.getChatById(id as string);
-        if (chat && (chat as any).data) {
-          const chatData = (chat as any).data;
-          // Extract userId from participants if not directly available
+        console.log('getChatById response:', chat);
+        
+        // Handle both wrapped and direct response
+        const chatData = (chat as any).data || chat;
+        
+        if (chatData) {
+          // Extract userId - try multiple sources
           let userId = chatData.userId;
+          
           if (!userId && chatData.participants && Array.isArray(chatData.participants)) {
             const otherParticipant = chatData.participants.find((p: any) => 
               (p.userId !== user.id && p.user?.id !== user.id)
@@ -160,37 +168,19 @@ export default function IndividualChatScreen() {
             userId = otherParticipant?.userId || otherParticipant?.user?.id;
           }
           
-          setChatData(prevData => ({
+          console.log('Extracted userId:', userId, 'from chatData');
+          
+          console.log('Setting chatData with userId:', userId);
+          setChatData(prev => ({
             id: chatData.id || id as string,
-            name: chatData.name || chatData.username || prevData?.name || 'User',
-            username: chatData.username || chatData.name || prevData?.username || 'User',
-            avatar: chatData.avatar || prevData?.avatar || '',
+            name: chatData.name || chatData.username || prev?.name || 'User',
+            username: chatData.username || chatData.name || prev?.username || 'User',
+            avatar: chatData.avatar || prev?.avatar || '',
             isOnline: chatData.isOnline || false,
             lastSeen: chatData.lastSeen || 'recently',
             lastSeenText: chatData.lastSeenText || (chatData.isOnline ? 'Online' : 'Last seen recently'),
-            userId: userId || prevData?.userId || 'unknown',
-          }));
-          setLoading(false);
-          return;
-        } else if (chat) {
-          // Direct chat object without .data wrapper
-          let userId = (chat as any).userId;
-          if (!userId && (chat as any).participants && Array.isArray((chat as any).participants)) {
-            const otherParticipant = (chat as any).participants.find((p: any) => 
-              (p.userId !== user.id && p.user?.id !== user.id)
-            );
-            userId = otherParticipant?.userId || otherParticipant?.user?.id;
-          }
-          
-          setChatData(prevData => ({
-            id: (chat as any).id || id as string,
-            name: (chat as any).name || (chat as any).username || prevData?.name || 'User',
-            username: (chat as any).username || (chat as any).name || prevData?.username || 'User',
-            avatar: (chat as any).avatar || prevData?.avatar || '',
-            isOnline: (chat as any).isOnline || false,
-            lastSeen: (chat as any).lastSeen || 'recently',
-            lastSeenText: (chat as any).lastSeenText || ((chat as any).isOnline ? 'Online' : 'Last seen recently'),
-            userId: userId || prevData?.userId || 'unknown',
+            userId: userId || prev?.userId || 'unknown',
+            isGroup: chatData.isGroup || false,
           }));
           setLoading(false);
           return;
@@ -210,8 +200,11 @@ export default function IndividualChatScreen() {
         }
       }
       if (chatFromList) {
-        // Extract userId from participants if not directly available
+        console.log('Found chat in list:', chatFromList);
+        
+        // Extract userId - already available in chatFromList
         let userId = chatFromList.userId;
+        
         if (!userId && chatFromList.participants && Array.isArray(chatFromList.participants)) {
           const otherParticipant = chatFromList.participants.find((p: any) => 
             (p.userId !== user.id && p.user?.id !== user.id)
@@ -219,15 +212,18 @@ export default function IndividualChatScreen() {
           userId = otherParticipant?.userId || otherParticipant?.user?.id;
         }
         
-        setChatData(prevData => ({
+        console.log('Chat list userId:', userId);
+        
+        setChatData(prev => ({
           id: chatFromList.id,
-          name: chatFromList.name || chatFromList.username || prevData?.name || 'User',
-          username: chatFromList.username || chatFromList.name || prevData?.username || 'User',
-          avatar: chatFromList.avatar || prevData?.avatar || '',
+          name: chatFromList.name || chatFromList.username || prev?.name || 'User',
+          username: chatFromList.username || chatFromList.name || prev?.username || 'User',
+          avatar: chatFromList.avatar || prev?.avatar || '',
           isOnline: chatFromList.isOnline || false,
           lastSeen: chatFromList.lastSeen || 'recently',
           lastSeenText: chatFromList.lastSeenText || (chatFromList.isOnline ? 'Online' : 'Last seen recently'),
-          userId: userId || prevData?.userId || 'unknown',
+          userId: userId || prev?.userId || 'unknown',
+          isGroup: chatFromList.isGroup || false,
         }));
         setLoading(false);
         return;

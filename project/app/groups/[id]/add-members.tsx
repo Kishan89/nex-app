@@ -97,9 +97,11 @@ const AddMembersScreen = () => {
         return a.username.localeCompare(b.username);
       });
 
+      console.log('Current members loaded:', currentMembers.length, currentMembers);
       setMembers(currentMembers);
 
       const filtered = messagableUsers.filter((u) => !existingIds.has(u.id));
+      console.log('Available users to add:', filtered.length);
       setUsers(filtered);
     } catch (error) {
       Alert.alert('Error', 'Failed to load users. Please try again.');
@@ -132,7 +134,7 @@ const AddMembersScreen = () => {
     try {
       setAddingId(userId);
       await apiService.addGroupMember(groupId, userId);
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      await loadUsers();
     } catch (error: any) {
       const message = error?.message || 'Failed to add member. You may not have permission.';
       Alert.alert('Error', message);
