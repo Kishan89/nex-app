@@ -111,14 +111,20 @@ const ChatScreen = React.memo(function ChatScreen({
       setGroupDescription(chatData.description || '');
       setGroupAvatar(chatData.avatar || '');
       
-      // Check admin status
-      if (user?.id && chatData.createdById) {
-        const isCreator = user.id === chatData.createdById;
-        setIsAdmin(isCreator);
-        console.log('👑 Admin check:', { userId: user.id, createdById: chatData.createdById, isAdmin: isCreator });
+      // Check admin status from participants
+      if (user?.id && chatData.participants && Array.isArray(chatData.participants)) {
+        const currentUserParticipant = chatData.participants.find((p: any) => p.userId === user.id);
+        const isUserAdmin = currentUserParticipant?.isAdmin === true;
+        setIsAdmin(isUserAdmin);
+        console.log('👑 Admin check:', { 
+          userId: user.id, 
+          participantFound: !!currentUserParticipant,
+          isAdmin: currentUserParticipant?.isAdmin,
+          finalIsAdmin: isUserAdmin 
+        });
       } else {
         setIsAdmin(false);
-        console.log('⚠️ Not admin - missing createdById or userId');
+        console.log('⚠️ Not admin - missing userId or participants');
       }
       
       // Load group members for mentions
@@ -1886,6 +1892,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   linkText: {
     textDecorationLine: 'underline',
     fontWeight: FontWeights.semibold,
+  },
+  mentionText: {
+    fontWeight: FontWeights.bold,
   },
   messageTime: {
     fontSize: FontSizes.xs,

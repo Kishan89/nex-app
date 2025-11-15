@@ -40,6 +40,7 @@ class ChatService {
             participants: {
               select: {
                 userId: true,
+                isAdmin: true,
                 user: {
                   select: {
                     id: true,
@@ -49,9 +50,6 @@ class ChatService {
                     lastSeen: true,
                   }
                 }
-              },
-              where: {
-                userId: { not: userId } // Get other participants only
               }
             },
             messages: {
@@ -168,7 +166,9 @@ class ChatService {
         },
         include: {
           participants: {
-            include: {
+            select: {
+              userId: true,
+              isAdmin: true,
               user: {
                 select: {
                   id: true,
