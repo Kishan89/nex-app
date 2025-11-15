@@ -20,7 +20,8 @@ import {
   AppStateStatus,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, Send, MoreVertical, Trash2, UserX, Flag } from 'lucide-react-native';
+import { ArrowLeft, Send, MoreVertical, Trash2, UserX, Flag, Users, Camera, Edit3 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/context/ThemeContext';
 import { Message } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -78,7 +79,21 @@ const ChatScreen = React.memo(function ChatScreen({
   const [isOnline, setIsOnline] = useState(chatData.isOnline || false);
   const [lastSeen, setLastSeen] = useState(chatData.lastSeen || 'recently');
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [groupDescription, setGroupDescription] = useState(chatData?.description || '');
+  const [groupName, setGroupName] = useState(chatData?.name || '');
+  const [groupAvatar, setGroupAvatar] = useState(chatData?.avatar || '');
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [editingName, setEditingName] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  
+  useEffect(() => {
+    if (chatData && chatData.isGroup) {
+      setGroupName(chatData.name || '');
+      setGroupDescription(chatData.description || '');
+      setGroupAvatar(chatData.avatar || '');
+    }
+  }, [chatData?.name, chatData?.description, chatData?.avatar, chatData?.isGroup]);
   // Refs
   const flatListRef = useRef<FlatList>(null);
   const timeoutRefs = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
@@ -694,6 +709,87 @@ const ChatScreen = React.memo(function ChatScreen({
       ]
     );
   }, [chatData.id, chatData.name, onBack, onChatDeleted, user?.id]);
+  const handleSetGroupAvatar = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant camera roll permissions to set group avatar.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        try {
+          const uploadResult = await apiService.uploadImageFile(imageUri, 'file', 'group-avatars');
+          const updateResponse = await apiService.updateGroupAvatar(String(chatData.id), uploadResult.url);
+          
+          setGroupAvatar(uploadResult.url);
+          if (chatData) {
+            chatData.avatar = uploadResult.url;
+          }
+          Alert.alert('Success', 'Group avatar updated successfully!');
+        } catch (error) {
+          Alert.alert('Error', 'Failed to update group avatar. Please try again.');
+        }
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to open image picker. Please try again.');
+    }
+  };
+
+  const handleEditDescription = () => {
+    setGroupDescription(chatData?.description || '');
+    setEditingDescription(true);
+  };
+
+  const handleSaveDescription = async () => {
+    if (!groupDescription.trim()) {
+      Alert.alert('Error', 'Description cannot be empty');
+      return;
+    }
+    
+    try {
+      await apiService.updateGroupDescription(String(chatData.id), groupDescription.trim());
+      setEditingDescription(false);
+      if (chatData) {
+        chatData.description = groupDescription.trim();
+      }
+      Alert.alert('Success', 'Group description updated successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update description. Please try again.');
+    }
+  };
+
+  const handleEditName = () => {
+    setGroupName(chatData?.name || '');
+    setEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!groupName.trim()) {
+      Alert.alert('Error', 'Group name cannot be empty');
+      return;
+    }
+    
+    try {
+      await apiService.updateGroupName(String(chatData.id), groupName.trim());
+      setEditingName(false);
+      if (chatData) {
+        chatData.name = groupName.trim();
+      }
+      Alert.alert('Success', 'Group name updated successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update group name. Please try again.');
+    }
+  };
+
   const handleComingSoon = (feature: string) => {
     Alert.alert('Coming Soon', `${feature} feature will be available in the next update!`);
   };
@@ -1122,16 +1218,41 @@ const ChatScreen = React.memo(function ChatScreen({
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.profileSection}
-            onPress={() => chatData?.userId && onUserProfile?.(chatData.userId)}
+            onPress={() => {
+              if (chatData?.isGroup) {
+                setShowGroupInfo(true);
+              } else if (chatData?.userId && chatData.userId !== 'unknown' && chatData.userId !== 'loading') {
+                onUserProfile?.(chatData.userId);
+              }
+            }}
+            activeOpacity={0.7}
           >
-            <Image 
-              source={chatData?.avatar ? { uri: chatData.avatar } : require('@/assets/images/default-avatar.png')} 
-              style={styles.avatar}
-            />
+            {(groupAvatar || chatData?.avatar) ? (
+              <Image 
+                source={{ uri: groupAvatar || chatData.avatar }} 
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: colors?.primary + (colors?.background === '#ffffff' ? '15' : '20') || '#e385ec20' }]}>
+                {chatData?.isGroup ? (
+                  <Users size={20} color={colors?.primary || '#e385ec'} />
+                ) : (
+                  <Image 
+                    source={require('@/assets/images/default-avatar.png')} 
+                    style={styles.avatar}
+                  />
+                )}
+              </View>
+            )}
             <View style={styles.profileInfo}>
               <Text style={[styles.name, { color: colors?.text || '#fff' }]} numberOfLines={1}>
-                {chatData?.name || 'Chat'}
+                {chatData?.isGroup ? (chatData?.name || 'Group') : (chatData?.username || chatData?.name || 'User')}
               </Text>
+              {chatData?.isGroup && (
+                <Text style={[styles.status, { color: colors?.textMuted || '#999' }]} numberOfLines={1}>
+                  {chatData?.memberCount ? `${chatData.memberCount} members` : 'Group'}
+                </Text>
+              )}
             </View>
           </TouchableOpacity>
           <View style={styles.headerActions}>
@@ -1237,24 +1358,6 @@ const ChatScreen = React.memo(function ChatScreen({
           onPress={() => setShowOptionsMenu(false)}
         >
           <View style={[styles.optionsMenu, { backgroundColor: colors.backgroundSecondary }]}>
-            {chatData?.isGroup && (
-              <TouchableOpacity 
-                style={styles.optionItem}
-                onPress={() => {
-                  setShowOptionsMenu(false);
-                  const groupId = String(chatData.id);
-                  router.push({
-                    pathname: `/groups/${groupId}/add-members`,
-                    params: {
-                      name: chatData.name || 'Group',
-                    },
-                  });
-                }}
-              >
-                <UserX size={20} color={colors.text} />
-                <Text style={styles.optionText}>Add Members</Text>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity 
               style={styles.optionItem}
               onPress={() => {
@@ -1267,6 +1370,159 @@ const ChatScreen = React.memo(function ChatScreen({
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+      
+      {/* Group Info Modal */}
+      <Modal
+        visible={showGroupInfo}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowGroupInfo(false)}
+      >
+        <View style={styles.groupInfoOverlay}>
+          <View style={[styles.groupInfoModal, { backgroundColor: colors.background }]}>
+            {/* Header */}
+            <View style={[styles.groupInfoHeader, { borderBottomColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setShowGroupInfo(false)} style={styles.groupInfoCloseButton}>
+                <ArrowLeft size={24} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={[styles.groupInfoTitle, { color: colors.text }]}>Group Info</Text>
+              <View style={styles.groupInfoHeaderSpacer} />
+            </View>
+            
+            {/* Group Avatar and Name */}
+            <View style={styles.groupInfoContent}>
+              <View style={styles.groupAvatarSection}>
+                <View style={styles.groupAvatarContainer}>
+                  {(groupAvatar || chatData?.avatar) ? (
+                    <Image 
+                      source={{ uri: groupAvatar || chatData.avatar }} 
+                      style={styles.groupAvatarLarge}
+                    />
+                  ) : (
+                    <View style={[styles.groupAvatarLarge, styles.groupAvatarPlaceholder, { backgroundColor: colors.primary + (colors.background === '#ffffff' ? '15' : '20') }]}>
+                      <Users size={40} color={colors.primary} />
+                    </View>
+                  )}
+                  <TouchableOpacity 
+                    style={[styles.groupAvatarEditButton, { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      setShowGroupInfo(false);
+                      handleSetGroupAvatar();
+                    }}
+                  >
+                    <Camera size={16} color="#ffffff" />
+                  </TouchableOpacity>
+                </View>
+                {editingName ? (
+                  <View style={styles.nameEditContainer}>
+                    <TextInput
+                      style={[styles.nameInput, { color: colors.text, borderColor: colors.border }]}
+                      value={groupName}
+                      onChangeText={setGroupName}
+                      placeholder="Group name"
+                      placeholderTextColor={colors.textMuted}
+                      maxLength={50}
+                      autoFocus
+                    />
+                    <View style={styles.nameActions}>
+                      <TouchableOpacity 
+                        style={[styles.nameButton, { backgroundColor: colors.backgroundSecondary }]}
+                        onPress={() => setEditingName(false)}
+                      >
+                        <Text style={[styles.nameButtonText, { color: colors.textMuted }]}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.nameButton, { backgroundColor: colors.primary }]}
+                        onPress={handleSaveName}
+                      >
+                        <Text style={[styles.nameButtonText, { color: '#ffffff' }]}>Save</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity onPress={handleEditName}>
+                    <Text style={[styles.groupNameLarge, { color: colors.text }]}>
+                      {groupName || chatData?.name || 'Group'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {editingDescription ? (
+                  <View style={styles.descriptionEditContainer}>
+                    <TextInput
+                      style={[styles.descriptionInput, { color: colors.text, borderColor: colors.border }]}
+                      value={groupDescription}
+                      onChangeText={setGroupDescription}
+                      placeholder="Add group description..."
+                      placeholderTextColor={colors.textMuted}
+                      multiline
+                      maxLength={200}
+                      autoFocus
+                    />
+                    <View style={styles.descriptionActions}>
+                      <TouchableOpacity 
+                        style={[styles.descriptionButton, { backgroundColor: colors.backgroundSecondary }]}
+                        onPress={() => setEditingDescription(false)}
+                      >
+                        <Text style={[styles.descriptionButtonText, { color: colors.textMuted }]}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.descriptionButton, { backgroundColor: colors.primary }]}
+                        onPress={handleSaveDescription}
+                      >
+                        <Text style={[styles.descriptionButtonText, { color: '#ffffff' }]}>Save</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity onPress={handleEditDescription}>
+                    <Text style={[styles.groupMemberCount, { color: colors.textMuted }]}>
+                      {chatData?.description || groupDescription || 'Group • Tap to add description'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              
+              {/* Group Options */}
+              <View style={styles.groupOptionsSection}>
+                <TouchableOpacity 
+                  style={[styles.groupOptionItem, { backgroundColor: colors.backgroundSecondary }]}
+                  onPress={handleEditDescription}
+                >
+                  <View style={[styles.groupOptionIcon, { backgroundColor: colors.primary + '20' }]}>
+                    <Edit3 size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.groupOptionContent}>
+                    <Text style={[styles.groupOptionTitle, { color: colors.text }]}>Edit Description</Text>
+                    <Text style={[styles.groupOptionSubtitle, { color: colors.textMuted }]}>Add group description</Text>
+                  </View>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.groupOptionItem, { backgroundColor: colors.backgroundSecondary }]}
+                  onPress={() => {
+                    setShowGroupInfo(false);
+                    const groupId = String(chatData.id);
+                    router.push({
+                      pathname: `/groups/${groupId}/add-members`,
+                      params: {
+                        name: chatData.name || 'Group',
+                      },
+                    });
+                  }}
+                >
+                  <View style={[styles.groupOptionIcon, { backgroundColor: colors.secondary + '20' }]}>
+                    <Users size={20} color={colors.secondary} />
+                  </View>
+                  <View style={styles.groupOptionContent}>
+                    <Text style={[styles.groupOptionTitle, { color: colors.text }]}>Add Members</Text>
+                    <Text style={[styles.groupOptionSubtitle, { color: colors.textMuted }]}>Invite people to this group</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -1298,12 +1554,20 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 20,
     marginRight: Spacing.sm,
   },
+  avatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   profileInfo: {
     flex: 1,
   },
   name: {
     fontSize: FontSizes.md,
     fontWeight: FontWeights.semibold,
+  },
+  status: {
+    fontSize: FontSizes.xs,
+    marginTop: 2,
   },
   headerActions: {
     flexDirection: 'row',
@@ -1481,6 +1745,169 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   senderName: {
     fontSize: FontSizes.xs,
+    fontWeight: FontWeights.semibold,
+  },
+  // Group Info Modal Styles
+  groupInfoOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  groupInfoModal: {
+    height: '80%',
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    paddingTop: Spacing.md,
+  },
+  groupInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  groupInfoCloseButton: {
+    padding: Spacing.xs,
+  },
+  groupInfoTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
+    flex: 1,
+    textAlign: 'center',
+    color: '#3B8FE8',
+  },
+  groupInfoHeaderSpacer: {
+    width: 40,
+  },
+  groupInfoContent: {
+    flex: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xl,
+  },
+  groupAvatarSection: {
+    alignItems: 'center',
+    marginBottom: Spacing.xxl,
+  },
+  groupAvatarContainer: {
+    position: 'relative',
+    marginBottom: Spacing.md,
+  },
+  groupAvatarLarge: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  groupAvatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupAvatarEditButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#ffffff',
+  },
+  groupNameLarge: {
+    fontSize: FontSizes.xl,
+    fontWeight: FontWeights.bold,
+    marginBottom: Spacing.xs,
+    textAlign: 'center',
+  },
+  groupMemberCount: {
+    fontSize: FontSizes.sm,
+    textAlign: 'center',
+  },
+  groupOptionsSection: {
+    gap: Spacing.md,
+  },
+  groupOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+  },
+  groupOptionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  groupOptionContent: {
+    flex: 1,
+  },
+  groupOptionTitle: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
+    marginBottom: Spacing.xs,
+    color: '#3B8FE8',
+  },
+  groupOptionSubtitle: {
+    fontSize: FontSizes.sm,
+  },
+  // Description editing styles
+  descriptionEditContainer: {
+    width: '100%',
+    marginTop: Spacing.md,
+  },
+  descriptionInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    fontSize: FontSizes.sm,
+    minHeight: 60,
+    textAlignVertical: 'top',
+    marginBottom: Spacing.md,
+  },
+  descriptionActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: Spacing.sm,
+  },
+  descriptionButton: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  descriptionButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
+  },
+  // Name editing styles
+  nameEditContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  nameInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
+    textAlign: 'center',
+    minWidth: 200,
+    marginBottom: Spacing.md,
+  },
+  nameActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  nameButton: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  nameButtonText: {
+    fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
   },
 });

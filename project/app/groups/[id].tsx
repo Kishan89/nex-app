@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import ChatScreen from '@/components/chat/ChatScreen';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { ChatSkeleton } from '@/components/skeletons';
 
 interface ChatData {
   id: string | number;
@@ -15,6 +16,8 @@ interface ChatData {
   userId?: string;
   username?: string;
   isGroup?: boolean;
+  description?: string;
+  memberCount?: number;
 }
 
 const GroupChatScreen = () => {
@@ -22,38 +25,50 @@ const GroupChatScreen = () => {
   const { id, name } = params as { id?: string; name?: string };
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useTheme();
   const [chatData, setChatData] = useState<ChatData | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadChatData();
-  }, [id, user?.id]);
-
-  const loadChatData = async () => {
+  const loadChatData = useCallback(async () => {
     if (!user || !id) return;
 
-    // Optimistic chat data
-    setChatData({
+    const optimisticData = {
       id: id as string,
       name: name || 'Group',
       avatar: '',
       isGroup: true,
-    });
+      userId: undefined,
+    };
+    setChatData(optimisticData);
 
     try {
       const resp = await apiService.getChatById(id as string);
-      const chat = (resp as any)?.data || resp;
-      if (chat) {
+      const group = (resp as any)?.data || resp;
+      
+      if (group) {
         setChatData({
-          id: chat.id || (id as string),
-          name: chat.name || name || 'Group',
-          avatar: '',
+          id: group?.id || (id as string),
+          name: group?.name || name || 'Group',
+          avatar: group?.avatar || group?.icon || '',
           isGroup: true,
+          description: group?.description || '',
+          memberCount: group?.memberCount || group?.members?.length || group?.participants?.length,
         });
       }
     } catch (error) {
-      // Keep optimistic data; ChatScreen will still function since messages use chatId
+      // Keep optimistic data on error
     }
-  };
+  }, [id, user, name]);
+
+  useEffect(() => {
+    loadChatData();
+  }, [loadChatData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadChatData();
+    }, [loadChatData])
+  );
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -63,18 +78,18 @@ const GroupChatScreen = () => {
     }
   };
 
-  if (!chatData) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading group chat...</Text>
-      </View>
-    );
-  }
+  // Don't show skeleton, pass optimistic data immediately
+  const optimisticChatData = chatData || {
+    id: id as string,
+    name: name || 'Group',
+    avatar: '',
+    isGroup: true,
+  };
 
   return (
     <View style={styles.container}>
       <ChatScreen
-        chatData={chatData}
+        chatData={optimisticChatData}
         onBack={handleBack}
         isNewChat={false}
         forceInitialRefresh={false}
@@ -88,11 +103,5 @@ export default GroupChatScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  loadingText: {
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 40,
   },
 });

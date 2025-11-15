@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, Image, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, Image, Modal, Pressable, RefreshControl } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, UserPlus, Image as ImageIcon } from 'lucide-react-native';
+import { ArrowLeft, UserPlus, UserMinus, Image as ImageIcon } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { apiService } from '@/lib/api';
 import { Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
+import { CreateGroupUserSkeleton } from '@/components/skeletons';
 
 interface UserItem {
   id: string;
@@ -24,21 +25,28 @@ const AddMembersScreen = () => {
   const [members, setMembers] = useState<UserItem[]>([]);
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<UserItem | null>(null);
+  const [groupData, setGroupData] = useState<any>(null);
 
   const groupId = id as string | undefined;
 
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async (isRefresh = false) => {
     if (!groupId || !user) {
       setLoading(false);
+      setRefreshing(false);
       return;
     }
 
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const [messagable, chatResp] = await Promise.all([
         apiService.getMessagableUsers(),
         apiService.getChatById(groupId).catch(() => null),
@@ -49,6 +57,16 @@ const AddMembersScreen = () => {
         : ((messagable as any)?.data || (messagable as any)?.users || []);
 
       const chat = chatResp ? ((chatResp as any)?.data || chatResp) : null;
+      
+      // Store group data for header
+      if (chat) {
+        setGroupData({
+          name: chat.name || name,
+          avatar: chat.avatar || chat.icon,
+          memberCount: chat.participants?.length || 0
+        });
+      }
+      
       const existingIds = new Set<string>();
       const currentMembers: UserItem[] = [];
 
@@ -87,8 +105,13 @@ const AddMembersScreen = () => {
       Alert.alert('Error', 'Failed to load users. Please try again.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [groupId, user?.id]);
+
+  const onRefresh = useCallback(() => {
+    loadUsers(true);
+  }, [loadUsers]);
 
   useEffect(() => {
     loadUsers();
@@ -167,28 +190,13 @@ const AddMembersScreen = () => {
         onPress={() => isSelected ? null : handleAddUser(item.id)}
         disabled={isAdding || isSelected}
       >
-        {item.avatar ? (
-          <Image
-            source={{ uri: item.avatar }}
-            style={[
-              styles.avatarImage,
-              isSelected && { borderColor: 'rgba(255, 255, 255, 0.3)', borderWidth: 2 }
-            ]}
-            defaultSource={require('@/assets/images/default-avatar.png')}
-          />
-        ) : (
-          <View style={[
-            styles.avatarPlaceholder,
-            isSelected && { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-          ]}>
-            <Text style={[
-              styles.avatarText,
-              isSelected && styles.selectedText
-            ]}>
-              {initials}
-            </Text>
-          </View>
-        )}
+        <Image
+          source={item.avatar ? { uri: item.avatar } : require('@/assets/images/default-avatar.png')}
+          style={[
+            styles.avatarImage,
+            isSelected && { borderColor: 'rgba(255, 255, 255, 0.3)', borderWidth: 2 }
+          ]}
+        />
         
         <View style={styles.userInfo}>
           <Text 
@@ -232,7 +240,7 @@ const AddMembersScreen = () => {
             {isAdding ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
-              <UserPlus size={16} color="white" />
+              <UserPlus size={16} color="#3B8FE8" />
             )}
           </TouchableOpacity>
         )}
@@ -295,21 +303,30 @@ const AddMembersScreen = () => {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>
-            {members.length > 0 ? `Add to ${name || 'Group'}` : 'Add Members'}
-          </Text>
-          {members.length > 0 && (
+        <View style={styles.headerCenter}>
+          {groupData?.avatar ? (
+            <Image source={{ uri: groupData.avatar }} style={styles.headerAvatar} />
+          ) : (
+            <View style={[styles.headerAvatarPlaceholder, { backgroundColor: colors.primary + (colors.background === '#ffffff' ? '15' : '20') }]}>
+              <UserPlus size={16} color={colors.primary} />
+            </View>
+          )}
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>
+              {groupData?.name || name || 'Group'}
+            </Text>
             <Text style={{ color: colors.textMuted, fontSize: FontSizes.sm }}>
               {members.length} members
             </Text>
-          )}
+          </View>
         </View>
         <View style={{ width: 36 }} />
       </View>
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+        <View style={styles.list}>
+          {Array.from({ length: 8 }).map((_, index) => (
+            <CreateGroupUserSkeleton key={index} />
+          ))}
         </View>
       ) : (
         <FlatList
@@ -318,6 +335,14 @@ const AddMembersScreen = () => {
           renderItem={renderUserItem}
           style={styles.list}
           contentContainerStyle={{ paddingBottom: 100 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#3B8FE8']}
+              tintColor={'#3B8FE8'}
+            />
+          }
           ListHeaderComponent={
             members.length > 0 ? (
               <View style={styles.membersSection}>
@@ -333,17 +358,13 @@ const AddMembersScreen = () => {
                       ]}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        <View style={[
-                          styles.avatarPlaceholder,
-                          isSelf && { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-                        ]}>
-                          <Text style={[
-                            styles.avatarText,
-                            isSelf && styles.selectedText
-                          ]}>
-                            {m.username?.[0]?.toUpperCase()}
-                          </Text>
-                        </View>
+                        <Image
+                          source={m.avatar ? { uri: m.avatar } : require('@/assets/images/default-avatar.png')}
+                          style={[
+                            styles.avatarImage,
+                            isSelf && { borderColor: 'rgba(255, 255, 255, 0.3)', borderWidth: 2 }
+                          ]}
+                        />
                         <View style={styles.userInfo}>
                           <Text style={[
                             styles.memberUsername,
@@ -376,7 +397,7 @@ const AddMembersScreen = () => {
                           style={styles.removeButton}
                           onPress={() => confirmRemoveMember(m)}
                         >
-                          <Text style={styles.removeButtonText}>Remove</Text>
+                          <UserMinus size={14} color="#ffffff" />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -414,10 +435,29 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTitleContainer: {
+  headerCenter: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 36, // Match back button width
+    justifyContent: 'center',
+    marginRight: 36,
+  },
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: Spacing.sm,
+  },
+  headerAvatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  headerTitleContainer: {
+    alignItems: 'center',
   },
   backButton: {
     width: 36,
@@ -440,11 +480,16 @@ const createStyles = (colors: any) => StyleSheet.create({
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.sm,
-    marginVertical: 2,
-    borderRadius: BorderRadius.md,
-    backgroundColor: colors.background,
+    padding: Spacing.md,
+    marginVertical: Spacing.xs,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: colors.backgroundSecondary,
     minHeight: 64,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   selectedUserItem: {
     backgroundColor: colors.primary,
@@ -474,13 +519,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text,
   },
   addButton: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: 16,
-    backgroundColor: colors.primary,
+    backgroundColor: '#3B8FE8' + (colors.background === '#ffffff' ? '15' : '20'),
+    borderWidth: 1,
+    borderColor: '#3B8FE8',
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 80,
+    minWidth: 60,
   },
   addButtonText: {
     color: '#ffffff',
@@ -524,10 +571,16 @@ const createStyles = (colors: any) => StyleSheet.create({
   memberItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    marginVertical: 2,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginVertical: Spacing.xs,
     justifyContent: 'space-between',
+    backgroundColor: colors.backgroundSecondary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   selectedMemberItem: {
     backgroundColor: colors.primary,
@@ -559,12 +612,12 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   removeButton: {
     backgroundColor: '#ff3b30',
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    borderRadius: 4,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 80,
+    minWidth: 60,
   },
   removeButtonText: {
     color: '#ffffff',
@@ -619,12 +672,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: FontWeights.medium,
   },
   headerTitle: {
-    color: '#ffffff',
+    color: colors.text,
     fontSize: FontSizes.lg,
     fontWeight: FontWeights.bold,
     textAlign: 'center',
-    includeFontPadding: false,
-    textTransform: 'capitalize',
   },
   optionText: {
     color: '#ffffff',

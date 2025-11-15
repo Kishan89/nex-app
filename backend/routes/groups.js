@@ -18,4 +18,13 @@ router.post('/:groupId/members', verifyAuthToken, groupChatController.addMember.
 // Remove a member from a group
 router.delete('/:groupId/members/:userId', verifyAuthToken, groupChatController.removeMember.bind(groupChatController));
 
+// Update group avatar
+router.put('/:groupId/avatar', verifyAuthToken, groupChatController.updateGroupAvatar.bind(groupChatController));
+
+// Update group name
+router.put('/:groupId/name', verifyAuthToken, groupChatController.updateGroupName.bind(groupChatController));
+
+// Update group description
+router.put('/:groupId/description', verifyAuthToken, groupChatController.updateGroupDescription.bind(groupChatController));
+
 module.exports = router;

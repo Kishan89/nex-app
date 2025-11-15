@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Search, MessageCircle, Plus } from 'lucide-react-native';
+import { Search, MessageCircle, Plus, Users } from 'lucide-react-native';
 import { ChatSkeleton } from '../../components/skeletons';
 import { apiService } from '../../lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -401,8 +401,8 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           <TouchableOpacity style={styles.actionButton} onPress={handleSearchPress}>
             <Search size={20} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={handleGroupsPress}>
-            <MessageCircle size={20} color={colors.text} />
+          <TouchableOpacity style={[styles.actionButton, styles.groupsButton]} onPress={handleGroupsPress}>
+            <Users size={20} color="#3B8FE8" />
           </TouchableOpacity>
         </View>
       </View>
@@ -419,7 +419,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       ) : (
         <FlatList
           style={styles.chatsList}
-          data={chats}
+          data={chats.filter(chat => !chat.isGroup)}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderChatItem}
           contentContainerStyle={{ paddingTop: 5, paddingBottom: 100, }}
@@ -427,6 +427,10 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No chats available</Text>
+              <TouchableOpacity style={styles.groupsHint} onPress={handleGroupsPress}>
+                <Users size={16} color={colors.primary} />
+                <Text style={[styles.groupsHintText, { color: colors.primary }]}>Try creating a group chat</Text>
+              </TouchableOpacity>
             </View>
           }
           refreshControl={
@@ -483,6 +487,11 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     justifyContent: 'center',
     marginLeft: Spacing.sm,
     ...Shadows.small,
+  },
+  groupsButton: {
+    backgroundColor: '#3B8FE8' + '20',
+    borderWidth: 1,
+    borderColor: '#3B8FE8' + '40',
   },
   chatsList: {
     flex: 1,
@@ -646,5 +655,21 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   unreadMessage: {
     fontWeight: FontWeights.semibold,
     color: colors.text,
+  },
+  groupsHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: colors.primary + '10',
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+  },
+  groupsHintText: {
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.medium,
+    marginLeft: Spacing.xs,
   },
 });

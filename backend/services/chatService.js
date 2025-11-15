@@ -220,7 +220,7 @@ class ChatService {
         name,
         username,
         userId: userIdForChat,
-        avatar,
+        avatar: isGroup ? (chat.avatar || avatar) : avatar,
         isOnline,
         lastSeen,
         lastSeenText,
@@ -228,6 +228,7 @@ class ChatService {
         time: lastMessage ? formatTimeAgo(lastMessage.createdAt) : '',
         participants: chat.participants,
         isGroup,
+        description: chat.description || '',
       };
     } catch (error) {
       throw error;
@@ -412,7 +413,7 @@ class ChatService {
    */
   async createChat(chatData) {
     try {
-      const { name, description, isGroup = false, participantIds, currentUserId } = chatData;
+      const { name, description, avatar, isGroup = false, participantIds, currentUserId } = chatData;
 
       const uniqueParticipantIds = Array.from(new Set(participantIds || []));
 
@@ -453,6 +454,7 @@ class ChatService {
         data: {
           name,
           description,
+          avatar,
           isGroup,
           createdById: isGroup ? (currentUserId || uniqueParticipantIds[0] || null) : null,
           participants: {
@@ -508,6 +510,7 @@ class ChatService {
           id: true,
           name: true,
           description: true,
+          avatar: true,
           isGroup: true,
           createdAt: true,
           updatedAt: true,
@@ -565,6 +568,7 @@ class ChatService {
           id: chat.id,
           name: chat.name || 'Group',
           description: chat.description || '',
+          avatar: chat.avatar || '',
           isGroup: true,
           lastMessage: lastMessage?.content || 'No messages yet',
           time: lastMessage ? formatTimeAgo(lastMessage.createdAt) : '',
@@ -847,6 +851,45 @@ class ChatService {
     } catch (error) {
       throw error;
     }
+  }
+
+  async updateGroupAvatar(chatId, avatar, userId) {
+    const chat = await prisma.chat.findFirst({
+      where: { id: chatId, isGroup: true, participants: { some: { userId, isAdmin: true } } }
+    });
+    if (!chat) throw new ForbiddenError('Only admins can update group avatar');
+    
+    return await prisma.chat.update({
+      where: { id: chatId },
+      data: { avatar },
+      include: { participants: { include: { user: { select: { id: true, username: true, avatar: true } } } } }
+    });
+  }
+
+  async updateGroupName(chatId, name, userId) {
+    const chat = await prisma.chat.findFirst({
+      where: { id: chatId, isGroup: true, participants: { some: { userId, isAdmin: true } } }
+    });
+    if (!chat) throw new ForbiddenError('Only admins can update group name');
+    
+    return await prisma.chat.update({
+      where: { id: chatId },
+      data: { name },
+      include: { participants: { include: { user: { select: { id: true, username: true, avatar: true } } } } }
+    });
+  }
+
+  async updateGroupDescription(chatId, description, userId) {
+    const chat = await prisma.chat.findFirst({
+      where: { id: chatId, isGroup: true, participants: { some: { userId, isAdmin: true } } }
+    });
+    if (!chat) throw new ForbiddenError('Only admins can update group description');
+    
+    return await prisma.chat.update({
+      where: { id: chatId },
+      data: { description },
+      include: { participants: { include: { user: { select: { id: true, username: true, avatar: true } } } } }
+    });
   }
 }
 

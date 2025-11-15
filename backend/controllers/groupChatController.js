@@ -30,7 +30,7 @@ class GroupChatController {
   async createGroup(req, res, next) {
     try {
       const { userId } = req.user || {};
-      const { name, description, memberIds } = req.body || {};
+      const { name, description, memberIds, avatar } = req.body || {};
 
       if (!userId) {
         throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED || 'Unauthorized');
@@ -54,6 +54,7 @@ class GroupChatController {
       const chat = await chatService.createChat({
         name: name.trim(),
         description: description || null,
+        avatar: avatar || null,
         isGroup: true,
         participantIds: uniqueMemberIds,
         currentUserId: userId,
@@ -124,6 +125,57 @@ class GroupChatController {
       return res
         .status(HTTP_STATUS.OK)
         .json(successResponse(updatedChat, 'Member removed from group'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateGroupAvatar(req, res, next) {
+    try {
+      const { userId } = req.user || {};
+      const { groupId } = req.params;
+      const { avatar } = req.body || {};
+
+      if (!userId) {
+        throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED || 'Unauthorized');
+      }
+
+      const updatedChat = await chatService.updateGroupAvatar(groupId, avatar, userId);
+      return res.status(HTTP_STATUS.OK).json(successResponse(updatedChat, 'Group avatar updated'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateGroupName(req, res, next) {
+    try {
+      const { userId } = req.user || {};
+      const { groupId } = req.params;
+      const { name } = req.body || {};
+
+      if (!userId) {
+        throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED || 'Unauthorized');
+      }
+
+      const updatedChat = await chatService.updateGroupName(groupId, name, userId);
+      return res.status(HTTP_STATUS.OK).json(successResponse(updatedChat, 'Group name updated'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateGroupDescription(req, res, next) {
+    try {
+      const { userId } = req.user || {};
+      const { groupId } = req.params;
+      const { description } = req.body || {};
+
+      if (!userId) {
+        throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED || 'Unauthorized');
+      }
+
+      const updatedChat = await chatService.updateGroupDescription(groupId, description, userId);
+      return res.status(HTTP_STATUS.OK).json(successResponse(updatedChat, 'Group description updated'));
     } catch (error) {
       next(error);
     }

@@ -347,7 +347,7 @@ class ApiService {
             return [];
         }
     }
-    getChatById(chatId: string) { return this.get<Chat>(`/chats/chat/${chatId}`); }
+    getChatById(chatId: string) { return this.get<Chat>(`/chats/${chatId}`); }
     async getChatMessages(chatId: string) {
         // Get current user ID from storage - try multiple sources
         let userId = null;
@@ -578,13 +578,16 @@ class ApiService {
         }
     }
 
-    async createGroup(name: string, description: string | null, memberIds: string[]): Promise<any> {
+    async createGroup(name: string, description: string | null, memberIds: string[], iconUrl?: string | null): Promise<any> {
         const payload: any = {
             name,
             memberIds,
         };
         if (description && description.trim() !== '') {
             payload.description = description.trim();
+        }
+        if (iconUrl) {
+            payload.avatar = iconUrl;
         }
         return this.post(API_ENDPOINTS.GROUPS, payload);
     }
@@ -595,6 +598,22 @@ class ApiService {
 
     async removeGroupMember(groupId: string, userId: string): Promise<any> {
         return this.delete(API_ENDPOINTS.GROUP_REMOVE_MEMBER(groupId, userId));
+    }
+
+    async updateGroupAvatar(groupId: string, avatarUrl: string): Promise<any> {
+        return this.put(`/groups/${groupId}/avatar`, { avatar: avatarUrl });
+    }
+
+    async updateGroupDescription(groupId: string, description: string): Promise<any> {
+        return this.put(`/groups/${groupId}/description`, { description });
+    }
+
+    async updateGroupName(groupId: string, name: string): Promise<any> {
+        return this.put(`/groups/${groupId}/name`, { name });
+    }
+
+    async getGroupDetails(groupId: string): Promise<any> {
+        return this.get(`/groups/${groupId}`);
     }
     // XP System methods
     async getXPRules() {

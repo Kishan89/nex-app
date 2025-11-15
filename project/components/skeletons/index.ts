@@ -21,6 +21,7 @@ export { XPLeadersSkeleton } from './XPLeadersSkeleton';
 export { SearchResultsSkeleton } from './SearchResultsSkeleton';
 export { AuthSkeleton } from './AuthSkeleton';
 export { CreatePostSkeleton } from './CreatePostSkeleton';
+export { GroupListSkeleton, GroupItemSkeleton, CreateGroupSkeleton, CreateGroupUserSkeleton } from './GroupSkeleton';
 // Skeleton patterns and utilities
 export { 
   UserRowSkeleton,

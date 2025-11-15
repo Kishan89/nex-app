@@ -100,6 +100,7 @@ model Chat {
   id           String            @id @default(cuid())
   name         String?
   description  String?
+  avatar       String?
   isGroup      Boolean           @default(false)
   createdById  String?
   createdBy    User?             @relation("ChatCreatedBy", fields: [createdById], references: [id])

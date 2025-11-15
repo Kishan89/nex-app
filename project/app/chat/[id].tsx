@@ -131,17 +131,19 @@ export default function IndividualChatScreen() {
     const cachedAvatar = params.cachedAvatar as string;
     const cachedIsOnline = params.cachedIsOnline === 'true';
     
-    setChatData({
-      id: id as string,
-      name: cachedName || 'Loading...',
-      username: cachedName || 'Loading...',
-      avatar: cachedAvatar || '',
-      isOnline: cachedIsOnline || false,
-      lastSeen: 'recently',
-      lastSeenText: cachedIsOnline ? 'Online' : 'Last seen recently',
-      userId: 'unknown',
-    });
-    setLoading(false); // No loading screen, show chat immediately
+    if (cachedName) {
+      setChatData({
+        id: id as string,
+        name: cachedName,
+        username: cachedName,
+        avatar: cachedAvatar || '',
+        isOnline: cachedIsOnline || false,
+        lastSeen: 'recently',
+        lastSeenText: cachedIsOnline ? 'Online' : 'Last seen recently',
+        userId: 'loading',
+      });
+      setLoading(false);
+    }
     
     try {
       // Strategy 1: Try to get chat by ID directly (most reliable for new chats)
@@ -149,30 +151,47 @@ export default function IndividualChatScreen() {
         const chat = await apiService.getChatById(id as string);
         if (chat && (chat as any).data) {
           const chatData = (chat as any).data;
-          setChatData({
+          // Extract userId from participants if not directly available
+          let userId = chatData.userId;
+          if (!userId && chatData.participants && Array.isArray(chatData.participants)) {
+            const otherParticipant = chatData.participants.find((p: any) => 
+              (p.userId !== user.id && p.user?.id !== user.id)
+            );
+            userId = otherParticipant?.userId || otherParticipant?.user?.id;
+          }
+          
+          setChatData(prevData => ({
             id: chatData.id || id as string,
-            name: chatData.name || chatData.username || 'User',
-            username: chatData.username || chatData.name || 'User',
-            avatar: chatData.avatar || '',
+            name: chatData.name || chatData.username || prevData?.name || 'User',
+            username: chatData.username || chatData.name || prevData?.username || 'User',
+            avatar: chatData.avatar || prevData?.avatar || '',
             isOnline: chatData.isOnline || false,
             lastSeen: chatData.lastSeen || 'recently',
             lastSeenText: chatData.lastSeenText || (chatData.isOnline ? 'Online' : 'Last seen recently'),
-            userId: chatData.userId || 'unknown',
-          });
+            userId: userId || prevData?.userId || 'unknown',
+          }));
           setLoading(false);
           return;
         } else if (chat) {
           // Direct chat object without .data wrapper
-          setChatData({
+          let userId = (chat as any).userId;
+          if (!userId && (chat as any).participants && Array.isArray((chat as any).participants)) {
+            const otherParticipant = (chat as any).participants.find((p: any) => 
+              (p.userId !== user.id && p.user?.id !== user.id)
+            );
+            userId = otherParticipant?.userId || otherParticipant?.user?.id;
+          }
+          
+          setChatData(prevData => ({
             id: (chat as any).id || id as string,
-            name: (chat as any).name || (chat as any).username || 'User',
-            username: (chat as any).username || (chat as any).name || 'User',
-            avatar: (chat as any).avatar || '',
+            name: (chat as any).name || (chat as any).username || prevData?.name || 'User',
+            username: (chat as any).username || (chat as any).name || prevData?.username || 'User',
+            avatar: (chat as any).avatar || prevData?.avatar || '',
             isOnline: (chat as any).isOnline || false,
             lastSeen: (chat as any).lastSeen || 'recently',
             lastSeenText: (chat as any).lastSeenText || ((chat as any).isOnline ? 'Online' : 'Last seen recently'),
-            userId: (chat as any).userId || 'unknown',
-          });
+            userId: userId || prevData?.userId || 'unknown',
+          }));
           setLoading(false);
           return;
         }
@@ -191,16 +210,25 @@ export default function IndividualChatScreen() {
         }
       }
       if (chatFromList) {
-        setChatData({
+        // Extract userId from participants if not directly available
+        let userId = chatFromList.userId;
+        if (!userId && chatFromList.participants && Array.isArray(chatFromList.participants)) {
+          const otherParticipant = chatFromList.participants.find((p: any) => 
+            (p.userId !== user.id && p.user?.id !== user.id)
+          );
+          userId = otherParticipant?.userId || otherParticipant?.user?.id;
+        }
+        
+        setChatData(prevData => ({
           id: chatFromList.id,
-          name: chatFromList.name || chatFromList.username || 'User',
-          username: chatFromList.username || chatFromList.name || 'User',
-          avatar: chatFromList.avatar || '',
+          name: chatFromList.name || chatFromList.username || prevData?.name || 'User',
+          username: chatFromList.username || chatFromList.name || prevData?.username || 'User',
+          avatar: chatFromList.avatar || prevData?.avatar || '',
           isOnline: chatFromList.isOnline || false,
           lastSeen: chatFromList.lastSeen || 'recently',
           lastSeenText: chatFromList.lastSeenText || (chatFromList.isOnline ? 'Online' : 'Last seen recently'),
-          userId: chatFromList.userId || 'unknown',
-        });
+          userId: userId || prevData?.userId || 'unknown',
+        }));
         setLoading(false);
         return;
       }
@@ -236,14 +264,8 @@ export default function IndividualChatScreen() {
   };
 
   const handleUserProfile = (userId: string) => {
-    if (userId && userId !== 'unknown' && userId !== 'undefined' && userId.trim() !== '') {
+    if (userId && userId !== 'unknown' && userId !== 'undefined' && userId !== 'loading' && userId.trim() !== '') {
       router.push(`/profile/${userId}`);
-    } else {
-      Alert.alert(
-        'Profile Unavailable', 
-        'Unable to open user profile. The user information is not available at the moment.',
-        [{ text: 'OK', style: 'default' }]
-      );
     }
   };
   
