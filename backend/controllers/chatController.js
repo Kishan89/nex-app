@@ -84,20 +84,30 @@ class ChatController {
   }
 
   /**
-   * Get a single chat by ID
+   * Get a single chat by ID or user chats
    */
   async getChatById(req, res, next) {
     try {
       const { chatId } = req.params;
       const userId = req.user?.userId || req.query.userId;
       
+      logger.info('getChatById called', { chatId, userId, hasUser: !!req.user });
+      
       if (!userId) {
         throw new BadRequestError(ERROR_MESSAGES.USER_ID_REQUIRED);
       }
       
-      const chat = await chatService.getChatById(chatId, userId);
-      
-      res.status(HTTP_STATUS.OK).json(successResponse(chat, SUCCESS_MESSAGES.CHAT_RETRIEVED));
+      // Try to get single chat first
+      try {
+        const chat = await chatService.getChatById(chatId, userId);
+        logger.info('Found chat by ID', { chatId, chatName: chat.name });
+        return res.status(HTTP_STATUS.OK).json(successResponse(chat, SUCCESS_MESSAGES.CHAT_RETRIEVED));
+      } catch (chatError) {
+        // If chat not found, maybe this is a user ID request for all chats
+        logger.info('Chat not found, trying as user chats request', { chatId });
+        const chats = await chatService.getUserChats(chatId);
+        return res.status(HTTP_STATUS.OK).json(chats);
+      }
     } catch (error) {
       next(error);
     }

@@ -47,22 +47,16 @@ const AddMembersScreen = () => {
       } else {
         setLoading(true);
       }
-      const [messagable, chatResp] = await Promise.all([
-        apiService.getMessagableUsers(),
-        apiService.getChatById(groupId).catch(() => null),
-      ]);
-
-      const messagableUsers: UserItem[] = Array.isArray(messagable)
-        ? messagable
-        : ((messagable as any)?.data || (messagable as any)?.users || []);
-
+      const chatResp = await apiService.getChatById(groupId).catch(() => null);
       const chat = chatResp ? ((chatResp as any)?.data || chatResp) : null;
+      
+      console.log('Chat data received:', chat);
       
       // Store group data for header
       if (chat) {
         setGroupData({
           name: chat.name || name,
-          avatar: chat.avatar || chat.icon,
+          avatar: chat.avatar || chat.icon || '',
           memberCount: chat.participants?.length || 0
         });
       }
@@ -99,6 +93,12 @@ const AddMembersScreen = () => {
 
       console.log('Current members loaded:', currentMembers.length, currentMembers);
       setMembers(currentMembers);
+
+      // Load messagable users AFTER we have members list
+      const messagable = await apiService.getMessagableUsers();
+      const messagableUsers: UserItem[] = Array.isArray(messagable)
+        ? messagable
+        : ((messagable as any)?.data || (messagable as any)?.users || []);
 
       const filtered = messagableUsers.filter((u) => !existingIds.has(u.id));
       console.log('Available users to add:', filtered.length);

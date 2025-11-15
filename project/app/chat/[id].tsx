@@ -131,9 +131,10 @@ export default function IndividualChatScreen() {
     const cachedAvatar = params.cachedAvatar as string;
     const cachedIsOnline = params.cachedIsOnline === 'true';
     const cachedUserId = params.cachedUserId as string;
+    const cachedIsGroup = params.cachedIsGroup === 'true';
     
     if (cachedName) {
-      console.log('Using cached data:', { cachedName, cachedUserId });
+      console.log('Using cached data:', { cachedName, cachedUserId, cachedIsGroup, cachedAvatar });
       setChatData({
         id: id as string,
         name: cachedName,
@@ -143,7 +144,9 @@ export default function IndividualChatScreen() {
         lastSeen: 'recently',
         lastSeenText: cachedIsOnline ? 'Online' : 'Last seen recently',
         userId: cachedUserId || 'loading',
-        isGroup: false,
+        isGroup: cachedIsGroup,
+        description: '',
+        memberCount: 0,
       });
       setLoading(false);
     }
@@ -170,7 +173,7 @@ export default function IndividualChatScreen() {
           
           console.log('Extracted userId:', userId, 'from chatData');
           
-          console.log('Setting chatData with userId:', userId);
+          console.log('Setting chatData with userId:', userId, 'isGroup:', chatData.isGroup);
           setChatData(prev => ({
             id: chatData.id || id as string,
             name: chatData.name || chatData.username || prev?.name || 'User',
@@ -181,6 +184,8 @@ export default function IndividualChatScreen() {
             lastSeenText: chatData.lastSeenText || (chatData.isOnline ? 'Online' : 'Last seen recently'),
             userId: userId || prev?.userId || 'unknown',
             isGroup: chatData.isGroup || false,
+            description: chatData.description || prev?.description || '',
+            memberCount: chatData.participants?.length || prev?.memberCount || 0,
           }));
           setLoading(false);
           return;

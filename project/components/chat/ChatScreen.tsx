@@ -90,9 +90,10 @@ const ChatScreen = React.memo(function ChatScreen({
   useEffect(() => {
     if (chatData && chatData.isGroup) {
       console.log('Syncing group data:', { name: chatData.name, description: chatData.description, avatar: chatData.avatar });
-      if (chatData.name) setGroupName(chatData.name);
-      if (chatData.description) setGroupDescription(chatData.description);
-      if (chatData.avatar) setGroupAvatar(chatData.avatar);
+      // Always sync group data, even if empty
+      setGroupName(chatData.name || '');
+      setGroupDescription(chatData.description || '');
+      setGroupAvatar(chatData.avatar || '');
     }
   }, [chatData?.name, chatData?.description, chatData?.avatar, chatData?.isGroup]);
   // Refs
@@ -728,19 +729,24 @@ const ChatScreen = React.memo(function ChatScreen({
       if (!result.canceled && result.assets[0]) {
         const imageUri = result.assets[0].uri;
         try {
+          console.log('Uploading group avatar...');
           const uploadResult = await apiService.uploadImageFile(imageUri, 'file', 'group-avatars');
-          const updateResponse = await apiService.updateGroupAvatar(String(chatData.id), uploadResult.url);
+          console.log('Upload result:', uploadResult.url);
           
+          console.log('Updating group avatar in database...');
+          await apiService.updateGroupAvatar(String(chatData.id), uploadResult.url);
+          
+          console.log('Avatar updated successfully, updating local state');
           setGroupAvatar(uploadResult.url);
-          if (chatData) {
-            chatData.avatar = uploadResult.url;
-          }
+          
           Alert.alert('Success', 'Group avatar updated successfully!');
         } catch (error) {
+          console.error('Error updating group avatar:', error);
           Alert.alert('Error', 'Failed to update group avatar. Please try again.');
         }
       }
     } catch (error) {
+      console.error('Error opening image picker:', error);
       Alert.alert('Error', 'Failed to open image picker. Please try again.');
     }
   };
@@ -757,13 +763,13 @@ const ChatScreen = React.memo(function ChatScreen({
     }
     
     try {
+      console.log('Updating group description:', groupDescription.trim());
       await apiService.updateGroupDescription(String(chatData.id), groupDescription.trim());
+      console.log('Description updated successfully');
       setEditingDescription(false);
-      if (chatData) {
-        chatData.description = groupDescription.trim();
-      }
       Alert.alert('Success', 'Group description updated successfully!');
     } catch (error) {
+      console.error('Error updating description:', error);
       Alert.alert('Error', 'Failed to update description. Please try again.');
     }
   };
@@ -780,13 +786,13 @@ const ChatScreen = React.memo(function ChatScreen({
     }
     
     try {
+      console.log('Updating group name:', groupName.trim());
       await apiService.updateGroupName(String(chatData.id), groupName.trim());
+      console.log('Name updated successfully');
       setEditingName(false);
-      if (chatData) {
-        chatData.name = groupName.trim();
-      }
       Alert.alert('Success', 'Group name updated successfully!');
     } catch (error) {
+      console.error('Error updating group name:', error);
       Alert.alert('Error', 'Failed to update group name. Please try again.');
     }
   };
@@ -1219,11 +1225,15 @@ const ChatScreen = React.memo(function ChatScreen({
       ? (groupName || chatData.name || 'Group') 
       : (chatData.username || chatData.name || 'User');
     
+    // For groups, prioritize groupAvatar state, then chatData.avatar
+    // For 1-on-1, use chatData.avatar
     const displayAvatar = chatData.isGroup 
-      ? (groupAvatar || chatData.avatar) 
-      : chatData.avatar;
+      ? (groupAvatar || chatData.avatar || '') 
+      : (chatData.avatar || '');
     
     const displayUserId = chatData.userId || 'unknown';
+    
+    console.log('Header render:', { displayName, displayAvatar, isGroup: chatData.isGroup, groupAvatar, chatDataAvatar: chatData.avatar });
     
     return (
       <View style={[styles.header, { backgroundColor: colors?.background || '#000', borderBottomColor: colors?.border || '#333' }]}>
@@ -1246,10 +1256,11 @@ const ChatScreen = React.memo(function ChatScreen({
           activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          {displayAvatar ? (
+          {displayAvatar && displayAvatar.trim() !== '' ? (
             <Image 
               source={{ uri: displayAvatar }} 
               style={styles.avatar}
+              onError={() => console.log('Avatar failed to load:', displayAvatar)}
             />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: colors?.primary + (colors?.background === '#ffffff' ? '15' : '20') || '#e385ec20' }]}>
@@ -1410,6 +1421,10 @@ const ChatScreen = React.memo(function ChatScreen({
                     <Image 
                       source={{ uri: groupAvatar || chatData?.avatar }} 
                       style={styles.groupAvatarLarge}
+                      onError={() => {
+                        console.log('Group avatar failed to load, using placeholder');
+                        setGroupAvatar('');
+                      }}
                     />
                   ) : (
                     <View style={[styles.groupAvatarLarge, styles.groupAvatarPlaceholder, { backgroundColor: colors.primary + (colors.background === '#ffffff' ? '15' : '20') }]}>
@@ -1418,10 +1433,7 @@ const ChatScreen = React.memo(function ChatScreen({
                   )}
                   <TouchableOpacity 
                     style={[styles.groupAvatarEditButton, { backgroundColor: colors.primary }]}
-                    onPress={() => {
-                      setShowGroupInfo(false);
-                      handleSetGroupAvatar();
-                    }}
+                    onPress={handleSetGroupAvatar}
                   >
                     <Camera size={16} color="#ffffff" />
                   </TouchableOpacity>
@@ -1474,7 +1486,10 @@ const ChatScreen = React.memo(function ChatScreen({
                     <View style={styles.descriptionActions}>
                       <TouchableOpacity 
                         style={[styles.descriptionButton, { backgroundColor: colors.backgroundSecondary }]}
-                        onPress={() => setEditingDescription(false)}
+                        onPress={() => {
+                          setEditingDescription(false);
+                          setGroupDescription(chatData?.description || '');
+                        }}
                       >
                         <Text style={[styles.descriptionButtonText, { color: colors.textMuted }]}>Cancel</Text>
                       </TouchableOpacity>
@@ -1489,7 +1504,7 @@ const ChatScreen = React.memo(function ChatScreen({
                 ) : (
                   <TouchableOpacity onPress={handleEditDescription}>
                     <Text style={[styles.groupMemberCount, { color: colors.textMuted }]}>
-                      {chatData?.description || groupDescription || 'Group • Tap to add description'}
+                      {groupDescription || 'Group • Tap to add description'}
                     </Text>
                   </TouchableOpacity>
                 )}

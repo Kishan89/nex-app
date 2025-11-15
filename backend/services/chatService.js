@@ -218,7 +218,7 @@ class ChatService {
         }
       }
 
-      return {
+      const result = {
         id: chat.id,
         name,
         username,
@@ -232,7 +232,19 @@ class ChatService {
         participants: chat.participants,
         isGroup,
         description: chat.description || '',
+        memberCount: chat.participants?.length || 0,
       };
+      
+      logger.info('getChatById result:', { 
+        id: result.id, 
+        name: result.name, 
+        isGroup: result.isGroup, 
+        avatar: result.avatar,
+        description: result.description,
+        memberCount: result.memberCount
+      });
+      
+      return result;
     } catch (error) {
       throw error;
     }
@@ -562,7 +574,7 @@ class ChatService {
         }
       });
 
-      return chats.map(chat => {
+      const result = chats.map(chat => {
         const lastMessage = chat.messages[0];
         const unreadCount = chat._count?.messages || 0;
         const memberCount = chat.participants.length;
@@ -581,6 +593,9 @@ class ChatService {
           lastMessageId: lastMessage?.id,
         };
       });
+      
+      logger.info('getUserGroupChats returning:', result.length, 'groups');
+      return result;
     } catch (error) {
       logger.error('Error getting user group chats:', error);
       return [];

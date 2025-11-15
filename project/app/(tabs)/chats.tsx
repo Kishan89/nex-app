@@ -337,6 +337,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
         cachedAvatar: chat.avatar || '',
         cachedIsOnline: chat.isOnline ? 'true' : 'false',
         cachedUserId: chat.userId || 'unknown',
+        cachedIsGroup: chat.isGroup ? 'true' : 'false',
       }
     });
   };
