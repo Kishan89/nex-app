@@ -18,7 +18,9 @@ import {
   Linking,
   AppState,
   AppStateStatus,
+  ActivityIndicator,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, Send, MoreVertical, Trash2, UserX, Flag, Users, Camera, Edit3 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -83,9 +85,13 @@ const ChatScreen = React.memo(function ChatScreen({
   const [groupDescription, setGroupDescription] = useState(chatData?.description || '');
   const [groupName, setGroupName] = useState(chatData?.name || '');
   const [groupAvatar, setGroupAvatar] = useState(chatData?.avatar || '');
-  const [editingDescription, setEditingDescription] = useState(false);
-  const [editingName, setEditingName] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [showEditNameModal, setShowEditNameModal] = useState(false);
+  const [showEditDescModal, setShowEditDescModal] = useState(false);
+  const [editNameInput, setEditNameInput] = useState('');
+  const [editDescInput, setEditDescInput] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [isSavingDesc, setIsSavingDesc] = useState(false);
   
   useEffect(() => {
     if (chatData && chatData.isGroup) {
@@ -751,51 +757,7 @@ const ChatScreen = React.memo(function ChatScreen({
     }
   };
 
-  const handleEditDescription = () => {
-    setGroupDescription(chatData?.description || '');
-    setEditingDescription(true);
-  };
 
-  const handleSaveDescription = async () => {
-    if (!groupDescription.trim()) {
-      Alert.alert('Error', 'Description cannot be empty');
-      return;
-    }
-    
-    try {
-      console.log('Updating group description:', groupDescription.trim());
-      await apiService.updateGroupDescription(String(chatData.id), groupDescription.trim());
-      console.log('Description updated successfully');
-      setEditingDescription(false);
-      Alert.alert('Success', 'Group description updated successfully!');
-    } catch (error) {
-      console.error('Error updating description:', error);
-      Alert.alert('Error', 'Failed to update description. Please try again.');
-    }
-  };
-
-  const handleEditName = () => {
-    setGroupName(chatData?.name || '');
-    setEditingName(true);
-  };
-
-  const handleSaveName = async () => {
-    if (!groupName.trim()) {
-      Alert.alert('Error', 'Group name cannot be empty');
-      return;
-    }
-    
-    try {
-      console.log('Updating group name:', groupName.trim());
-      await apiService.updateGroupName(String(chatData.id), groupName.trim());
-      console.log('Name updated successfully');
-      setEditingName(false);
-      Alert.alert('Success', 'Group name updated successfully!');
-    } catch (error) {
-      console.error('Error updating group name:', error);
-      Alert.alert('Error', 'Failed to update group name. Please try again.');
-    }
-  };
 
   const handleComingSoon = (feature: string) => {
     Alert.alert('Coming Soon', `${feature} feature will be available in the next update!`);
@@ -1404,149 +1366,244 @@ const ChatScreen = React.memo(function ChatScreen({
       >
         <View style={styles.groupInfoOverlay}>
           <View style={[styles.groupInfoModal, { backgroundColor: colors.background }]}>
-            {/* Header */}
-            <View style={[styles.groupInfoHeader, { borderBottomColor: colors.border }]}>
-              <TouchableOpacity onPress={() => setShowGroupInfo(false)} style={styles.groupInfoCloseButton}>
-                <ArrowLeft size={24} color={colors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.groupInfoTitle, { color: colors.text }]}>Group Info</Text>
-              <View style={styles.groupInfoHeaderSpacer} />
-            </View>
+            {/* Header with Gradient */}
+            <LinearGradient
+              colors={['#3B8FE8', '#e385ec']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.groupInfoHeaderGradient}
+            >
+              <View style={[styles.groupInfoHeader, { borderBottomWidth: 0 }]}>
+                <TouchableOpacity onPress={() => setShowGroupInfo(false)} style={styles.groupInfoCloseButton}>
+                  <ArrowLeft size={24} color="#ffffff" />
+                </TouchableOpacity>
+                <Text style={styles.groupInfoTitle}>Group Info</Text>
+                <View style={styles.groupInfoHeaderSpacer} />
+              </View>
+            </LinearGradient>
             
             {/* Group Avatar and Name */}
             <View style={styles.groupInfoContent}>
-              <View style={styles.groupAvatarSection}>
-                <View style={styles.groupAvatarContainer}>
-                  {(groupAvatar || chatData?.avatar) ? (
-                    <Image 
-                      source={{ uri: groupAvatar || chatData?.avatar }} 
-                      style={styles.groupAvatarLarge}
-                      onError={() => {
-                        console.log('Group avatar failed to load, using placeholder');
-                        setGroupAvatar('');
-                      }}
-                    />
-                  ) : (
-                    <View style={[styles.groupAvatarLarge, styles.groupAvatarPlaceholder, { backgroundColor: colors.primary + (colors.background === '#ffffff' ? '15' : '20') }]}>
-                      <Users size={40} color={colors.primary} />
+                <View style={styles.groupAvatarSection}>
+                  <View style={styles.groupAvatarContainer}>
+                    {(groupAvatar || chatData?.avatar) ? (
+                      <Image 
+                        source={{ uri: groupAvatar || chatData?.avatar }} 
+                        style={styles.groupAvatarLarge}
+                        onError={() => {
+                          console.log('Group avatar failed to load, using placeholder');
+                          setGroupAvatar('');
+                        }}
+                      />
+                    ) : (
+                      <LinearGradient
+                        colors={['#3B8FE8', '#e385ec']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[styles.groupAvatarLarge, styles.groupAvatarPlaceholder]}
+                      >
+                        <Users size={50} color="#ffffff" />
+                      </LinearGradient>
+                    )}
+                    <LinearGradient
+                      colors={['#3B8FE8', '#e385ec']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.groupAvatarEditButton}
+                    >
+                      <TouchableOpacity 
+                        onPress={handleSetGroupAvatar}
+                        style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Camera size={18} color="#ffffff" />
+                      </TouchableOpacity>
+                    </LinearGradient>
+                  </View>
+                  
+                  {/* Group Name Card */}
+                  <View style={[styles.infoCard, { backgroundColor: colors.backgroundSecondary }]}>
+                    <Text style={[styles.infoCardLabel, { color: colors.textMuted }]}>NAME</Text>
+                    <View style={styles.infoCardRow}>
+                      <Text style={[styles.infoCardValue, { color: colors.text, flex: 1 }]}>
+                        {groupName || chatData?.name || 'Group'}
+                      </Text>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          setEditNameInput(groupName);
+                          setShowEditNameModal(true);
+                        }}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Edit3 size={18} color={colors.primary} />
+                      </TouchableOpacity>
                     </View>
-                  )}
+                  </View>
+                  
+                  {/* Group Description Card */}
+                  <View style={[styles.infoCard, { backgroundColor: colors.backgroundSecondary }]}>
+                    <Text style={[styles.infoCardLabel, { color: colors.textMuted }]}>DESCRIPTION</Text>
+                    <View style={styles.infoCardRow}>
+                      <Text style={[styles.infoCardValue, { color: colors.text, flex: 1 }]}>
+                        {groupDescription || 'No description'}
+                      </Text>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          setEditDescInput(groupDescription);
+                          setShowEditDescModal(true);
+                        }}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Edit3 size={18} color={colors.secondary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  
+                </View>
+                
+                {/* Group Actions */}
+                <View style={styles.groupActionsSection}>
                   <TouchableOpacity 
-                    style={[styles.groupAvatarEditButton, { backgroundColor: colors.primary }]}
-                    onPress={handleSetGroupAvatar}
+                    style={[styles.actionCard, { backgroundColor: colors.backgroundSecondary }]}
+                    onPress={() => {
+                      setShowGroupInfo(false);
+                      const groupId = String(chatData.id);
+                      router.push({
+                        pathname: `/groups/${groupId}/add-members`,
+                        params: {
+                          name: chatData.name || 'Group',
+                        },
+                      });
+                    }}
                   >
-                    <Camera size={16} color="#ffffff" />
+                    <LinearGradient
+                      colors={['#3B8FE8', '#e385ec']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.actionCardIcon}
+                    >
+                      <Users size={22} color="#ffffff" />
+                    </LinearGradient>
+                    <View style={styles.actionCardContent}>
+                      <Text style={[styles.actionCardTitle, { color: colors.text }]}>Add Members</Text>
+                      <Text style={[styles.actionCardSubtitle, { color: colors.textMuted }]}>Invite people to this group</Text>
+                    </View>
+                    <Text style={[styles.memberCountText, { color: colors.textMuted }]}>
+                      {chatData.memberCount || 0}
+                    </Text>
                   </TouchableOpacity>
                 </View>
-                {editingName ? (
-                  <View style={styles.nameEditContainer}>
-                    <TextInput
-                      style={[styles.nameInput, { color: colors.text, borderColor: colors.border }]}
-                      value={groupName}
-                      onChangeText={setGroupName}
-                      placeholder="Group name"
-                      placeholderTextColor={colors.textMuted}
-                      maxLength={50}
-                      autoFocus
-                    />
-                    <View style={styles.nameActions}>
-                      <TouchableOpacity 
-                        style={[styles.nameButton, { backgroundColor: colors.backgroundSecondary }]}
-                        onPress={() => setEditingName(false)}
-                      >
-                        <Text style={[styles.nameButtonText, { color: colors.textMuted }]}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.nameButton, { backgroundColor: colors.primary }]}
-                        onPress={handleSaveName}
-                      >
-                        <Text style={[styles.nameButtonText, { color: '#ffffff' }]}>Save</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Name Modal */}
+      <Modal
+        visible={showEditNameModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEditNameModal(false)}
+      >
+        <View style={styles.editModalOverlay}>
+          <View style={[styles.editModalContent, { backgroundColor: colors.background }]}>
+            <Text style={[styles.editModalTitle, { color: colors.text }]}>Edit Group Name</Text>
+            <TextInput
+              style={[styles.editModalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+              value={editNameInput}
+              onChangeText={setEditNameInput}
+              placeholder="Enter group name"
+              placeholderTextColor={colors.textMuted}
+              autoFocus
+            />
+            <View style={styles.editModalButtons}>
+              <TouchableOpacity
+                style={[styles.editModalButton, { backgroundColor: colors.backgroundSecondary }]}
+                onPress={() => setShowEditNameModal(false)}
+              >
+                <Text style={[styles.editModalButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editModalButton, { backgroundColor: colors.primary, opacity: isSavingName ? 0.7 : 1 }]}
+                onPress={async () => {
+                  if (editNameInput && editNameInput.trim() && !isSavingName) {
+                    setIsSavingName(true);
+                    try {
+                      await apiService.updateGroupName(String(chatData.id), editNameInput.trim());
+                      setGroupName(editNameInput.trim());
+                      setShowEditNameModal(false);
+                      Alert.alert('Success', 'Group name updated!');
+                    } catch (error) {
+                      Alert.alert('Error', 'Failed to update name');
+                    } finally {
+                      setIsSavingName(false);
+                    }
+                  }
+                }}
+                disabled={isSavingName}
+              >
+                {isSavingName ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <TouchableOpacity onPress={handleEditName}>
-                    <Text style={[styles.groupNameLarge, { color: colors.text }]}>
-                      {groupName || chatData?.name || 'Group'}
-                    </Text>
-                  </TouchableOpacity>
+                  <Text style={[styles.editModalButtonText, { color: '#ffffff' }]}>Save</Text>
                 )}
-                {editingDescription ? (
-                  <View style={styles.descriptionEditContainer}>
-                    <TextInput
-                      style={[styles.descriptionInput, { color: colors.text, borderColor: colors.border }]}
-                      value={groupDescription}
-                      onChangeText={setGroupDescription}
-                      placeholder="Add group description..."
-                      placeholderTextColor={colors.textMuted}
-                      multiline
-                      maxLength={200}
-                      autoFocus
-                    />
-                    <View style={styles.descriptionActions}>
-                      <TouchableOpacity 
-                        style={[styles.descriptionButton, { backgroundColor: colors.backgroundSecondary }]}
-                        onPress={() => {
-                          setEditingDescription(false);
-                          setGroupDescription(chatData?.description || '');
-                        }}
-                      >
-                        <Text style={[styles.descriptionButtonText, { color: colors.textMuted }]}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.descriptionButton, { backgroundColor: colors.primary }]}
-                        onPress={handleSaveDescription}
-                      >
-                        <Text style={[styles.descriptionButtonText, { color: '#ffffff' }]}>Save</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Description Modal */}
+      <Modal
+        visible={showEditDescModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEditDescModal(false)}
+      >
+        <View style={styles.editModalOverlay}>
+          <View style={[styles.editModalContent, { backgroundColor: colors.background }]}>
+            <Text style={[styles.editModalTitle, { color: colors.text }]}>Edit Description</Text>
+            <TextInput
+              style={[styles.editModalInput, styles.editModalTextArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}
+              value={editDescInput}
+              onChangeText={setEditDescInput}
+              placeholder="Enter group description"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              numberOfLines={4}
+              autoFocus
+            />
+            <View style={styles.editModalButtons}>
+              <TouchableOpacity
+                style={[styles.editModalButton, { backgroundColor: colors.backgroundSecondary }]}
+                onPress={() => setShowEditDescModal(false)}
+              >
+                <Text style={[styles.editModalButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editModalButton, { backgroundColor: colors.secondary, opacity: isSavingDesc ? 0.7 : 1 }]}
+                onPress={async () => {
+                  if (!isSavingDesc) {
+                    setIsSavingDesc(true);
+                    try {
+                      await apiService.updateGroupDescription(String(chatData.id), editDescInput.trim());
+                      setGroupDescription(editDescInput.trim());
+                      setShowEditDescModal(false);
+                      Alert.alert('Success', 'Description updated!');
+                    } catch (error) {
+                      Alert.alert('Error', 'Failed to update description');
+                    } finally {
+                      setIsSavingDesc(false);
+                    }
+                  }
+                }}
+                disabled={isSavingDesc}
+              >
+                {isSavingDesc ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <TouchableOpacity onPress={handleEditDescription}>
-                    <Text style={[styles.groupMemberCount, { color: colors.textMuted }]}>
-                      {groupDescription || 'Group • Tap to add description'}
-                    </Text>
-                  </TouchableOpacity>
+                  <Text style={[styles.editModalButtonText, { color: '#ffffff' }]}>Save</Text>
                 )}
-              </View>
-              
-              {/* Group Options */}
-              <View style={styles.groupOptionsSection}>
-                <TouchableOpacity 
-                  style={[styles.groupOptionItem, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={handleEditDescription}
-                >
-                  <View style={[styles.groupOptionIcon, { backgroundColor: colors.primary + '20' }]}>
-                    <Edit3 size={20} color={colors.primary} />
-                  </View>
-                  <View style={styles.groupOptionContent}>
-                    <Text style={[styles.groupOptionTitle, { color: colors.text }]}>Edit Description</Text>
-                    <Text style={[styles.groupOptionSubtitle, { color: colors.textMuted }]}>Add group description</Text>
-                  </View>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.groupOptionItem, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={() => {
-                    setShowGroupInfo(false);
-                    const groupId = String(chatData.id);
-                    router.push({
-                      pathname: `/groups/${groupId}/add-members`,
-                      params: {
-                        name: chatData.name || 'Group',
-                      },
-                    });
-                  }}
-                >
-                  <View style={[styles.groupOptionIcon, { backgroundColor: colors.secondary + '20' }]}>
-                    <Users size={20} color={colors.secondary} />
-                  </View>
-                  <View style={styles.groupOptionContent}>
-                    <Text style={[styles.groupOptionTitle, { color: colors.text }]}>Add Members</Text>
-                    <Text style={[styles.groupOptionSubtitle, { color: colors.textMuted }]}>Invite people to this group</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1777,13 +1834,16 @@ const createStyles = (colors: any) => StyleSheet.create({
   // Group Info Modal Styles
   groupInfoOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
   groupInfoModal: {
-    height: '80%',
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
+    height: '75%',
+    borderTopLeftRadius: BorderRadius.xxl,
+    borderTopRightRadius: BorderRadius.xxl,
+    overflow: 'hidden',
+  },
+  groupInfoHeaderGradient: {
     paddingTop: Spacing.md,
   },
   groupInfoHeader: {
@@ -1791,7 +1851,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
   },
   groupInfoCloseButton: {
     padding: Spacing.xs,
@@ -1801,28 +1860,32 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: FontWeights.bold,
     flex: 1,
     textAlign: 'center',
-    color: '#3B8FE8',
+    color: '#ffffff',
   },
   groupInfoHeaderSpacer: {
     width: 40,
   },
+
   groupInfoContent: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.lg,
   },
   groupAvatarSection: {
     alignItems: 'center',
-    marginBottom: Spacing.xxl,
+    marginBottom: Spacing.md,
   },
   groupAvatarContainer: {
     position: 'relative',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   groupAvatarLarge: {
     width: 100,
     height: 100,
     borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#ffffff',
   },
   groupAvatarPlaceholder: {
     alignItems: 'center',
@@ -1832,52 +1895,117 @@ const createStyles = (colors: any) => StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    overflow: 'hidden',
     borderWidth: 3,
     borderColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
   },
-  groupNameLarge: {
-    fontSize: FontSizes.xl,
+  infoCard: {
+    width: '100%',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.sm,
+  },
+  infoCardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+  },
+  infoCardLabel: {
+    fontSize: 10,
     fontWeight: FontWeights.bold,
-    marginBottom: Spacing.xs,
-    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  groupMemberCount: {
-    fontSize: FontSizes.sm,
-    textAlign: 'center',
+  infoCardValue: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.medium,
   },
-  groupOptionsSection: {
-    gap: Spacing.md,
+  groupActionsSection: {
+    marginTop: Spacing.md,
   },
-  groupOptionItem: {
+  actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
   },
-  groupOptionIcon: {
+  actionCardIcon: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.md,
+    overflow: 'hidden',
   },
-  groupOptionContent: {
+  actionCardContent: {
     flex: 1,
   },
-  groupOptionTitle: {
+  actionCardTitle: {
     fontSize: FontSizes.md,
     fontWeight: FontWeights.semibold,
-    marginBottom: Spacing.xs,
-    color: '#3B8FE8',
+    marginBottom: 2,
   },
-  groupOptionSubtitle: {
-    fontSize: FontSizes.sm,
+  actionCardSubtitle: {
+    fontSize: FontSizes.xs,
+  },
+  memberCountText: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
+  },
+  // Edit Modal Styles
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  editModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+  },
+  editModalTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
+    marginBottom: Spacing.lg,
+    textAlign: 'center',
+  },
+  editModalInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    fontSize: FontSizes.md,
+    marginBottom: Spacing.lg,
+  },
+  editModalTextArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  editModalButtons: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  editModalButton: {
+    flex: 1,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+  },
+  editModalButtonText: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
   },
   // Description editing styles
   descriptionEditContainer: {

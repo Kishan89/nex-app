@@ -87,6 +87,15 @@ const ChatsScreen = React.memo(function ChatsScreen() {
         items = [];
       }
       
+      // Debug: Log groups to check avatar data
+      const groups = items.filter(item => item.isGroup);
+      if (groups.length > 0) {
+        console.log('📋 Groups loaded:', groups.length);
+        groups.forEach(group => {
+          console.log(`  - ${group.name}: avatar=${group.avatar || 'NO AVATAR'}`);
+        });
+      }
+      
       // Update state with fresh data
       setChats(items);
       
@@ -345,8 +354,6 @@ const ChatsScreen = React.memo(function ChatsScreen() {
     router.push('/search-users');
   };
   const renderChatItem = ({ item }: { item: Chat }) => {
-    // Backend now returns accurate unread count, no need for local calculation
-    // item.unread already contains only unread messages from others
     const effectiveUnread = item.unread || 0;
     return (
       <TouchableOpacity 
@@ -354,15 +361,29 @@ const ChatsScreen = React.memo(function ChatsScreen() {
         onPress={() => handleChatPress(item)}
       >
         <View style={styles.avatarContainer}>
-          <Image 
-            source={(item.avatar && item.avatar.trim() !== '') ? { uri: item.avatar } : require('@/assets/images/default-avatar.png')} 
-            style={styles.avatar}
-            onError={(error) => {
-              }}
-            onLoad={() => {
-              }}
-          />
-          {/* {item.isOnline && <View style={styles.onlineIndicator} />} */}
+          {item.isGroup ? (
+            item.avatar && item.avatar.trim() !== '' ? (
+              <Image 
+                source={{ uri: item.avatar }} 
+                style={styles.avatar}
+                onError={(e) => {
+                  console.log('❌ Group avatar failed to load:', item.avatar, e.nativeEvent.error);
+                }}
+                onLoad={() => {
+                  console.log('✅ Group avatar loaded:', item.avatar);
+                }}
+              />
+            ) : (
+              <View style={[styles.avatar, styles.groupAvatarPlaceholder]}>
+                <Users size={24} color={colors.primary} />
+              </View>
+            )
+          ) : (
+            <Image 
+              source={(item.avatar && item.avatar.trim() !== '') ? { uri: item.avatar } : require('@/assets/images/default-avatar.png')} 
+              style={styles.avatar}
+            />
+          )}
         </View>
         <View style={styles.chatContent}>
           <View style={styles.chatHeader}>
@@ -421,7 +442,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       ) : (
         <FlatList
           style={styles.chatsList}
-          data={chats.filter(chat => !chat.isGroup)}
+          data={chats}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderChatItem}
           contentContainerStyle={{ paddingTop: 5, paddingBottom: 100, }}
@@ -673,5 +694,10 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.medium,
     marginLeft: Spacing.xs,
+  },
+  groupAvatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary + '20',
   },
 });

@@ -32,6 +32,8 @@ class ChatService {
           select: {
             id: true,
             name: true,
+            avatar: true,
+            description: true,
             isGroup: true,
             updatedAt: true,
             participants: {
@@ -98,6 +100,7 @@ class ChatService {
         if (chat.isGroup) {
           name = chat.name || 'Group';
           username = name;
+          avatar = chat.avatar || null;
         } else {
           const otherParticipantData = chat.participants[0];
           const otherParticipant = otherParticipantData?.user;
