@@ -5,9 +5,13 @@ const logger = createLogger('CommentLikeService');
 
 class CommentLikeService {
   async toggleLike({ commentId, userId }) {
+    logger.info('❤️ [toggleLike] Start:', { commentId, userId });
+    
     const existingLike = await prisma.commentLike.findUnique({
       where: { userId_commentId: { userId, commentId } },
     });
+
+    logger.info('❤️ [toggleLike] Existing like check:', { commentId, userId, exists: !!existingLike });
 
     if (existingLike) {
       await prisma.$transaction(async (tx) => {
@@ -29,6 +33,7 @@ class CommentLikeService {
         select: { likesCount: true }
       });
       
+      logger.info('❤️ [toggleLike] Unlike complete:', { commentId, newLikesCount: updatedComment?.likesCount });
       return { liked: false, likeCount: updatedComment?.likesCount || 0 };
     } else {
       await prisma.$transaction([
@@ -44,6 +49,7 @@ class CommentLikeService {
         select: { likesCount: true }
       });
       
+      logger.info('❤️ [toggleLike] Like complete:', { commentId, newLikesCount: updatedComment?.likesCount });
       return { liked: true, likeCount: updatedComment?.likesCount || 0 };
     }
   }

@@ -77,7 +77,22 @@ class CommentService {
     const transformedComments = parentComments.map(parent => {
       const transformedParent = transformComment(parent);
       transformedParent.likesCount = parent.likesCount || 0;
-      transformedParent.isLiked = userId && parent.likes ? parent.likes.some(like => like.userId === userId) : false;
+      
+      // Check if user has liked this parent comment
+      const parentLikedByCurrentUser = userId && parent.likes ? parent.likes.some(like => {
+        const match = like.userId === userId;
+        if (parent.id.substring(0, 8) === 'cmi0div0') {
+          logger.info('🔍 Parent comment like check:', {
+            parentId: parent.id.substring(0, 8),
+            currentUserId: userId,
+            likeUserId: like.userId,
+            match: match
+          });
+        }
+        return match;
+      }) : false;
+      
+      transformedParent.isLiked = parentLikedByCurrentUser;
       
       logger.debug('💬 Parent comment like data:', {
         commentId: parent.id.substring(0, 8),
