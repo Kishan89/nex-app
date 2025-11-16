@@ -33,8 +33,8 @@ class CommentService {
         },
         likes: userId ? {
           where: { userId },
-          select: { id: true }
-        } : false
+          select: { id: true, userId: true }
+        } : true
       },
       orderBy: {
         createdAt: 'asc' // Changed to 'asc' for oldest to latest
@@ -63,7 +63,7 @@ class CommentService {
     const transformedComments = parentComments.map(parent => {
       const transformedParent = transformComment(parent);
       transformedParent.likesCount = parent.likesCount || 0;
-      transformedParent.isLiked = parent.likes && parent.likes.length > 0;
+      transformedParent.isLiked = userId && parent.likes ? parent.likes.some(like => like.userId === userId) : false;
       const replies = replyMap[parent.id] || [];
       // Sort replies by createdAt ascending (oldest to latest)
       const sortedReplies = replies.sort((a, b) => 
@@ -72,7 +72,7 @@ class CommentService {
       transformedParent.replies = sortedReplies.map(reply => {
         const transformed = transformComment(reply);
         transformed.likesCount = reply.likesCount || 0;
-        transformed.isLiked = reply.likes && reply.likes.length > 0;
+        transformed.isLiked = userId && reply.likes ? reply.likes.some(like => like.userId === userId) : false;
         return transformed;
       });
       return transformedParent;
@@ -187,6 +187,8 @@ class CommentService {
       });
 
       const transformedComment = transformComment(createdComment);
+      transformedComment.likesCount = 0;
+      transformedComment.isLiked = false;
 
       // Send notification to post owner
       try {

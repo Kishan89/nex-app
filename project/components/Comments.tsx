@@ -16,7 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
-import { X, Send, Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, ChevronDown, ChevronRight, UserX, ThumbsUp } from 'lucide-react-native';
+import { X, Send, Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, ChevronDown, ChevronRight, UserX } from 'lucide-react-native';
 // Assuming the following types and constants are defined correctly in your project
 import { NormalizedPost, Comment } from '@/types'; 
 import { supabase } from '@/lib/supabase';
@@ -122,11 +122,15 @@ export default function CommentsModal({
       // Apply display masking to all comments and replies
       const processedComments = comments.map(comment => ({
         ...comment,
+        likesCount: comment.likesCount || 0,
+        isLiked: comment.isLiked || false,
         username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
         avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
         user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous),
         replies: comment.replies?.map(reply => ({
           ...reply,
+          likesCount: reply.likesCount || 0,
+          isLiked: reply.isLiked || false,
           username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
           avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
           user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
@@ -149,11 +153,15 @@ export default function CommentsModal({
         // Apply display masking to cached comments
         const processedCachedComments = cachedComments.map(comment => ({
           ...comment,
+          likesCount: comment.likesCount || 0,
+          isLiked: comment.isLiked || false,
           username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
           avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
           user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous),
           replies: comment.replies?.map(reply => ({
             ...reply,
+            likesCount: reply.likesCount || 0,
+            isLiked: reply.isLiked || false,
             username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
             avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
             user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
@@ -235,6 +243,8 @@ export default function CommentsModal({
           // Apply display masking to the new comment
           const processedComment = {
             ...comment,
+            likesCount: comment.likesCount || 0,
+            isLiked: comment.isLiked || false,
             username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
             avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
             user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous),
@@ -372,7 +382,9 @@ export default function CommentsModal({
         parentId: undefined,
         replies: [],
         isAnonymous: isAnonymous,
-        user: currentUserData
+        user: currentUserData,
+        likesCount: 0,
+        isLiked: false
       };
 
       // Add instant comment immediately
@@ -700,22 +712,6 @@ export default function CommentsModal({
               </TouchableOpacity>
             </View>
             <Text style={styles.commentText}>{comment.text}</Text>
-            {/* Like button */}
-            <TouchableOpacity
-              style={styles.commentLikeButton}
-              onPress={() => handleLikeComment(comment.id, comment.isLiked || false)}
-            >
-              <ThumbsUp 
-                size={14} 
-                color={comment.isLiked ? colors.primary : colors.textMuted}
-                fill={comment.isLiked ? colors.primary : 'none'}
-              />
-              {(comment.likesCount || 0) > 0 && (
-                <Text style={[styles.commentLikeCount, comment.isLiked && { color: colors.primary }]}>
-                  {comment.likesCount}
-                </Text>
-              )}
-            </TouchableOpacity>
             {/* Dropdown menu */}
             {showMenuForComment === comment.id && (
               <View style={styles.menuDropdown}>
@@ -739,15 +735,34 @@ export default function CommentsModal({
             )}
           </View>
         </View>
-        {/* View Replies Button - Left aligned like PostCard */}
-        <TouchableOpacity 
-          style={styles.viewRepliesButton}
-          onPress={() => handleViewReplies(comment)}
-        >
-          <Text style={styles.viewRepliesText}>
-            {hasReplies ? `${comment.replies!.length} ${comment.replies!.length === 1 ? 'reply' : 'replies'}` : '0 replies'}
-          </Text>
-        </TouchableOpacity>
+        {/* Reply and Like buttons in same row */}
+        <View style={styles.commentActionsRow}>
+          <View style={styles.replyWithLike}>
+            <TouchableOpacity 
+              style={styles.viewRepliesButton}
+              onPress={() => handleViewReplies(comment)}
+            >
+              <Text style={styles.viewRepliesText}>
+                {hasReplies ? `${comment.replies!.length} ${comment.replies!.length === 1 ? 'reply' : 'replies'}` : '0 replies'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.commentLikeButton}
+              onPress={() => handleLikeComment(comment.id, comment.isLiked || false)}
+            >
+              <Heart 
+                size={14} 
+                color={comment.isLiked ? colors.primary : colors.textMuted}
+                fill={comment.isLiked ? colors.primary : 'none'}
+              />
+              {(comment.likesCount || 0) > 0 && (
+                <Text style={[styles.commentLikeCount, comment.isLiked && { color: colors.primary }]}>
+                  {comment.likesCount}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     );
   };
@@ -1007,17 +1022,22 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.regular,
   },
+  commentActionsRow: {
+    marginTop: Spacing.xs,
+  },
+  replyWithLike: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
   viewRepliesButton: {
     paddingVertical: Spacing.xs,
-    paddingLeft:0,
-    marginTop: Spacing.xs,
-    marginLeft: 0,
   },
   commentLikeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: Spacing.xs,
+    paddingVertical: Spacing.xs,
   },
   commentLikeCount: {
     fontSize: FontSizes.xs,

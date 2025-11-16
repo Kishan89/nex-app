@@ -32,7 +32,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
-import { X, Send, ArrowLeft, Trash2, MoreVertical, Flag, UserX, ThumbsUp } from 'lucide-react-native';
+import { X, Send, ArrowLeft, Trash2, MoreVertical, Flag, UserX, Heart } from 'lucide-react-native';
 import { Comment } from '@/types';
 import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -124,6 +124,8 @@ export default function CommentReplyPanel({
         // Apply display masking to existing replies
         const processedReplies = parentComment.replies.map(reply => ({
           ...reply,
+          likesCount: reply.likesCount || 0,
+          isLiked: reply.isLiked || false,
           username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
           avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
           user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
@@ -147,6 +149,8 @@ export default function CommentReplyPanel({
         // Apply display masking to fetched replies
         const processedReplies = parentWithReplies.replies.map(reply => ({
           ...reply,
+          likesCount: reply.likesCount || 0,
+          isLiked: reply.isLiked || false,
           username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
           avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
           user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
@@ -199,6 +203,8 @@ export default function CommentReplyPanel({
           // Apply display masking to the new reply
           const processedReply = {
             ...comment,
+            likesCount: comment.likesCount !== undefined ? comment.likesCount : 0,
+            isLiked: comment.isLiked !== undefined ? comment.isLiked : false,
             username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
             avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
             user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous),
@@ -360,7 +366,9 @@ export default function CommentReplyPanel({
       userId: currentUserId || '',
       isAnonymous: isAnonymous,
       createdAt: new Date().toISOString(),
-      user: currentUserData
+      user: currentUserData,
+      likesCount: 0,
+      isLiked: false
     };
 
     // Add instant reply at the end for oldest-to-latest order
@@ -550,22 +558,6 @@ export default function CommentReplyPanel({
               )
             )}
           </Text>
-          {/* Like button */}
-          <TouchableOpacity
-            style={styles.replyLikeButton}
-            onPress={() => handleLikeReply(reply.id, reply.isLiked || false)}
-          >
-            <ThumbsUp 
-              size={14} 
-              color={reply.isLiked ? colors.primary : colors.textMuted}
-              fill={reply.isLiked ? colors.primary : 'none'}
-            />
-            {(reply.likesCount || 0) > 0 && (
-              <Text style={[styles.replyLikeCount, reply.isLiked && { color: colors.primary }]}>
-                {reply.likesCount}
-              </Text>
-            )}
-          </TouchableOpacity>
           {/* Dropdown menu */}
           {showMenuForReply === reply.id && (
             <View style={styles.menuDropdown}>
@@ -589,13 +581,32 @@ export default function CommentReplyPanel({
           )}
           </View>
         </View>
-        {/* Reply button */}
-        <TouchableOpacity 
-          style={styles.replyButton}
-          onPress={() => handleReplyToReply(reply)}
-        >
-          <Text style={styles.replyButtonText}>Reply</Text>
-        </TouchableOpacity>
+        {/* Reply and Like buttons in same row */}
+        <View style={styles.replyActionsRow}>
+          <View style={styles.replyWithLike}>
+            <TouchableOpacity 
+              style={styles.replyButton}
+              onPress={() => handleReplyToReply(reply)}
+            >
+              <Text style={styles.replyButtonText}>Reply</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.replyLikeButton}
+              onPress={() => handleLikeReply(reply.id, reply.isLiked || false)}
+            >
+              <Heart 
+                size={14} 
+                color={reply.isLiked ? colors.primary : colors.textMuted}
+                fill={reply.isLiked ? colors.primary : 'none'}
+              />
+              {(reply.likesCount || 0) > 0 && (
+                <Text style={[styles.replyLikeCount, reply.isLiked && { color: colors.primary }]}>
+                  {reply.likesCount}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     );
   };
@@ -900,11 +911,16 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
+  replyActionsRow: {
+    marginTop: Spacing.xs,
+  },
+  replyWithLike: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
   replyButton: {
     paddingVertical: Spacing.xs,
-    paddingLeft: 0,
-    marginTop: Spacing.xs,
-    marginLeft: 0,
   },
   replyButtonText: {
     fontSize: FontSizes.xs,
@@ -915,7 +931,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: Spacing.xs,
+    paddingVertical: Spacing.xs,
   },
   replyLikeCount: {
     fontSize: FontSizes.xs,

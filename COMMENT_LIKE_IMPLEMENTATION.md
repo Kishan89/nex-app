@@ -177,7 +177,7 @@ Response:
 ## 🎨 UI/UX
 
 ### Visual Design
-- ThumbsUp icon (lucide-react-native)
+- Heart icon (lucide-react-native) - same as post likes
 - Blue when liked, gray when not liked
 - Count displayed next to icon (hidden if 0)
 - Smooth color transitions
