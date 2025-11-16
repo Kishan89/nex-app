@@ -6,17 +6,20 @@ interface CommentReplyContextType {
   closeReplies: () => void;
   isVisible: boolean;
   onReplyAdded?: (commentId: string) => void;
+  onPanelClose?: () => void;
 }
 const CommentReplyContext = createContext<CommentReplyContextType | undefined>(undefined);
 interface CommentReplyProviderProps {
   children: ReactNode;
   currentUserId: string;
   currentUserAvatar?: string;
+  onPanelClose?: () => void;
 }
 export function CommentReplyProvider({ 
   children, 
   currentUserId, 
-  currentUserAvatar 
+  currentUserAvatar,
+  onPanelClose
 }: CommentReplyProviderProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
@@ -34,6 +37,12 @@ export function CommentReplyProvider({
   };
   const closeReplies = () => {
     setIsVisible(false);
+    // Trigger callback to refresh comments when panel closes
+    if (onPanelClose) {
+      setTimeout(() => {
+        onPanelClose();
+      }, 100);
+    }
     // Delay clearing data to allow animation to complete
     setTimeout(() => {
       setSelectedComment(null);
@@ -45,6 +54,7 @@ export function CommentReplyProvider({
     closeReplies,
     isVisible,
     onReplyAdded: undefined, // Can be extended later if needed
+    onPanelClose,
   };
   return (
     <CommentReplyContext.Provider value={contextValue}>

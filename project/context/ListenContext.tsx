@@ -116,12 +116,15 @@ const normalizeComment = (c: any): Comment => {
       avatar: '',
       text: c.text ?? c.body ?? '',
       time: c.createdAt ?? c.time ?? 'now',
+      createdAt: c.createdAt ?? new Date().toISOString(),
       parentId: c.parentId ? String(c.parentId) : undefined,
       replyTo: c.replyTo ?? undefined,
       user: { id: c.userId, username: 'Anonymous', avatar: '' },
       userId: c.userId, // Keep real userId for backend operations
       isAnonymous: true,
       replies: replies,
+      likesCount: c.likesCount ?? 0,
+      isLiked: c.isLiked ?? false,
     };
   }
   
@@ -139,12 +142,15 @@ const normalizeComment = (c: any): Comment => {
     avatar: c.avatar ?? userInfo.avatar ?? '',
     text: c.text ?? c.body ?? '',
     time: c.createdAt ?? c.time ?? 'now',
+    createdAt: c.createdAt ?? new Date().toISOString(),
     parentId: c.parentId ? String(c.parentId) : undefined,
     replyTo: c.replyTo ?? undefined,
     user: userInfo.id ? userInfo : undefined,
     userId: userId,
     isAnonymous: false,
     replies: replies,
+    likesCount: c.likesCount ?? 0,
+    isLiked: c.isLiked ?? false,
   };
 };
 // Function to build nested comment structure from flat array
@@ -896,6 +902,8 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
           parentId: newCommentResponse.data.parentId,
           replies: [],
           isAnonymous: newCommentResponse.data.isAnonymous,
+          likesCount: 0,
+          isLiked: false,
           user: newCommentResponse.data.isAnonymous ? 
             { id: newCommentResponse.data.userId, username: 'Anonymous', avatar: ANONYMOUS_AVATAR } :
             newCommentResponse.data.user

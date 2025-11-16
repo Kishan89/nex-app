@@ -110,32 +110,10 @@ export default function CommentReplyPanel({
     try {
       setLoading(true);
       
-      console.log('🔍 [ReplyPanel] parentComment:', {
-        id: parentComment.id,
-        hasReplies: !!parentComment.replies,
-        repliesIsArray: Array.isArray(parentComment.replies),
-        repliesLength: parentComment.replies?.length || 0,
-        repliesData: parentComment.replies
-      });
+      console.log('🔍 [ReplyPanel] Loading fresh replies from server for comment:', parentComment.id);
       
-      // Check if replies are already in the parent comment (nested structure)
-      if (parentComment.replies && Array.isArray(parentComment.replies) && parentComment.replies.length > 0) {
-        console.log('✅ [ReplyPanel] Using nested replies from parent comment:', parentComment.replies.length);
-        // Apply display masking to existing replies
-        const processedReplies = parentComment.replies.map(reply => ({
-          ...reply,
-          likesCount: reply.likesCount || 0,
-          isLiked: reply.isLiked || false,
-          username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
-          avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
-          user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
-        }));
-        setReplies(processedReplies);
-        setLoading(false);
-        return;
-      }
-      
-      // Fallback: Fetch all comments and find the parent with nested replies
+      // Always fetch fresh comments from server to get latest like counts
+      // This ensures reply likes persist correctly after refresh
       const comments = await apiService.getPostComments(postId);
       
       console.log('🔍 [ReplyPanel] Total comments fetched:', comments.length);
@@ -146,11 +124,17 @@ export default function CommentReplyPanel({
       
       if (parentWithReplies && parentWithReplies.replies && parentWithReplies.replies.length > 0) {
         console.log('✅ [ReplyPanel] Found parent comment with nested replies:', parentWithReplies.replies.length);
+        console.log('📊 [ReplyPanel] Reply likes data:', parentWithReplies.replies.map(r => ({
+          id: r.id.substring(0, 8),
+          likesCount: r.likesCount,
+          isLiked: r.isLiked
+        })));
+        
         // Apply display masking to fetched replies
         const processedReplies = parentWithReplies.replies.map(reply => ({
           ...reply,
-          likesCount: reply.likesCount || 0,
-          isLiked: reply.isLiked || false,
+          likesCount: reply.likesCount ?? 0,
+          isLiked: reply.isLiked ?? false,
           username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
           avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
           user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
@@ -444,12 +428,13 @@ export default function CommentReplyPanel({
     ));
 
     try {
-      const response = await apiService.toggleCommentLike(postId, replyId);
+      const response: any = await apiService.toggleCommentLike(postId, replyId);
       // Update with actual count from server
       if (response?.data?.likeCount !== undefined) {
+        const { liked, likeCount } = response.data;
         setReplies(prev => prev.map(r => 
           r.id === replyId 
-            ? { ...r, isLiked: response.data.liked, likesCount: response.data.likeCount }
+            ? { ...r, isLiked: liked, likesCount: likeCount }
             : r
         ));
       }
