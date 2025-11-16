@@ -44,17 +44,15 @@ class CommentService {
       take: limit,
     });
     
-    logger.debug('📊 [getCommentsByPostId] Prisma query result:', {
+    logger.info('📊 [getCommentsByPostId] Prisma query result:', {
       postId,
       userId,
       totalComments: allComments.length,
-      firstComment: allComments[0] ? {
-        id: allComments[0].id,
-        likesCount: allComments[0].likesCount,
-        likesArray: allComments[0].likes,
-        hasLikes: !!allComments[0].likes,
-        likesLength: allComments[0].likes?.length
-      } : 'No comments'
+      allCommentsLikeCounts: allComments.map(c => ({
+        id: c.id.substring(0, 8),
+        likesCount: c.likesCount,
+        actualLikes: c.likes?.length || 0
+      }))
     });
     
     if (!allComments) {
