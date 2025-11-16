@@ -13,8 +13,9 @@ class CommentController {
   async getComments(req, res, next) {
     try {
       const { postId } = req.params;
-      const { page, limit } = req.query;
-      const userId = req.user?.userId;
+      const { page, limit, userId: queryUserId } = req.query;
+      // Get userId from JWT token or query params (for like status)
+      const userId = req.user?.userId || queryUserId;
 
       const comments = await commentService.getCommentsByPostId(postId, { page, limit, userId });
       if (!Array.isArray(comments)) {

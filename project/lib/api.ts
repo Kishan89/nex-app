@@ -309,7 +309,11 @@ class ApiService {
         return this.post<Post>(API_ENDPOINTS.POSTS, payload);
     }
     async getPostComments(postId: string): Promise<any[]> {
-        const response = await this.get<any>(API_ENDPOINTS.POST_COMMENTS(postId));
+        // Include userId in query params so backend can return isLiked status
+        const url = this.userId 
+            ? `${API_ENDPOINTS.POST_COMMENTS(postId)}?userId=${this.userId}`
+            : API_ENDPOINTS.POST_COMMENTS(postId);
+        const response = await this.get<any>(url);
         if (response && response.data && Array.isArray(response.data)) {
             return response.data;
         }

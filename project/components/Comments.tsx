@@ -499,7 +499,7 @@ export default function CommentsModal({
     if (!post?.id) return;
     
     // Optimistic update
-    setLocalComments(prev => prev.map(c => {
+    const updatedComments = localComments.map(c => {
       if (c.id === commentId) {
         return {
           ...c,
@@ -519,13 +519,18 @@ export default function CommentsModal({
         };
       }
       return c;
-    }));
+    });
+    
+    setLocalComments(updatedComments);
+    
+    // Update cache immediately
+    await commentCache.cacheComments(post.id, updatedComments);
 
     try {
       await apiService.toggleCommentLike(post.id, commentId);
     } catch (error) {
       // Rollback on error
-      setLocalComments(prev => prev.map(c => {
+      const rolledBackComments = updatedComments.map(c => {
         if (c.id === commentId) {
           return {
             ...c,
@@ -544,7 +549,11 @@ export default function CommentsModal({
           };
         }
         return c;
-      }));
+      });
+      
+      setLocalComments(rolledBackComments);
+      // Rollback cache too
+      await commentCache.cacheComments(post.id, rolledBackComments);
     }
   };
 
