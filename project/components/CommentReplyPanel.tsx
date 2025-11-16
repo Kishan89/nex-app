@@ -542,15 +542,33 @@ export default function CommentReplyPanel({
               <MoreVertical size={16} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.replyText}>
-            {reply.text.split(/(@\w+)/g).map((part, index) => 
-              part.startsWith('@') ? (
-                <Text key={index} style={styles.mentionText}>{part}</Text>
-              ) : (
-                part
-              )
-            )}
-          </Text>
+          <TouchableOpacity 
+            activeOpacity={1}
+            onPress={() => {
+              const now = Date.now();
+              const lastTap = (reply as any)._lastTap || 0;
+              const DOUBLE_TAP_DELAY = 300;
+              
+              if (now - lastTap < DOUBLE_TAP_DELAY) {
+                // Double tap detected - like the reply
+                handleLikeReply(reply.id, reply.isLiked || false);
+                (reply as any)._lastTap = 0;
+              } else {
+                // Single tap - store timestamp
+                (reply as any)._lastTap = now;
+              }
+            }}
+          >
+            <Text style={styles.replyText}>
+              {reply.text.split(/(@\w+)/g).map((part, index) => 
+                part.startsWith('@') ? (
+                  <Text key={index} style={styles.mentionText}>{part}</Text>
+                ) : (
+                  part
+                )
+              )}
+            </Text>
+          </TouchableOpacity>
           {/* Dropdown menu */}
           {showMenuForReply === reply.id && (
             <View style={styles.menuDropdown}>

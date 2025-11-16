@@ -717,7 +717,25 @@ export default function CommentsModal({
                 <MoreVertical size={16} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.commentText}>{comment.text}</Text>
+            <TouchableOpacity 
+              activeOpacity={1}
+              onPress={() => {
+                const now = Date.now();
+                const lastTap = (comment as any)._lastTap || 0;
+                const DOUBLE_TAP_DELAY = 300;
+                
+                if (now - lastTap < DOUBLE_TAP_DELAY) {
+                  // Double tap detected - like the comment
+                  handleLikeComment(comment.id, comment.isLiked || false);
+                  (comment as any)._lastTap = 0;
+                } else {
+                  // Single tap - store timestamp
+                  (comment as any)._lastTap = now;
+                }
+              }}
+            >
+              <Text style={styles.commentText}>{comment.text}</Text>
+            </TouchableOpacity>
             {/* Dropdown menu */}
             {showMenuForComment === comment.id && (
               <View style={styles.menuDropdown}>
