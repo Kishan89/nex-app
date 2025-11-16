@@ -33,10 +33,9 @@ class CommentService {
             avatar: true,
           }
         },
-        likes: userId ? {
-          where: { userId },
+        likes: {
           select: { id: true, userId: true }
-        } : true
+        }
       },
       orderBy: {
         createdAt: 'asc' // Changed to 'asc' for oldest to latest
