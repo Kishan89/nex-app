@@ -44,6 +44,19 @@ class CommentService {
       take: limit,
     });
     
+    logger.debug('📊 [getCommentsByPostId] Prisma query result:', {
+      postId,
+      userId,
+      totalComments: allComments.length,
+      firstComment: allComments[0] ? {
+        id: allComments[0].id,
+        likesCount: allComments[0].likesCount,
+        likesArray: allComments[0].likes,
+        hasLikes: !!allComments[0].likes,
+        likesLength: allComments[0].likes?.length
+      } : 'No comments'
+    });
+    
     if (!allComments) {
         return [];
     }
@@ -71,8 +84,10 @@ class CommentService {
         likesCount: parent.likesCount,
         totalLikes: parent.likes?.length || 0,
         userId,
+        currentUserId: userId,
         isLiked: transformedParent.isLiked,
-        likesData: parent.likes?.map(l => ({ userId: l.userId?.substring(0, 8), id: l.id?.substring(0, 8) }))
+        likesArray: parent.likes,
+        likesData: parent.likes?.map(l => ({ userId: l.userId, id: l.id }))
       });
       
       const replies = replyMap[parent.id] || [];
@@ -83,13 +98,30 @@ class CommentService {
       transformedParent.replies = sortedReplies.map(reply => {
         const transformed = transformComment(reply);
         transformed.likesCount = reply.likesCount || 0;
-        transformed.isLiked = userId && reply.likes ? reply.likes.some(like => like.userId === userId) : false;
+        
+        // Check if user has liked this reply
+        const likedByCurrentUser = userId && reply.likes ? reply.likes.some(like => {
+          const match = like.userId === userId;
+          if (reply.id.substring(0, 8) === 'cmi0ouncp' || reply.id.substring(0, 8) === 'cmi0ibx6') {
+            logger.info('🔍 Comparing likes for reply:', {
+              replyId: reply.id.substring(0, 8),
+              currentUserId: userId,
+              likeUserId: like.userId,
+              match: match
+            });
+          }
+          return match;
+        }) : false;
+        
+        transformed.isLiked = likedByCurrentUser;
         
         logger.debug('  💬 Reply like data:', {
           replyId: reply.id.substring(0, 8),
           likesCount: reply.likesCount,
           totalLikes: reply.likes?.length || 0,
-          isLiked: transformed.isLiked
+          userId,
+          isLiked: transformed.isLiked,
+          likesArray: reply.likes
         });
         
         return transformed;

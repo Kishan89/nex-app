@@ -112,8 +112,8 @@ export default function CommentsModal({
   
   useEffect(() => {
     if (post) {
-      // Try to load cached comments first for instant display
-      loadCachedComments();
+      // Don't load from cache - use the comments passed from ListenContext which are fresh from server
+      // This ensures correct isLiked status after reload
       console.log('📝 [Comments] Setting local comments:', comments.length, 'comments');
       comments.forEach((c, i) => {
         console.log(`  Comment ${i + 1}: id=${c.id.substring(0, 8)}, replies=${c.replies?.length || 0}`);
@@ -144,37 +144,8 @@ export default function CommentsModal({
     }
   }, [post, comments]);
 
-  // Load cached comments for instant display
-  const loadCachedComments = async () => {
-    if (!post?.id) return;
-    try {
-      const cachedComments = await commentCache.getCachedComments(post.id);
-      if (cachedComments.length > 0) {
-        // Apply display masking to cached comments
-        const processedCachedComments = cachedComments.map(comment => ({
-          ...comment,
-          likesCount: comment.likesCount || 0,
-          isLiked: comment.isLiked || false,
-          username: getDisplayUser(comment.user || comment, comment.isAnonymous).username,
-          avatar: getDisplayUser(comment.user || comment, comment.isAnonymous).avatar,
-          user: getDisplayUser(comment.user || { id: comment.userId, username: comment.username, avatar: comment.avatar }, comment.isAnonymous),
-          replies: comment.replies?.map(reply => ({
-            ...reply,
-            likesCount: reply.likesCount || 0,
-            isLiked: reply.isLiked || false,
-            username: getDisplayUser(reply.user || reply, reply.isAnonymous).username,
-            avatar: getDisplayUser(reply.user || reply, reply.isAnonymous).avatar,
-            user: getDisplayUser(reply.user || { id: reply.userId, username: reply.username, avatar: reply.avatar }, reply.isAnonymous)
-          })) || []
-        }));
-        
-        setLocalComments(processedCachedComments);
-        console.log(`📦 Loaded ${processedCachedComments.length} cached comments for instant display`);
-      }
-    } catch (error) {
-      console.error('Error loading cached comments:', error);
-    }
-  };
+  // NOTE: Comment cache loading removed because it contains stale user-specific data (isLiked status)
+  // The fresh comments from ListenContext are used directly instead
   // Set navigation bar theme-aware when modal opens
   useEffect(() => {
     if (Platform.OS === 'android') {
