@@ -17,6 +17,8 @@ class CommentService {
   async getCommentsByPostId(postId, options = {}) {
     const { page = 1, limit = 50, userId } = options;
     const skip = (page - 1) * limit;
+    
+    logger.debug('🔍 getCommentsByPostId called:', { postId, userId, hasUserId: !!userId });
 
     // Get ALL comments for this post (including replies)
     const allComments = await prisma.comment.findMany({
@@ -64,6 +66,16 @@ class CommentService {
       const transformedParent = transformComment(parent);
       transformedParent.likesCount = parent.likesCount || 0;
       transformedParent.isLiked = userId && parent.likes ? parent.likes.some(like => like.userId === userId) : false;
+      
+      logger.debug('💬 Parent comment like data:', {
+        commentId: parent.id.substring(0, 8),
+        likesCount: parent.likesCount,
+        totalLikes: parent.likes?.length || 0,
+        userId,
+        isLiked: transformedParent.isLiked,
+        likesData: parent.likes?.map(l => ({ userId: l.userId?.substring(0, 8), id: l.id?.substring(0, 8) }))
+      });
+      
       const replies = replyMap[parent.id] || [];
       // Sort replies by createdAt ascending (oldest to latest)
       const sortedReplies = replies.sort((a, b) => 
@@ -73,6 +85,14 @@ class CommentService {
         const transformed = transformComment(reply);
         transformed.likesCount = reply.likesCount || 0;
         transformed.isLiked = userId && reply.likes ? reply.likes.some(like => like.userId === userId) : false;
+        
+        logger.debug('  💬 Reply like data:', {
+          replyId: reply.id.substring(0, 8),
+          likesCount: reply.likesCount,
+          totalLikes: reply.likes?.length || 0,
+          isLiked: transformed.isLiked
+        });
+        
         return transformed;
       });
       return transformedParent;
