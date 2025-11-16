@@ -1,0 +1,106 @@
+{
+  "expo": {
+    "name": "Nexeed",
+    "slug": "nexeed-social-app",
+    "scheme": "boltnexeed",
+    "version": "1.2.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mycompany.nexeed1",
+      "userInterfaceStyle": "automatic",
+      "config": {},
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification", "background-fetch", "background-processing"],
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to save images.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs permission to save images to your photo library."
+      }
+    },
+    "notification": {
+      "icon": "./assets/notification_icon.png",
+      "color": "#00d4ff",
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} new notifications"
+    },
+    "android": {
+      "icon": "./assets/icon.png",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "boltnexeed"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https",
+              "host": "nex-app-production.up.railway.app",
+              "pathPrefix": "/post"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https",
+              "host": "nex-app-production.up.railway.app",
+              "pathPrefix": "/profile"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
+      "package": "com.mycompany.nexeed1",
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize",
+      "userInterfaceStyle": "automatic",
+      "permissions": [
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.mycompany.nexeed1",
+      "versionCode": 22
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "96af36dc-9af8-4c34-86a7-c32539f13290"
+      },
+      "googleWebClientId": "775891172931-b6r8as807ahbuiclek3lvqmv2aqqolsa.apps.googleusercontent.com",
+      "googleAndroidClientId": "775891172931-ncpt427eouiuf45eb918nfgdh73njcjn.apps.googleusercontent.com",
+      "googleIosClientId": "775891172931-b6r8as807ahbuiclek3lvqmv2aqqolsa.apps.googleusercontent.com",
+      "oneSignalAppId": "969b571c-b5af-475d-941d-58fe3879ffa0"
+    },
+    "plugins": [
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "production"
+        }
+      ]
+    ]
+  }
+}

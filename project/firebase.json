@@ -1,0 +1,10 @@
+{
+  "react-native": {
+    "analytics_debug_mode": true,
+    "analytics_collection_enabled": true,
+    "analytics_auto_collection_enabled": true,
+    "crashlytics_debug_enabled": true,
+    "analytics_default_allow_analytics_storage": true,
+    "analytics_default_allow_ad_storage": false
+  }
+}
