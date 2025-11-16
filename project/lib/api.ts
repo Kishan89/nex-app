@@ -309,10 +309,31 @@ class ApiService {
         return this.post<Post>(API_ENDPOINTS.POSTS, payload);
     }
     async getPostComments(postId: string): Promise<any[]> {
-        // Include userId in query params so backend can return isLiked status
-        const url = this.userId 
-            ? `${API_ENDPOINTS.POST_COMMENTS(postId)}?userId=${this.userId}`
-            : API_ENDPOINTS.POST_COMMENTS(postId);
+        // Always include userId in query params so backend can return isLiked status
+        // This is critical for determining which comments the current user has liked
+        let url = API_ENDPOINTS.POST_COMMENTS(postId);
+        
+        // Try to get userId from multiple sources to ensure it's available
+        let userId = this.userId;
+        
+        // If userId is not in apiService, try to get it from storage
+        if (!userId) {
+            try {
+                const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+                if (token) {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    userId = payload.userId || payload.sub || payload.id;
+                }
+            } catch (e) {
+                // Silently fail - userId will remain null
+            }
+        }
+        
+        // Add userId to query params if available
+        if (userId) {
+            url = `${url}?userId=${userId}`;
+        }
+        
         const response = await this.get<any>(url);
         if (response && response.data && Array.isArray(response.data)) {
             return response.data;

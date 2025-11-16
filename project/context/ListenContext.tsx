@@ -815,14 +815,11 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
         return;
       }
 
-      // Try to load from comment cache first for instant display
-      const commentCacheData = await commentCache.getCachedComments(postId);
-      if (commentCacheData.length > 0) {
-        setComments(prev => ({ ...prev, [postId]: commentCacheData }));
-        console.log(`📦 Loaded ${commentCacheData.length} cached comments for instant display`);
-      }
+      // NOTE: We skip comment cache because it contains user-specific data (isLiked status)
+      // that becomes stale when the user reloads the page.
+      // Always fetch fresh from server to get correct like status.
 
-      // Fetch fresh comments from server
+      // Fetch fresh comments from server with current userId for accurate isLiked status
       const remoteResponse: any = await apiService.getPostComments(postId);
       // Debug logging - temporary
       // Handle both direct array and wrapped response formats
