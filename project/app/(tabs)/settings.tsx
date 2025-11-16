@@ -37,10 +37,12 @@ import {
   Shadows,
 } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
+
 export default function SettingsScreen() {
   const [showAppearanceModal, setShowAppearanceModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const { themeMode, setThemeMode, colors, isDark } = useTheme();
+
   // Track screen view when component mounts
   useEffect(() => {
     trackScreenView('settings_screen');

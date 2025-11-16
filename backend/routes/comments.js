@@ -1,5 +1,6 @@
 const express = require('express');
 const commentController = require('../controllers/commentController');
+const commentLikeController = require('../controllers/commentLikeController');
 const { verifyAuthToken } = require('../middleware/auth'); 
 
 const router = express.Router({ mergeParams: true });
@@ -18,5 +19,8 @@ router.delete('/:commentId', verifyAuthToken, commentController.deleteComment);
 
 // Report a comment (requires a logged-in user)
 router.post('/:commentId/report', verifyAuthToken, commentController.reportComment);
+
+// Like/unlike a comment (requires a logged-in user)
+router.post('/:commentId/like', verifyAuthToken, commentLikeController.toggleLike);
 
 module.exports = router;

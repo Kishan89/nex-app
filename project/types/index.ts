@@ -47,6 +47,8 @@ export interface Comment {
   replyTo?: string; // Username being replied to
   isOptimistic?: boolean; // Flag for optimistic updates
   createdAt?: string; // ISO date string for sorting
+  likesCount?: number;
+  isLiked?: boolean;
 }
 // Corrected: Moved RawComment to its proper section
 export type RawComment = Record<string, any>;

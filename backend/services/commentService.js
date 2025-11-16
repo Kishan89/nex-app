@@ -15,7 +15,7 @@ class CommentService {
 {{ ... }}
    */
   async getCommentsByPostId(postId, options = {}) {
-    const { page = 1, limit = 50 } = options;
+    const { page = 1, limit = 50, userId } = options;
     const skip = (page - 1) * limit;
 
     // Get ALL comments for this post (including replies)
@@ -30,7 +30,11 @@ class CommentService {
             username: true,
             avatar: true,
           }
-        }
+        },
+        likes: userId ? {
+          where: { userId },
+          select: { id: true }
+        } : false
       },
       orderBy: {
         createdAt: 'asc' // Changed to 'asc' for oldest to latest
@@ -58,12 +62,19 @@ class CommentService {
     // Transform comments with nested replies - oldest first
     const transformedComments = parentComments.map(parent => {
       const transformedParent = transformComment(parent);
+      transformedParent.likesCount = parent.likesCount || 0;
+      transformedParent.isLiked = parent.likes && parent.likes.length > 0;
       const replies = replyMap[parent.id] || [];
       // Sort replies by createdAt ascending (oldest to latest)
       const sortedReplies = replies.sort((a, b) => 
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
-      transformedParent.replies = sortedReplies.map(transformComment);
+      transformedParent.replies = sortedReplies.map(reply => {
+        const transformed = transformComment(reply);
+        transformed.likesCount = reply.likesCount || 0;
+        transformed.isLiked = reply.likes && reply.likes.length > 0;
+        return transformed;
+      });
       return transformedParent;
     });
 

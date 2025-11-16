@@ -32,7 +32,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
-import { X, Send, ArrowLeft, Trash2, MoreVertical, Flag, UserX } from 'lucide-react-native';
+import { X, Send, ArrowLeft, Trash2, MoreVertical, Flag, UserX, ThumbsUp } from 'lucide-react-native';
 import { Comment } from '@/types';
 import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -427,6 +427,26 @@ export default function CommentReplyPanel({
     );
   };
 
+  const handleLikeReply = async (replyId: string, isLiked: boolean) => {
+    // Optimistic update
+    setReplies(prev => prev.map(r => 
+      r.id === replyId 
+        ? { ...r, isLiked: !isLiked, likesCount: (r.likesCount || 0) + (isLiked ? -1 : 1) }
+        : r
+    ));
+
+    try {
+      await apiService.toggleCommentLike(postId, replyId);
+    } catch (error) {
+      // Rollback on error
+      setReplies(prev => prev.map(r => 
+        r.id === replyId 
+          ? { ...r, isLiked: isLiked, likesCount: (r.likesCount || 0) + (isLiked ? 1 : -1) }
+          : r
+      ));
+    }
+  };
+
   const handleReportReply = async (replyId: string) => {
     setShowMenuForReply(null);
     Alert.alert(
@@ -530,6 +550,22 @@ export default function CommentReplyPanel({
               )
             )}
           </Text>
+          {/* Like button */}
+          <TouchableOpacity
+            style={styles.replyLikeButton}
+            onPress={() => handleLikeReply(reply.id, reply.isLiked || false)}
+          >
+            <ThumbsUp 
+              size={14} 
+              color={reply.isLiked ? colors.primary : colors.textMuted}
+              fill={reply.isLiked ? colors.primary : 'none'}
+            />
+            {(reply.likesCount || 0) > 0 && (
+              <Text style={[styles.replyLikeCount, reply.isLiked && { color: colors.primary }]}>
+                {reply.likesCount}
+              </Text>
+            )}
+          </TouchableOpacity>
           {/* Dropdown menu */}
           {showMenuForReply === reply.id && (
             <View style={styles.menuDropdown}>
@@ -874,6 +910,17 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontSize: FontSizes.xs,
     color: colors.textMuted,
     fontWeight: FontWeights.semibold,
+  },
+  replyLikeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: Spacing.xs,
+  },
+  replyLikeCount: {
+    fontSize: FontSizes.xs,
+    color: colors.textMuted,
+    fontWeight: FontWeights.medium,
   },
   replyText: {
     fontSize: FontSizes.sm,

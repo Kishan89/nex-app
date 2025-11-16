@@ -1087,8 +1087,8 @@ const ChatScreen = React.memo(function ChatScreen({
   
   // Helper function to render text with clickable links and mentions
   const renderTextWithLinks = useCallback((text: string, isUserMessage: boolean) => {
-    // Combined regex for URLs and mentions
-    const urlPattern = /(https?:\/\/[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[^\s]{2,})|(@\w+)/g;
+    // Combined regex for URLs and mentions - improved to capture @username properly
+    const urlPattern = /(https?:\/\/[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[^\s]{2,})|(@[a-zA-Z0-9_]+)/g;
     const matches = [];
     let match;
     
@@ -1119,14 +1119,18 @@ const ChatScreen = React.memo(function ChatScreen({
       }
       
       if (matchInfo.isMention) {
-        // Render mention with highlight
+        // Render mention with highlight and background
         parts.push(
           <Text
             key={`mention-${i}`}
-            style={[styles.mentionText, { 
+            style={{
               color: isUserMessage ? '#ffffff' : '#3B8FE8',
-              fontWeight: '700'
-            }]}
+              fontWeight: '700',
+              backgroundColor: isUserMessage ? 'rgba(255,255,255,0.2)' : 'rgba(59,143,232,0.15)',
+              paddingHorizontal: 4,
+              paddingVertical: 2,
+              borderRadius: 4,
+            }}
           >
             {matchInfo.content}
           </Text>
@@ -1140,9 +1144,7 @@ const ChatScreen = React.memo(function ChatScreen({
             <Text
               style={[styles.linkText, { color: isUserMessage ? '#ffffff' : '#3B8FE8' }]}
               onPress={() => {
-                console.log('🔗 Opening URL:', fullUrl);
-                Linking.openURL(fullUrl).catch(err => {
-                  console.error('Failed to open URL:', err);
+                Linking.openURL(fullUrl).catch(() => {
                   Alert.alert('Error', 'Could not open link');
                 });
               }}
@@ -1337,6 +1339,34 @@ const ChatScreen = React.memo(function ChatScreen({
       </View>
     );
   };
+  // Auto-mention functionality
+  const handleTextChange = useCallback((text: string) => {
+    setMessage(text);
+    
+    // Auto-mention detection for group chats
+    if (chatData?.isGroup && groupMembers.length > 0) {
+      const words = text.split(/\s/);
+      const lastWord = words[words.length - 1];
+      
+      if (lastWord?.startsWith('@')) {
+        if (lastWord.length === 1) {
+          // Just typed @, show all members
+          setShowMentionModal(true);
+        } else if (lastWord.length > 1) {
+          // Typing username after @
+          const query = lastWord.substring(1).toLowerCase();
+          const filteredMembers = groupMembers.filter((m) =>
+            m.user?.username?.toLowerCase().includes(query)
+          );
+          
+          setShowMentionModal(filteredMembers.length > 0);
+        }
+      } else {
+        setShowMentionModal(false);
+      }
+    }
+  }, [chatData?.isGroup, groupMembers]);
+
   // Input component - render directly to avoid undefined issues
   const renderMessageInput = () => (
     <KeyboardAvoidingView 
@@ -1344,23 +1374,11 @@ const ChatScreen = React.memo(function ChatScreen({
       style={styles.inputContainer}
     >
       <View style={[styles.inputWrapper, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-        {chatData?.isGroup && groupMembers.length > 0 && (
-          <TouchableOpacity 
-            onPress={() => {
-              console.log('@ button clicked, opening mention modal');
-              console.log('Group members:', groupMembers.length);
-              setShowMentionModal(true);
-            }}
-            style={styles.mentionButton}
-          >
-            <Text style={[styles.mentionButtonText, { color: colors.primary }]}>@</Text>
-          </TouchableOpacity>
-        )}
         <TextInput
           style={[styles.textInput, { color: colors.text }]}
           value={message}
-          onChangeText={setMessage}
-          placeholder="Type a message..."
+          onChangeText={handleTextChange}
+          placeholder={chatData?.isGroup ? "Type @ to mention someone..." : "Type a message..."}
           placeholderTextColor={colors.textMuted}
           multiline
           maxLength={1000}
@@ -1491,14 +1509,9 @@ const ChatScreen = React.memo(function ChatScreen({
                         }}
                       />
                     ) : (
-                      <LinearGradient
-                        colors={['#3B8FE8', '#e385ec']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[styles.groupAvatarLarge, styles.groupAvatarPlaceholder]}
-                      >
-                        <Users size={50} color="#ffffff" />
-                      </LinearGradient>
+                      <View style={[styles.groupAvatarLarge, styles.groupAvatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
+                        <Users size={50} color={colors.primary} />
+                      </View>
                     )}
                     {isAdmin && (
                       <LinearGradient
@@ -1760,57 +1773,53 @@ const ChatScreen = React.memo(function ChatScreen({
         </View>
       </Modal>
 
-      {/* Mention Modal */}
-      <Modal
-        visible={showMentionModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowMentionModal(false)}
-      >
-        <View style={styles.mentionModalOverlay}>
-          <View style={[styles.mentionModalContent, { backgroundColor: colors.background }]}>
-            <View style={styles.mentionModalHeader}>
-              <Text style={[styles.mentionModalTitle, { color: colors.text }]}>Mention Someone ({groupMembers.length})</Text>
-              <TouchableOpacity onPress={() => setShowMentionModal(false)}>
-                <Text style={[styles.mentionModalClose, { color: colors.textMuted }]}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={groupMembers}
-              keyExtractor={(item, index) => item.userId || `member-${index}`}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.mentionItem, { backgroundColor: colors.backgroundSecondary }]}
-                  onPress={() => {
-                    const username = item.user?.username || 'User';
-                    console.log('Member selected:', username);
-                    setMessage(prev => {
-                      const newMessage = prev + `@${username} `;
-                      console.log('New message:', newMessage);
-                      return newMessage;
-                    });
-                    setShowMentionModal(false);
-                  }}
-                >
-                  {item.user?.avatar ? (
-                    <Image source={{ uri: item.user.avatar }} style={styles.mentionAvatar} />
-                  ) : (
-                    <View style={[styles.mentionAvatar, { backgroundColor: colors.primary + '20' }]}>
-                      <Text style={{ color: colors.primary }}>👤</Text>
-                    </View>
-                  )}
-                  <Text style={[styles.mentionUsername, { color: colors.text }]}>
-                    {item.user?.username || 'User'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <Text style={[styles.mentionEmpty, { color: colors.textMuted }]}>No members to mention</Text>
+      {/* Auto-mention suggestions */}
+      {showMentionModal && chatData?.isGroup && (
+        <View style={[styles.mentionSuggestions, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+          <FlatList
+            data={groupMembers.filter((m) => {
+              const words = message.split(/\s/);
+              const lastWord = words[words.length - 1];
+              if (lastWord?.startsWith('@')) {
+                if (lastWord.length === 1) {
+                  // Show all members when just @ is typed
+                  return true;
+                }
+                const query = lastWord.substring(1).toLowerCase();
+                return m.user?.username?.toLowerCase().includes(query);
               }
-            />
-          </View>
+              return false;
+            })}
+            keyExtractor={(item, index) => item.userId || `member-${index}`}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.mentionSuggestionItem, { borderBottomColor: colors.border }]}
+                onPress={() => {
+                  const username = item.user?.username || 'User';
+                  const words = message.split(/\s/);
+                  words[words.length - 1] = `@${username}`;
+                  const newMessage = words.join(' ') + ' ';
+                  setMessage(newMessage);
+                  setShowMentionModal(false);
+                }}
+              >
+                {item.user?.avatar ? (
+                  <Image source={{ uri: item.user.avatar }} style={styles.mentionSuggestionAvatar} />
+                ) : (
+                  <View style={[styles.mentionSuggestionAvatar, { backgroundColor: colors.primary + '20' }]}>
+                    <Text style={{ color: colors.primary, fontSize: 12 }}>👤</Text>
+                  </View>
+                )}
+                <Text style={[styles.mentionSuggestionText, { color: colors.text }]}>
+                  @{item.user?.username || 'User'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            style={styles.mentionSuggestionsList}
+            keyboardShouldPersistTaps="handled"
+          />
         </View>
-      </Modal>
+      )}
     </SafeAreaView>
   );
 });
@@ -1962,17 +1971,42 @@ const createStyles = (colors: any) => StyleSheet.create({
     maxHeight: 100,
     marginRight: Spacing.sm,
   },
-  mentionButton: {
+  // Auto-mention suggestion styles
+  mentionSuggestions: {
+    position: 'absolute',
+    bottom: '100%',
+    left: Spacing.md,
+    right: Spacing.md,
+    maxHeight: 200,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  mentionSuggestionsList: {
+    maxHeight: 200,
+  },
+  mentionSuggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderBottomWidth: 1,
+  },
+  mentionSuggestionAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
+    marginRight: Spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.xs,
   },
-  mentionButtonText: {
-    fontSize: 20,
-    fontWeight: FontWeights.bold,
+  mentionSuggestionText: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.medium,
   },
   sendButton: {
     width: 36,
@@ -2110,6 +2144,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   groupAvatarPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 0,
   },
   groupAvatarEditButton: {
     position: 'absolute',
@@ -2285,54 +2320,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
   },
-  // Mention Modal Styles
-  mentionModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  mentionModalContent: {
-    height: '50%',
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-  },
-  mentionModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  mentionModalTitle: {
-    fontSize: FontSizes.lg,
-    fontWeight: FontWeights.bold,
-  },
-  mentionModalClose: {
-    fontSize: FontSizes.xl,
-  },
-  mentionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.xs,
-  },
-  mentionAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: Spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mentionUsername: {
-    fontSize: FontSizes.md,
-    fontWeight: FontWeights.medium,
-  },
-  mentionEmpty: {
-    textAlign: 'center',
-    padding: Spacing.xl,
-  },
+
   // Members List Styles
   membersList: {
     marginTop: Spacing.sm,

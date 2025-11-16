@@ -14,8 +14,9 @@ class CommentController {
     try {
       const { postId } = req.params;
       const { page, limit } = req.query;
+      const userId = req.user?.userId;
 
-      const comments = await commentService.getCommentsByPostId(postId, { page, limit });
+      const comments = await commentService.getCommentsByPostId(postId, { page, limit, userId });
       if (!Array.isArray(comments)) {
         return res.status(HTTP_STATUS.OK).json(successResponse([], 'Comments fetched successfully'));
       }

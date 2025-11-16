@@ -16,7 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
-import { X, Send, Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, ChevronDown, ChevronRight, UserX } from 'lucide-react-native';
+import { X, Send, Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, ChevronDown, ChevronRight, UserX, ThumbsUp } from 'lucide-react-native';
 // Assuming the following types and constants are defined correctly in your project
 import { NormalizedPost, Comment } from '@/types'; 
 import { supabase } from '@/lib/supabase';
@@ -483,6 +483,59 @@ export default function CommentsModal({
     );
   };
 
+  const handleLikeComment = async (commentId: string, isLiked: boolean) => {
+    if (!post?.id) return;
+    
+    // Optimistic update
+    setLocalComments(prev => prev.map(c => {
+      if (c.id === commentId) {
+        return {
+          ...c,
+          isLiked: !isLiked,
+          likesCount: (c.likesCount || 0) + (isLiked ? -1 : 1)
+        };
+      }
+      // Update in replies
+      if (c.replies) {
+        return {
+          ...c,
+          replies: c.replies.map(r => 
+            r.id === commentId 
+              ? { ...r, isLiked: !isLiked, likesCount: (r.likesCount || 0) + (isLiked ? -1 : 1) }
+              : r
+          )
+        };
+      }
+      return c;
+    }));
+
+    try {
+      await apiService.toggleCommentLike(post.id, commentId);
+    } catch (error) {
+      // Rollback on error
+      setLocalComments(prev => prev.map(c => {
+        if (c.id === commentId) {
+          return {
+            ...c,
+            isLiked: isLiked,
+            likesCount: (c.likesCount || 0) + (isLiked ? 1 : -1)
+          };
+        }
+        if (c.replies) {
+          return {
+            ...c,
+            replies: c.replies.map(r => 
+              r.id === commentId 
+                ? { ...r, isLiked: isLiked, likesCount: (r.likesCount || 0) + (isLiked ? 1 : -1) }
+                : r
+            )
+          };
+        }
+        return c;
+      }));
+    }
+  };
+
   const handleReportComment = async (commentId: string) => {
     setShowMenuForComment(null);
     Alert.alert(
@@ -647,6 +700,22 @@ export default function CommentsModal({
               </TouchableOpacity>
             </View>
             <Text style={styles.commentText}>{comment.text}</Text>
+            {/* Like button */}
+            <TouchableOpacity
+              style={styles.commentLikeButton}
+              onPress={() => handleLikeComment(comment.id, comment.isLiked || false)}
+            >
+              <ThumbsUp 
+                size={14} 
+                color={comment.isLiked ? colors.primary : colors.textMuted}
+                fill={comment.isLiked ? colors.primary : 'none'}
+              />
+              {(comment.likesCount || 0) > 0 && (
+                <Text style={[styles.commentLikeCount, comment.isLiked && { color: colors.primary }]}>
+                  {comment.likesCount}
+                </Text>
+              )}
+            </TouchableOpacity>
             {/* Dropdown menu */}
             {showMenuForComment === comment.id && (
               <View style={styles.menuDropdown}>
@@ -943,6 +1012,17 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     paddingLeft:0,
     marginTop: Spacing.xs,
     marginLeft: 0,
+  },
+  commentLikeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: Spacing.xs,
+  },
+  commentLikeCount: {
+    fontSize: FontSizes.xs,
+    color: colors.textMuted,
+    fontWeight: FontWeights.medium,
   },
   viewRepliesLine: {
     width: 24,

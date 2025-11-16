@@ -23,7 +23,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@prisma/client": "^6.18.0",
+    "@prisma/client": "^6.19.0",
     "@supabase/supabase-js": "^2.57.4",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
@@ -42,6 +42,6 @@
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "prisma": "^6.18.0"
+    "prisma": "^6.19.0"
   }
 }

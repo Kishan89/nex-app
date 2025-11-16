@@ -32,6 +32,7 @@ model User {
   chatParticipants       ChatParticipant[]
   createdChats           Chat[]            @relation("ChatCreatedBy")
   comments               Comment[]
+  commentLikes           CommentLike[]
   fcmTokens              FcmToken[]
   following              Follow[]          @relation("UserFollowing")
   followers              Follow[]          @relation("UserFollower")
@@ -79,19 +80,21 @@ model Post {
 }
 
 model Comment {
-  id           String    @id @default(cuid())
+  id           String        @id @default(cuid())
   text         String
   postId       String
   userId       String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   parentId     String?
-  reportsCount Int       @default(0)
-  isAnonymous  Boolean    @default(false)
-  parent       Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies      Comment[] @relation("CommentReplies")
-  post         Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reportsCount Int           @default(0)
+  likesCount   Int           @default(0)
+  isAnonymous  Boolean       @default(false)
+  parent       Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      Comment[]     @relation("CommentReplies")
+  post         Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes        CommentLike[]
 
   @@map("comments")
 }
@@ -268,6 +271,19 @@ model UserBlock {
 
   @@unique([blockerId, blockedId])
   @@map("user_blocks")
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  userId    String
+  commentId String
+  createdAt DateTime @default(now())
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+  @@map("comment_likes")
 }
 
 enum MessageStatus {

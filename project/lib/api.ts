@@ -651,6 +651,10 @@ class ApiService {
     async reportComment(postId: string, commentId: string) {
         return this.post(API_ENDPOINTS.REPORT_COMMENT(postId, commentId), {});
     }
+
+    async toggleCommentLike(postId: string, commentId: string) {
+        return this.post(`/posts/${postId}/comments/${commentId}/like`, {});
+    }
     // Chat management methods
     async markChatAsRead(chatId: string) {
         try {
