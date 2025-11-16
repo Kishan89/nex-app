@@ -498,7 +498,33 @@ export default function CommentsModal({
     await commentCache.cacheComments(post.id, updatedComments);
 
     try {
-      await apiService.toggleCommentLike(post.id, commentId);
+      const response = await apiService.toggleCommentLike(post.id, commentId);
+      // Update with actual count from server
+      if (response?.data?.likeCount !== undefined) {
+        const serverUpdatedComments = localComments.map(c => {
+          if (c.id === commentId) {
+            return {
+              ...c,
+              isLiked: response.data.liked,
+              likesCount: response.data.likeCount
+            };
+          }
+          // Update in replies
+          if (c.replies) {
+            return {
+              ...c,
+              replies: c.replies.map(r => 
+                r.id === commentId 
+                  ? { ...r, isLiked: response.data.liked, likesCount: response.data.likeCount }
+                  : r
+              )
+            };
+          }
+          return c;
+        });
+        setLocalComments(serverUpdatedComments);
+        await commentCache.cacheComments(post.id, serverUpdatedComments);
+      }
     } catch (error) {
       // Rollback on error
       const rolledBackComments = updatedComments.map(c => {

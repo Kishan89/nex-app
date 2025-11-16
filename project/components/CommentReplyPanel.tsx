@@ -444,7 +444,15 @@ export default function CommentReplyPanel({
     ));
 
     try {
-      await apiService.toggleCommentLike(postId, replyId);
+      const response = await apiService.toggleCommentLike(postId, replyId);
+      // Update with actual count from server
+      if (response?.data?.likeCount !== undefined) {
+        setReplies(prev => prev.map(r => 
+          r.id === replyId 
+            ? { ...r, isLiked: response.data.liked, likesCount: response.data.likeCount }
+            : r
+        ));
+      }
     } catch (error) {
       // Rollback on error
       setReplies(prev => prev.map(r => 
