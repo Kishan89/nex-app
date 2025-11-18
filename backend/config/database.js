@@ -94,11 +94,42 @@ async function disconnectDatabase() {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// For backend, we need the service role key for full access to storage
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseKey;
+
+// Log configuration for debugging (only in development)
+if (process.env.NODE_ENV === 'development') {
+  console.log('Supabase Config:', {
+    url: !!supabaseUrl,
+    anonKey: !!supabaseKey,
+    serviceKey: !!supabaseServiceKey,
+    usingServiceKey: supabaseServiceKey !== supabaseKey
+  });
+}
+
 if (!supabaseUrl || !supabaseKey) {
   console.warn('⚠️ Supabase configuration missing — storage features disabled.');
 }
 
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = supabaseUrl && (supabaseKey || supabaseServiceKey) ? createClient(supabaseUrl, supabaseServiceKey || supabaseKey) : null;
+
+// Add a health check function for Supabase
+const checkSupabaseHealth = async () => {
+  if (!supabase) {
+    return { healthy: false, error: 'Supabase client not initialized' };
+  }
+  
+  try {
+    // Try to list buckets as a health check
+    const { data, error } = await supabase.storage.listBuckets();
+    if (error) {
+      return { healthy: false, error: error.message };
+    }
+    return { healthy: true, buckets: data?.length || 0 };
+  } catch (error) {
+    return { healthy: false, error: error.message };
+  }
+};
 
 module.exports = {
   prisma,
@@ -106,4 +137,5 @@ module.exports = {
   connectDatabase,
   disconnectDatabase,
   resetConnection,
+  checkSupabaseHealth, // Export the health check function
 };

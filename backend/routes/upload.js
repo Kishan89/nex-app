@@ -1,8 +1,8 @@
-
 const express = require('express');
 const router = express.Router();
 const storageService = require('../services/storageService');
 const Busboy = require('busboy');
+const { checkSupabaseHealth } = require('../config/database');
 
 // Initialize storage bucket on startup
 (async () => {
@@ -12,6 +12,23 @@ const Busboy = require('busboy');
     console.error('❌ Failed to initialize storage bucket:', error);
   }
 })();
+
+// Add a health check endpoint
+router.get('/health', async (req, res) => {
+  try {
+    const supabaseHealth = await checkSupabaseHealth();
+    res.json({
+      success: true,
+      supabase: supabaseHealth,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 // Define the POST / route for file uploads to Supabase Storage
 router.post('/', (req, res) => {
@@ -88,9 +105,26 @@ router.post('/', (req, res) => {
 
       } catch (error) {
         console.error('❌ Upload processing error:', error);
+        
+        // Provide more specific error messages
+        let errorMessage = 'Upload failed. Please try again.';
+        if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        // Log detailed error information for debugging
+        console.error('Upload Error Details:', {
+          message: error.message,
+          stack: error.stack,
+          fileName,
+          mimeType,
+          fileSize: fileBuffer.length,
+          folder
+        });
+        
         res.status(500).json({
           success: false,
-          message: 'Upload failed. Please try again.',
+          message: errorMessage,
           error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
       }

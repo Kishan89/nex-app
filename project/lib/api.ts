@@ -446,33 +446,55 @@ class ApiService {
     }
     async uploadImageFile(uri: string, fieldName = "file", folder = "uploads") {
         if (!uri) throw new Error("No file URI provided for upload");
-        const form = new FormData();
-        const filename = uri.split("/").pop() || `upload.jpg`;
-        const match = /\.(\w+)$/.exec(filename);
-        const ext = match ? match[1].toLowerCase() : "jpg";
-        const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
-        // @ts-ignore
-        form.append(fieldName, { uri, name: filename, type: mime });
-        // Add folder parameter for organized storage
-        form.append('folder', folder);
-        const uploadResponse = await this.post<{
-            success: boolean;
-            url: string;
-            fileName: string;
-            originalName: string;
-            size: number;
-            path: string;
-        }>(API_ENDPOINTS.UPLOAD, form);
-        if (!uploadResponse?.success || !uploadResponse?.url) {
-            throw new Error('Upload failed: Invalid response from server');
+        
+        // Validate URI format
+        if (!uri.startsWith('file://') && !uri.startsWith('content://') && !uri.startsWith('http')) {
+            throw new Error("Invalid file URI format");
         }
-        return { 
-            url: uploadResponse.url,
-            fileName: uploadResponse.fileName,
-            originalName: uploadResponse.originalName,
-            size: uploadResponse.size,
-            path: uploadResponse.path
-        };
+        
+        try {
+            const form = new FormData();
+            const filename = uri.split("/").pop() || `upload_${Date.now()}.jpg`;
+            const match = /\.(\w+)$/.exec(filename);
+            const ext = match ? match[1].toLowerCase() : "jpg";
+            const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
+            
+            // @ts-ignore
+            form.append(fieldName, { uri, name: filename, type: mime });
+            // Add folder parameter for organized storage
+            form.append('folder', folder);
+            
+            console.log(`📤 Uploading image: ${filename} (${mime}) to folder: ${folder}`);
+            
+            const uploadResponse = await this.post<{
+                success: boolean;
+                message?: string;
+                url: string;
+                fileName: string;
+                originalName: string;
+                size: number;
+                path: string;
+            }>(API_ENDPOINTS.UPLOAD, form);
+            
+            if (!uploadResponse?.success || !uploadResponse?.url) {
+                const errorMessage = uploadResponse?.message || 'Upload failed: Invalid response from server';
+                throw new Error(errorMessage);
+            }
+            
+            console.log(`✅ Image uploaded successfully: ${uploadResponse.url}`);
+            
+            return { 
+                url: uploadResponse.url,
+                fileName: uploadResponse.fileName,
+                originalName: uploadResponse.originalName,
+                size: uploadResponse.size,
+                path: uploadResponse.path
+            };
+        } catch (error: any) {
+            console.error('❌ Image upload failed:', error);
+            const errorMessage = error.message || 'Failed to upload image. Please try again.';
+            throw new Error(errorMessage);
+        }
     }
     getBookmarks(userId: string) { return this.get<Post[]>(API_ENDPOINTS.USER_BOOKMARKS(userId)); }
     searchUsers(query: string) { return this.get<{ users: UserSearchResult[] }>(`${API_ENDPOINTS.SEARCH_USERS}?q=${encodeURIComponent(query)}`); }

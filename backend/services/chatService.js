@@ -347,12 +347,24 @@ class ChatService {
     try {
       const { content, chatId, senderId, imageUrl } = messageData;
       
-      logger.info('📤 [SEND MESSAGE] Starting message creation', { chatId, senderId, contentLength: content?.length, hasImage: !!imageUrl });
+      logger.info('📤 [SEND MESSAGE] Starting message creation', { 
+        chatId, 
+        senderId, 
+        contentLength: content?.length, 
+        hasImage: !!imageUrl,
+        imageUrlPreview: imageUrl ? imageUrl.substring(0, 50) + '...' : undefined
+      });
 
       // Validate input
-      if (!content || !chatId || !senderId) {
-        logger.error('❌ [SEND MESSAGE] Missing required fields', { content: !!content, chatId: !!chatId, senderId: !!senderId });
-        throw new Error('Missing required fields: content, chatId, or senderId');
+      // Allow messages with either content or imageUrl (or both)
+      if ((!content || !content.trim()) && !imageUrl) {
+        logger.error('❌ [SEND MESSAGE] Missing required fields', { content: !!content, chatId: !!chatId, senderId: !!senderId, imageUrl: !!imageUrl });
+        throw new Error('Message must have either text content or an image');
+      }
+      
+      if (!chatId || !senderId) {
+        logger.error('❌ [SEND MESSAGE] Missing required fields', { chatId: !!chatId, senderId: !!senderId });
+        throw new Error('Missing required fields: chatId, or senderId');
       }
 
       // Check if user is a participant
@@ -380,6 +392,12 @@ class ChatService {
 
       // Add imageUrl if provided
       if (imageUrl) {
+        // Validate image URL
+        if (typeof imageUrl !== 'string' || imageUrl.length === 0) {
+          logger.error('❌ [SEND MESSAGE] Invalid image URL provided', { imageUrl });
+          throw new Error('Invalid image URL provided');
+        }
+        
         messageCreateData.imageUrl = imageUrl;
       }
 

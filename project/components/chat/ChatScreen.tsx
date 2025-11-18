@@ -106,6 +106,7 @@ const ChatScreen = React.memo(function ChatScreen({
   const [pendingImageCompression, setPendingImageCompression] = useState<CompressionResult | null>(null);
   const [isCompressingImage, setIsCompressingImage] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const lastSentMessageRef = useRef<{ text: string; timestamp: number } | null>(null);
   
   useEffect(() => {
     if (chatData && chatData.isGroup) {
@@ -167,12 +168,16 @@ const ChatScreen = React.memo(function ChatScreen({
         setGroupMembers(members);
       }
     }
+    
+    // Reset refresh scheduled ref when chat changes
+    refreshScheduledRef.current = false;
   }, [chatData?.name, chatData?.description, chatData?.avatar, chatData?.isGroup, chatData?.createdById, chatData?.participants, user?.id]);
   // Refs
   const flatListRef = useRef<FlatList>(null);
   const timeoutRefs = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const socketListenersRef = useRef<(() => void)[]>([]);
+  const refreshScheduledRef = useRef(false);
   
   // Helper function for memory-safe timeouts
   const safeSetTimeout = useCallback((callback: () => void, delay: number) => {
@@ -217,6 +222,8 @@ const ChatScreen = React.memo(function ChatScreen({
     return () => {
       timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
       timeoutRefs.current.clear();
+      // Reset refresh scheduled ref
+      refreshScheduledRef.current = false;
     };
   }, []);
   // ⚡ ULTRA-FAST MESSAGE LOADING - INSTANT DISPLAY
@@ -242,34 +249,44 @@ const ChatScreen = React.memo(function ChatScreen({
       const ultraFastCached = ultraFastChatCache.getInstantMessages(chatId);
       if (ultraFastCached && ultraFastCached.length > 0) {
         console.log('⚡ [CACHE HIT] Loaded from ultra-fast cache:', ultraFastCached.length, 'messages');
-        // Filter out temp messages to prevent showing duplicates with stuck "sending" status
-        const filteredMessages = ultraFastCached.filter(msg => !msg.id.startsWith('temp-'));
-        setMessages(filteredMessages);
+        // 🔒 CRITICAL: Keep temp messages visible until replaced by server message
+        // Don't filter them out or messages will disappear after sending
+        setMessages(ultraFastCached);
         setLoading(false);
-        // Background refresh
-        setTimeout(() => {
-          if (!isSending) {
-            loadMessages(true);
+        // Background refresh with debounce to prevent multiple rapid calls
+        if (!isSending) {
+          // Use a ref to track if we've already scheduled a refresh
+          if (!refreshScheduledRef.current) {
+            refreshScheduledRef.current = true;
+            setTimeout(() => {
+              refreshScheduledRef.current = false;
+              loadMessages(true);
+            }, 300);
           }
-        }, 300);
+        }
         return;
       }
       // PRIORITY 2: Try to get from global state first (instant)
       try {
         const globalMessages = getChatMessages(chatId);
         if (globalMessages && globalMessages.length > 0) {
-          // Filter out temp messages to prevent showing duplicates with stuck "sending" status
-          const filteredMessages = globalMessages.filter(msg => !msg.id.startsWith('temp-'));
-          setMessages(filteredMessages);
+          // 🔒 CRITICAL: Keep temp messages visible until replaced by server message
+          // Don't filter them out or messages will disappear after sending
+          setMessages(globalMessages);
           setLoading(false);
-          // Cache in ultra-fast cache (without temp messages)
-          ultraFastChatCache.cacheMessages(chatId, filteredMessages, chatData);
-          // Background refresh
-          setTimeout(() => {
-            if (!isSending) {
-              loadMessages(true);
+          // Cache in ultra-fast cache (including temp messages for now)
+          ultraFastChatCache.cacheMessages(chatId, globalMessages, chatData);
+          // Background refresh with debounce to prevent multiple rapid calls
+          if (!isSending) {
+            // Use a ref to track if we've already scheduled a refresh
+            if (!refreshScheduledRef.current) {
+              refreshScheduledRef.current = true;
+              setTimeout(() => {
+                refreshScheduledRef.current = false;
+                loadMessages(true);
+              }, 300);
             }
-          }, 300);
+          }
           return;
         }
       } catch (error) {
@@ -277,18 +294,23 @@ const ChatScreen = React.memo(function ChatScreen({
       // PRIORITY 3: Fallback to old cache
       const cachedMessages = chatMessageCache.getCachedMessages(chatId);
       if (cachedMessages && cachedMessages.messages.length > 0) {
-        // Filter out temp messages to prevent showing duplicates with stuck "sending" status
-        const filteredMessages = cachedMessages.messages.filter(msg => !msg.id.startsWith('temp-'));
-        setMessages(filteredMessages);
+        // 🔒 CRITICAL: Keep temp messages visible until replaced by server message
+        // Don't filter them out or messages will disappear after sending
+        setMessages(cachedMessages.messages);
         setLoading(false);
-        // Upgrade to ultra-fast cache (without temp messages)
-        ultraFastChatCache.cacheMessages(chatId, filteredMessages, chatData);
-        // Background refresh
-        setTimeout(() => {
-          if (!isSending) {
-            loadMessages(true);
+        // Upgrade to ultra-fast cache (including temp messages for now)
+        ultraFastChatCache.cacheMessages(chatId, cachedMessages.messages, chatData);
+        // Background refresh with debounce to prevent multiple rapid calls
+        if (!isSending) {
+          // Use a ref to track if we've already scheduled a refresh
+          if (!refreshScheduledRef.current) {
+            refreshScheduledRef.current = true;
+            setTimeout(() => {
+              refreshScheduledRef.current = false;
+              loadMessages(true);
+            }, 300);
           }
-        }, 300);
+        }
         return;
       }
     }
@@ -424,9 +446,35 @@ const ChatScreen = React.memo(function ChatScreen({
     const trimmed = message.trim();
     if (!trimmed && !pendingImageUri) return;
     if (!user || !chatData?.id) return;
+    
+    // 🔒 CRITICAL: Prevent duplicate sends (debounce check)
+    const now = Date.now();
+    if (lastSentMessageRef.current) {
+      const { text: lastText, timestamp: lastTimestamp } = lastSentMessageRef.current;
+      // Prevent sending same message within 1 second (duplicate prevention)
+      if (lastText === trimmed && now - lastTimestamp < 1000) {
+        console.log('⚠️ [DUPLICATE PREVENTION] Same message sent within 1 second, skipping');
+        return;
+      }
+    }
+    
+    // 🔒 CRITICAL: Set sending state to prevent background refresh interference
+    if (isSending) {
+      console.log('⚠️ [ALREADY SENDING] Message send in progress, skipping');
+      return;
+    }
+    setIsSending(true);
+    
+    // Record this message send
+    lastSentMessageRef.current = { text: trimmed, timestamp: now };
+    
     const messageText = trimmed;
     let chatId = String(chatData.id);
     const tempId = `temp-${Date.now()}`;
+    
+    // 🔒 CRITICAL: Capture image state before clearing (closure issue fix)
+    const capturedImageUri = pendingImageUri;
+    const capturedImageCompression = pendingImageCompression;
     
     // 🆕 NEW CHAT HANDLING: If this is a new chat, create it first
     // Only treat as new if ID is literally 'new' (not a real chat ID)
@@ -466,6 +514,8 @@ const ChatScreen = React.memo(function ChatScreen({
         // The socket listener will replace it with the real message when it arrives
         console.log('✅ [NEW CHAT] Keeping temp message visible until broadcast arrives');
         
+        // Reset sending state
+        setIsSending(false);
         return;
       } catch (error) {
         console.error('❌ [NEW CHAT] Failed to create chat:', error);
@@ -473,6 +523,8 @@ const ChatScreen = React.memo(function ChatScreen({
         // Restore the message in input
         setMessage(messageText);
         setMessages(prev => prev.filter(msg => msg.id !== tempId));
+        // Reset sending state
+        setIsSending(false);
         return;
       }
     }
@@ -503,13 +555,26 @@ const ChatScreen = React.memo(function ChatScreen({
         avatar: user.avatar || null,
       },
       // Optional imageUrl field if your Message type supports it
-      ...(pendingImageUri ? { imageUrl: pendingImageUri } : {} as any),
+      ...(capturedImageUri ? { imageUrl: capturedImageUri } : {} as any),
     } as any;
     
     console.log('✅ [OPTIMISTIC] Adding temp message to UI:', tempId);
     
     // 🚀 INSTANT UI UPDATE - Message appears immediately
     setMessages(prev => {
+      // 🔒 SAFETY: Check if this temp ID or similar message already exists
+      const tempExists = prev.some(msg => msg.id === tempId);
+      const duplicateContent = prev.some(msg => 
+        msg.text === messageText && 
+        msg.sender?.id === user.id && 
+        msg.status === 'sending'
+      );
+      
+      if (tempExists || duplicateContent) {
+        console.log('⚠️ [SKIP] Temp message already exists or duplicate detected');
+        return prev;
+      }
+      
       return [...prev, tempMessage];
     });
     // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
@@ -545,14 +610,39 @@ const ChatScreen = React.memo(function ChatScreen({
         let serverResponse = null;
         let uploadedImageUrl: string | undefined;
         // If we have an image, upload it first
-        if (pendingImageCompression?.uri) {
-          try {
-            const uploadResp = await apiService.uploadImageFile(pendingImageCompression.uri, 'file', 'chat-images');
-            if (uploadResp?.url) {
-              uploadedImageUrl = uploadResp.url;
+        if (capturedImageCompression) {
+          // Check if we have a valid URI in the compression result
+          if (capturedImageCompression.uri) {
+            try {
+              console.log('📤 [IMAGE] Uploading image from compression result:', {
+                hasUri: !!capturedImageCompression.uri,
+                uriPreview: capturedImageCompression.uri?.substring(0, 50) + '...'
+              });
+              
+              // Add timeout to prevent hanging
+              const uploadPromise = apiService.uploadImageFile(capturedImageCompression.uri, 'file', 'chat-images');
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Upload timeout - please try again')), 30000)
+              );
+              
+              const uploadResp = await Promise.race([uploadPromise, timeoutPromise]) as any;
+              
+              if (uploadResp?.url) {
+                uploadedImageUrl = uploadResp.url;
+                console.log('✅ [IMAGE] Upload successful:', uploadedImageUrl.substring(0, 50) + '...');
+              } else {
+                throw new Error('Upload response missing URL');
+              }
+            } catch (e: any) {
+              console.error('❌ [IMAGE] Failed to upload chat image:', e);
+              const errorMessage = e.message || 'Failed to upload image. Please try again.';
+              Alert.alert('Error', errorMessage);
+              // Re-throw to stop message sending
+              throw e;
             }
-          } catch (e) {
-            console.error('❌ [IMAGE] Failed to upload chat image:', e);
+          } else {
+            console.warn('⚠️ [IMAGE] Compression result missing URI:', capturedImageCompression);
+            throw new Error('Image compression failed - no URI generated');
           }
         }
 
@@ -561,7 +651,7 @@ const ChatScreen = React.memo(function ChatScreen({
         if (uploadedImageUrl) {
           console.log('🌐 [API] Using HTTP API for image message...');
           serverResponse = await apiService.sendMessage(chatId, { 
-            content: messageText || ' ', // Send space if no text (image-only message)
+            content: messageText || '', // Send empty string if no text (image-only message)
             chatId: chatId, 
             senderId: user.id,
             imageUrl: uploadedImageUrl,
@@ -608,6 +698,25 @@ const ChatScreen = React.memo(function ChatScreen({
           });
           
           setMessages(prev => {
+            // 🔒 CRITICAL: Check if server message already exists (prevent duplicates)
+            // This can happen if socket broadcast arrives before API response
+            const messageExists = prev.some(msg => msg.id === serverMessage.id);
+            if (messageExists) {
+              console.log('⚠️ [SKIP REPLACE] Server message already exists, keeping existing');
+              // But we still need to make sure the message has the correct status
+              const updated = prev.map(msg => 
+                msg.id === serverMessage.id ? { ...msg, status: 'sent' } as Message : msg
+              );
+              return updated;
+            }
+            
+            // Also check if temp message exists
+            const hasTempMessage = prev.some(msg => msg.id === tempId);
+            if (!hasTempMessage) {
+              console.log('⚠️ [ADD] Temp message not found, adding server message');
+              return [...prev, serverMessage];
+            }
+            
             const replaced = prev.map(msg => 
               msg.id === tempId ? serverMessage : msg
             );
@@ -619,17 +728,19 @@ const ChatScreen = React.memo(function ChatScreen({
           ultraFastChatCache.replaceMessageInstantly(chatId, tempId, serverMessage);
           console.log('✅ [REPLACE] Temp message replaced in cache');
           
-          // Update global state with server message (duplicate check enabled)
-          setTimeout(() => {
-            addMessageToChat(chatId, serverMessage, false);
-            console.log('✅ [GLOBAL] Server message added to global state');
-          }, 0);
+          // 🔒 DON'T add to global state here - it will be added via socket broadcast or loadMessages
+          // This prevents duplicate messages in global state
+          console.log('⏭️ [SKIP GLOBAL] Skipping global state update to prevent duplicates');
+          
+          // ✅ SUCCESS: Reset sending state
+          setIsSending(false);
+          return; // Exit early on socket success
         }
         
         if (!serverResponse || !serverResponse.success) {
           console.log('🌐 [API] Falling back to HTTP API...');
           serverResponse = await apiService.sendMessage(chatId, { 
-            content: messageText, 
+            content: messageText || '', // Send empty string if no text
             chatId: chatId, 
             senderId: user.id,
             ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {}),
@@ -676,6 +787,25 @@ const ChatScreen = React.memo(function ChatScreen({
             });
             
             setMessages(prev => {
+              // 🔒 CRITICAL: Check if server message already exists (prevent duplicates)
+              // This can happen if socket broadcast arrives before API response
+              const messageExists = prev.some(msg => msg.id === serverMessage.id);
+              if (messageExists) {
+                console.log('⚠️ [SKIP REPLACE HTTP] Server message already exists, keeping existing');
+                // But we still need to make sure the message has the correct status
+                const updated = prev.map(msg => 
+                  msg.id === serverMessage.id ? { ...msg, status: 'sent' } as Message : msg
+                );
+                return updated;
+              }
+              
+              // Also check if temp message exists
+              const hasTempMessage = prev.some(msg => msg.id === tempId);
+              if (!hasTempMessage) {
+                console.log('⚠️ [ADD HTTP] Temp message not found, adding server message');
+                return [...prev, serverMessage];
+              }
+              
               const replaced = prev.map(msg => 
                 msg.id === tempId ? serverMessage : msg
               );
@@ -687,19 +817,23 @@ const ChatScreen = React.memo(function ChatScreen({
             ultraFastChatCache.replaceMessageInstantly(chatId, tempId, serverMessage);
             console.log('✅ [REPLACE HTTP] Temp message replaced in cache');
             
-            // Update global state with server message (duplicate check enabled)
-            setTimeout(() => {
-              addMessageToChat(chatId, serverMessage, false);
-              console.log('✅ [GLOBAL HTTP] Server message added to global state');
-            }, 0);
+            // 🔒 DON'T add to global state here - it will be added via socket broadcast or loadMessages
+            // This prevents duplicate messages in global state
+            console.log('⏭️ [SKIP GLOBAL HTTP] Skipping global state update to prevent duplicates');
+            
+            // ✅ SUCCESS: Reset sending state
+            setIsSending(false);
+          } else {
+            // ❌ FAILED: Reset sending state
+            setIsSending(false);
+            throw new Error('Invalid server response');
           }
-        }
-        
-        // Verify message was sent successfully
-        if (!serverResponse || (!serverResponse.messageId && !serverResponse.id)) {
-          throw new Error('Invalid server response');
+        } else {
+          // ❌ FAILED: Reset sending state
+          setIsSending(false);
         }
       } catch (error) {
+        console.error('❌ [SEND ERROR] Message send failed:', error);
         // Mark message as failed - keep it visible with retry option
         setMessages(prev => prev.map(msg => 
           msg.id === tempId ? {
@@ -707,16 +841,20 @@ const ChatScreen = React.memo(function ChatScreen({
             status: 'failed' // ❌ Red X icon
           } : msg
         ));
+        // ❌ FAILED: Reset sending state
+        setIsSending(false);
       }
     };
     // Start backend work immediately but don't block UI
     sendToBackend();
-  }, [user, chatData, message, addMessageToChat, scrollToBottom, isNewChat, onFirstMessage]);
+  }, [user, chatData, message, pendingImageUri, pendingImageCompression, addMessageToChat, scrollToBottom, isNewChat, onFirstMessage]);
   // Retry failed message
   const retryMessage = useCallback((failedMessage: Message) => {
     if (!user || !chatData?.id) return;
     const chatId = String(chatData.id);
     const messageText = failedMessage.text;
+    const imageUrl = failedMessage.imageUrl;
+    
     // Update message status to sending
     setMessages(prev => prev.map(msg => 
       msg.id === failedMessage.id ? {
@@ -724,25 +862,51 @@ const ChatScreen = React.memo(function ChatScreen({
         status: 'sending'
       } : msg
     ));
+    
     // Retry backend sending
     const retryBackend = async () => {
       try {
         let serverResponse = null;
-        // Try Socket.io first
-        if (socketService.isSocketConnected()) {
+        
+        // For image messages, always use API (socket doesn't support images yet)
+        if (imageUrl) {
           try {
-            serverResponse = await socketService.sendMessage(chatId, messageText, failedMessage.id);
-          } catch (socketError) {
+            // Add timeout to prevent hanging
+            const sendMessagePromise = apiService.sendMessage(chatId, { 
+              content: messageText || '',
+              chatId: chatId, 
+              senderId: user.id,
+              imageUrl: imageUrl
+            });
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Message send timeout - please try again')), 30000)
+            );
+            
+            serverResponse = await Promise.race([sendMessagePromise, timeoutPromise]);
+          } catch (imageError: any) {
+            console.error('❌ [RETRY IMAGE] Failed to send image message:', imageError);
+            throw new Error(`Failed to send image: ${imageError.message || 'Please try again'}`);
+          }
+        } else {
+          // Try Socket.io first for text-only messages
+          if (socketService.isSocketConnected()) {
+            try {
+              serverResponse = await socketService.sendMessage(chatId, messageText, failedMessage.id);
+            } catch (socketError) {
+              console.warn('⚠️ [RETRY] Socket send failed, falling back to API:', socketError);
             }
+          }
+          
+          // Fallback to API
+          if (!serverResponse || !serverResponse.success) {
+            serverResponse = await apiService.sendMessage(chatId, { 
+              content: messageText || '',
+              chatId: chatId, 
+              senderId: user.id
+            });
+          }
         }
-        // Fallback to API
-        if (!serverResponse || !serverResponse.success) {
-          serverResponse = await apiService.sendMessage(chatId, { 
-            content: messageText, 
-            chatId: chatId, 
-            senderId: user.id
-          });
-        }
+        
         // Update with success
         if (serverResponse && (serverResponse.messageId || serverResponse.id)) {
           const realMessageId = serverResponse.messageId || serverResponse.id;
@@ -753,10 +917,11 @@ const ChatScreen = React.memo(function ChatScreen({
               status: 'sent'
             } : msg
           ));
-          } else {
-          throw new Error('Retry failed');
+        } else {
+          throw new Error('Retry failed - invalid server response');
         }
-      } catch (error) {
+      } catch (error: any) {
+        console.error('❌ [RETRY] Message retry failed:', error);
         // Mark as failed again
         setMessages(prev => prev.map(msg => 
           msg.id === failedMessage.id ? {
@@ -764,8 +929,13 @@ const ChatScreen = React.memo(function ChatScreen({
             status: 'failed'
           } : msg
         ));
+        
+        // Show error to user
+        const errorMessage = error.message || 'Failed to send message. Please try again.';
+        Alert.alert('Error', errorMessage);
       }
     };
+    
     retryBackend();
   }, [user, chatData]);
   // Handle delete chat
@@ -1106,57 +1276,13 @@ const ChatScreen = React.memo(function ChatScreen({
       
       // Only add message if it's for this chat
       if (socketMessage.chatId === chatId) {
-        // 🚀 PERFORMANCE FIX: For new chats, sender also receives message via broadcast
-        // This ensures first message appears immediately without needing to refresh
         const isSenderMessage = socketMessage.sender?.id === user.id;
         
-        // If this is a sender's message in a new chat, replace temp message
+        // 🔒 CRITICAL: Skip sender's own messages from socket broadcast
+        // Sender already has the message from API response callback
+        // Only socket should handle messages from OTHER users
         if (isSenderMessage) {
-          console.log('🔄 [NEW CHAT] Replacing temp message with server message for sender');
-          
-          const newMessage: Message = {
-            id: socketMessage.id,
-            text: socketMessage.text || socketMessage.content,
-            isUser: true,
-            timestamp: fixServerTimestamp(socketMessage.timestamp) || formatMessageTime(new Date()),
-            status: 'sent',
-            sender: socketMessage.sender,
-            ...(socketMessage.imageUrl ? { imageUrl: socketMessage.imageUrl } : {}),
-          } as any;
-          
-          setMessages(prev => {
-            // Find and replace any temp message with the same content
-            const hasTempMessage = prev.some(msg => 
-              msg.id.startsWith('temp-') && 
-              msg.text === newMessage.text &&
-              msg.sender?.id === user.id
-            );
-            
-            if (hasTempMessage) {
-              console.log('✅ [REPLACE] Replacing temp message with server message');
-              return prev.map(msg => 
-                (msg.id.startsWith('temp-') && msg.text === newMessage.text && msg.sender?.id === user.id)
-                  ? newMessage
-                  : msg
-              );
-            } else {
-              // No temp message found, just add the new message
-              console.log('➕ [ADD] Adding server message (no temp message found)');
-              return [...prev, newMessage];
-            }
-          });
-          
-          // ⚡ ULTRA-FAST: Update cache
-          ultraFastChatCache.addMessageInstantly(chatId, newMessage);
-          
-          // Update global state
-          setTimeout(() => {
-            addMessageToChat(chatId, newMessage, false);
-          }, 0);
-          
-          // Auto-scroll
-          setTimeout(() => scrollToBottom(true), 50);
-          setTimeout(() => scrollToBottom(true), 150);
+          console.log('🔕 [SKIP] Sender\'s own message from broadcast - already handled by API response');
           return;
         }
         

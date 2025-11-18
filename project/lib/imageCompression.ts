@@ -1,1 +1,364 @@
-import { Alert } from 'react-native';// Conditional import with fallbacklet ImageManipulator: any = null;try {  ImageManipulator = require('expo-image-manipulator');} catch (error) {  }export interface CompressionOptions {  maxWidth?: number;  maxHeight?: number;  quality?: number;  format?: 'jpeg' | 'png' | 'webp';}export interface CompressionResult {  uri: string;  originalSize: number;  compressedSize: number;  compressionRatio: number;  width: number;  height: number;}class ImageCompressionService {  // Default compression settings for different use cases  private static readonly COMPRESSION_PRESETS = {    // High quality for profile pictures    profile: {      maxWidth: 800,      maxHeight: 800,      quality: 0.85,      format: 'jpeg' as const,    },    // Medium quality for posts (balanced size/quality)    post: {      maxWidth: 1080,      maxHeight: 1080,      quality: 0.8,      format: 'jpeg' as const,    },    // Lower quality for thumbnails    thumbnail: {      maxWidth: 300,      maxHeight: 300,      quality: 0.7,      format: 'jpeg' as const,    },    // High compression for chat images    chat: {      maxWidth: 720,      maxHeight: 720,      quality: 0.75,      format: 'jpeg' as const,    },  };  /**   * Get file size from URI   */  private static async getFileSize(uri: string): Promise<number> {    try {      const response = await fetch(uri);      const blob = await response.blob();      return blob.size;    } catch (error) {      return 0;    }  }  /**   * Format file size for display   */  private static formatFileSize(bytes: number): string {    if (bytes === 0) return '0 B';    const k = 1024;    const sizes = ['B', 'KB', 'MB', 'GB'];    const i = Math.floor(Math.log(bytes) / Math.log(k));    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];  }  /**   * Calculate resize dimensions while maintaining aspect ratio   */  private static calculateResizeDimensions(    originalWidth: number,    originalHeight: number,    maxWidth: number,    maxHeight: number  ): { width: number; height: number } {    const aspectRatio = originalWidth / originalHeight;    let newWidth = originalWidth;    let newHeight = originalHeight;    // Only resize if image is larger than max dimensions    if (originalWidth > maxWidth || originalHeight > maxHeight) {      if (aspectRatio > 1) {        // Landscape        newWidth = Math.min(maxWidth, originalWidth);        newHeight = newWidth / aspectRatio;        if (newHeight > maxHeight) {          newHeight = maxHeight;          newWidth = newHeight * aspectRatio;        }      } else {        // Portrait or square        newHeight = Math.min(maxHeight, originalHeight);        newWidth = newHeight * aspectRatio;        if (newWidth > maxWidth) {          newWidth = maxWidth;          newHeight = newWidth / aspectRatio;        }      }    }    return {      width: Math.round(newWidth),      height: Math.round(newHeight),    };  }  /**   * Fallback compression using canvas (when native module is not available)   */  private static async fallbackCompress(    imageUri: string,    options: CompressionOptions = {}  ): Promise<CompressionResult> {    const {      maxWidth = 1080,      maxHeight = 1080,      quality = 0.8,    } = options;    // Get original file size    const originalSize = await this.getFileSize(imageUri);    // For fallback, we'll use the original image with reduced quality from ImagePicker    // This is not ideal but provides a working solution    const result: CompressionResult = {      uri: imageUri,      originalSize,      compressedSize: Math.round(originalSize * quality), // Estimate      compressionRatio: 1 - quality,      width: maxWidth, // Estimate      height: maxHeight, // Estimate    };    return result;  }  /**   * Compress image with custom options using Expo ImageManipulator   */  static async compressImage(    imageUri: string,    options: CompressionOptions = {}  ): Promise<CompressionResult> {    // Check if native module is available    if (!ImageManipulator) {      return this.fallbackCompress(imageUri, options);    }    try {      const {        maxWidth = 1080,        maxHeight = 1080,        quality = 0.8,        format = 'jpeg',      } = options;      // Get original file size      const originalSize = await this.getFileSize(imageUri);      // Get image info to determine if resizing is needed      const imageInfo = await ImageManipulator.manipulateAsync(        imageUri,        [], // No actions, just get info        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }      );      // Calculate optimal dimensions      const { width: targetWidth, height: targetHeight } = this.calculateResizeDimensions(        imageInfo.width,        imageInfo.height,        maxWidth,        maxHeight      );      // Prepare manipulation actions      const actions: any[] = [];      // Add resize action if needed      if (targetWidth !== imageInfo.width || targetHeight !== imageInfo.height) {        actions.push({          resize: {            width: targetWidth,            height: targetHeight,          },        });      }      // Convert format string to SaveFormat enum      let saveFormat: any;      switch (format) {        case 'png':          saveFormat = ImageManipulator.SaveFormat.PNG;          break;        case 'webp':          saveFormat = ImageManipulator.SaveFormat.WEBP;          break;        case 'jpeg':        default:          saveFormat = ImageManipulator.SaveFormat.JPEG;          break;      }      // Compress the image      const compressedImage = await ImageManipulator.manipulateAsync(        imageUri,        actions,        {          compress: quality,          format: saveFormat,        }      );      // Get compressed file size      const compressedSize = await this.getFileSize(compressedImage.uri);      const compressionRatio = originalSize > 0 ? (originalSize - compressedSize) / originalSize : 0;      const result: CompressionResult = {        uri: compressedImage.uri,        originalSize,        compressedSize,        compressionRatio,        width: compressedImage.width,        height: compressedImage.height,      };      return result;    } catch (error) {      // Fallback to simple compression if native method fails      return this.fallbackCompress(imageUri, options);    }  }  /**   * Compress image for post creation (optimized for social media)   */  static async compressForPost(imageUri: string): Promise<CompressionResult> {    return this.compressImage(imageUri, this.COMPRESSION_PRESETS.post);  }  /**   * Compress image for profile picture   */  static async compressForProfile(imageUri: string): Promise<CompressionResult> {    return this.compressImage(imageUri, this.COMPRESSION_PRESETS.profile);  }  /**   * Compress image for chat   */  static async compressForChat(imageUri: string): Promise<CompressionResult> {    return this.compressImage(imageUri, this.COMPRESSION_PRESETS.chat);  }  /**   * Create thumbnail from image   */  static async createThumbnail(imageUri: string): Promise<CompressionResult> {    return this.compressImage(imageUri, this.COMPRESSION_PRESETS.thumbnail);  }  /**   * Smart compression - automatically chooses best settings based on image size   */  static async smartCompress(imageUri: string): Promise<CompressionResult> {    try {      const originalSize = await this.getFileSize(imageUri);      // Choose compression level based on file size      let preset: CompressionOptions;      if (originalSize > 5 * 1024 * 1024) { // > 5MB - aggressive compression        preset = {          maxWidth: 1080,          maxHeight: 1080,          quality: 0.7,          format: 'jpeg',        };      } else if (originalSize > 2 * 1024 * 1024) { // > 2MB - medium compression        preset = {          maxWidth: 1080,          maxHeight: 1080,          quality: 0.75,          format: 'jpeg',        };      } else if (originalSize > 1 * 1024 * 1024) { // > 1MB - light compression        preset = {          maxWidth: 1080,          maxHeight: 1080,          quality: 0.8,          format: 'jpeg',        };      } else { // < 1MB - minimal compression        preset = {          maxWidth: 1080,          maxHeight: 1080,          quality: 0.85,          format: 'jpeg',        };      }      return this.compressImage(imageUri, preset);    } catch (error) {      // Fallback to standard post compression      return this.compressForPost(imageUri);    }  }  /**   * Show compression results to user (optional)   */  static showCompressionResults(result: CompressionResult): void {    const savedSpace = result.originalSize - result.compressedSize;    const compressionPercent = (result.compressionRatio * 100).toFixed(1);    Alert.alert(      '🗜️ Image Compressed',      `Original: ${this.formatFileSize(result.originalSize)}\n` +      `Compressed: ${this.formatFileSize(result.compressedSize)}\n` +      `Saved: ${this.formatFileSize(savedSpace)} (${compressionPercent}%)\n` +      `Dimensions: ${result.width}×${result.height}`,      [{ text: 'OK' }]    );  }}export default ImageCompressionService;
+import { Alert } from 'react-native';
+// Conditional import with fallback
+let ImageManipulator: any = null;
+try {
+  ImageManipulator = require('expo-image-manipulator');
+} catch (error) {
+  console.warn('expo-image-manipulator not available, will use fallback compression');
+}
+
+export interface CompressionOptions {
+  maxWidth?: number;
+  maxHeight?: number;
+  quality?: number;
+  format?: 'jpeg' | 'png' | 'webp';
+}
+
+export interface CompressionResult {
+  uri: string;
+  originalSize: number;
+  compressedSize: number;
+  compressionRatio: number;
+  width: number;
+  height: number;
+}
+
+class ImageCompressionService {
+  // Default compression settings for different use cases
+  private static readonly COMPRESSION_PRESETS = {
+    // High quality for profile pictures
+    profile: {
+      maxWidth: 800,
+      maxHeight: 800,
+      quality: 0.85,
+      format: 'jpeg' as const,
+    },
+    // Medium quality for posts (balanced size/quality)
+    post: {
+      maxWidth: 1080,
+      maxHeight: 1080,
+      quality: 0.8,
+      format: 'jpeg' as const,
+    },
+    // Lower quality for thumbnails
+    thumbnail: {
+      maxWidth: 300,
+      maxHeight: 300,
+      quality: 0.7,
+      format: 'jpeg' as const,
+    },
+    // High compression for chat images
+    chat: {
+      maxWidth: 720,
+      maxHeight: 720,
+      quality: 0.75,
+      format: 'jpeg' as const,
+    },
+  };
+
+  /**
+   * Get file size from URI
+   */
+  private static async getFileSize(uri: string): Promise<number> {
+    try {
+      // For local files, we can't use fetch, so we'll return 0 and estimate
+      if (uri.startsWith('file://') || uri.startsWith('content://')) {
+        return 0; // Will be estimated
+      }
+      
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      return blob.size;
+    } catch (error) {
+      console.warn('Could not determine file size:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Format file size for display
+   */
+  private static formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  /**
+   * Calculate resize dimensions while maintaining aspect ratio
+   */
+  private static calculateResizeDimensions(
+    originalWidth: number,
+    originalHeight: number,
+    maxWidth: number,
+    maxHeight: number
+  ): { width: number; height: number } {
+    const aspectRatio = originalWidth / originalHeight;
+    let newWidth = originalWidth;
+    let newHeight = originalHeight;
+    
+    // Only resize if image is larger than max dimensions
+    if (originalWidth > maxWidth || originalHeight > maxHeight) {
+      if (aspectRatio > 1) {
+        // Landscape
+        newWidth = Math.min(maxWidth, originalWidth);
+        newHeight = newWidth / aspectRatio;
+        if (newHeight > maxHeight) {
+          newHeight = maxHeight;
+          newWidth = newHeight * aspectRatio;
+        }
+      } else {
+        // Portrait or square
+        newHeight = Math.min(maxHeight, originalHeight);
+        newWidth = newHeight * aspectRatio;
+        if (newWidth > maxWidth) {
+          newWidth = maxWidth;
+          newHeight = newWidth / aspectRatio;
+        }
+      }
+    }
+    
+    return {
+      width: Math.round(newWidth),
+      height: Math.round(newHeight),
+    };
+  }
+
+  /**
+   * Fallback compression using canvas (when native module is not available)
+   */
+  private static async fallbackCompress(
+    imageUri: string,
+    options: CompressionOptions = {}
+  ): Promise<CompressionResult> {
+    const {
+      maxWidth = 1080,
+      maxHeight = 1080,
+      quality = 0.8,
+    } = options;
+    
+    // Get original file size
+    const originalSize = await this.getFileSize(imageUri);
+    
+    // For fallback, we'll use the original image with reduced quality from ImagePicker
+    // This is not ideal but provides a working solution
+    const result: CompressionResult = {
+      uri: imageUri,
+      originalSize,
+      compressedSize: Math.round(originalSize * quality), // Estimate
+      compressionRatio: 1 - quality,
+      width: maxWidth, // Estimate
+      height: maxHeight, // Estimate
+    };
+    
+    return result;
+  }
+
+  /**
+   * Compress image with custom options using Expo ImageManipulator
+   */
+  static async compressImage(
+    imageUri: string,
+    options: CompressionOptions = {}
+  ): Promise<CompressionResult> {
+    // Check if native module is available
+    if (!ImageManipulator) {
+      console.warn('ImageManipulator not available, using fallback compression');
+      return this.fallbackCompress(imageUri, options);
+    }
+    
+    try {
+      const {
+        maxWidth = 1080,
+        maxHeight = 1080,
+        quality = 0.8,
+        format = 'jpeg',
+      } = options;
+      
+      // Validate input
+      if (!imageUri) {
+        throw new Error('Invalid image URI provided');
+      }
+      
+      // Get original file size
+      const originalSize = await this.getFileSize(imageUri);
+      
+      // Get image info to determine if resizing is needed
+      const imageInfo = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [], // No actions, just get info
+        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      
+      // Validate image info
+      if (!imageInfo || !imageInfo.width || !imageInfo.height) {
+        throw new Error('Invalid image data received from ImageManipulator');
+      }
+      
+      // Calculate optimal dimensions
+      const { width: targetWidth, height: targetHeight } = this.calculateResizeDimensions(
+        imageInfo.width,
+        imageInfo.height,
+        maxWidth,
+        maxHeight
+      );
+      
+      // Prepare manipulation actions
+      const actions: any[] = [];
+      
+      // Add resize action if needed
+      if (targetWidth !== imageInfo.width || targetHeight !== imageInfo.height) {
+        actions.push({
+          resize: {
+            width: targetWidth,
+            height: targetHeight,
+          },
+        });
+      }
+      
+      // Convert format string to SaveFormat enum
+      let saveFormat: any;
+      switch (format) {
+        case 'png':
+          saveFormat = ImageManipulator.SaveFormat.PNG;
+          break;
+        case 'webp':
+          saveFormat = ImageManipulator.SaveFormat.WEBP;
+          break;
+        case 'jpeg':
+        default:
+          saveFormat = ImageManipulator.SaveFormat.JPEG;
+          break;
+      }
+      
+      // Compress the image
+      const compressedImage = await ImageManipulator.manipulateAsync(
+        imageUri,
+        actions,
+        {
+          compress: quality,
+          format: saveFormat,
+        }
+      );
+      
+      // Validate compressed image
+      if (!compressedImage || !compressedImage.uri) {
+        throw new Error('Image compression failed - no output received');
+      }
+      
+      // Get compressed file size
+      const compressedSize = await this.getFileSize(compressedImage.uri);
+      const compressionRatio = originalSize > 0 ? (originalSize - compressedSize) / originalSize : 0;
+      
+      const result: CompressionResult = {
+        uri: compressedImage.uri,
+        originalSize,
+        compressedSize,
+        compressionRatio,
+        width: compressedImage.width,
+        height: compressedImage.height,
+      };
+      
+      return result;
+    } catch (error) {
+      console.error('Image compression failed:', error);
+      // Fallback to simple compression if native method fails
+      return this.fallbackCompress(imageUri, options);
+    }
+  }
+
+  /**
+   * Compress image for post creation (optimized for social media)
+   */
+  static async compressForPost(imageUri: string): Promise<CompressionResult> {
+    return this.compressImage(imageUri, this.COMPRESSION_PRESETS.post);
+  }
+
+  /**
+   * Compress image for profile picture
+   */
+  static async compressForProfile(imageUri: string): Promise<CompressionResult> {
+    return this.compressImage(imageUri, this.COMPRESSION_PRESETS.profile);
+  }
+
+  /**
+   * Compress image for chat
+   */
+  static async compressForChat(imageUri: string): Promise<CompressionResult> {
+    return this.compressImage(imageUri, this.COMPRESSION_PRESETS.chat);
+  }
+
+  /**
+   * Create thumbnail from image
+   */
+  static async createThumbnail(imageUri: string): Promise<CompressionResult> {
+    return this.compressImage(imageUri, this.COMPRESSION_PRESETS.thumbnail);
+  }
+
+  /**
+   * Smart compression - automatically chooses best settings based on image size
+   */
+  static async smartCompress(imageUri: string): Promise<CompressionResult> {
+    try {
+      const originalSize = await this.getFileSize(imageUri);
+      
+      // Choose compression level based on file size
+      let preset: CompressionOptions;
+      if (originalSize > 5 * 1024 * 1024) { // > 5MB - aggressive compression
+        preset = {
+          maxWidth: 1080,
+          maxHeight: 1080,
+          quality: 0.7,
+          format: 'jpeg',
+        };
+      } else if (originalSize > 2 * 1024 * 1024) { // > 2MB - medium compression
+        preset = {
+          maxWidth: 1080,
+          maxHeight: 1080,
+          quality: 0.75,
+          format: 'jpeg',
+        };
+      } else if (originalSize > 1 * 1024 * 1024) { // > 1MB - light compression
+        preset = {
+          maxWidth: 1080,
+          maxHeight: 1080,
+          quality: 0.8,
+          format: 'jpeg',
+        };
+      } else { // < 1MB - minimal compression
+        preset = {
+          maxWidth: 1080,
+          maxHeight: 1080,
+          quality: 0.85,
+          format: 'jpeg',
+        };
+      }
+      
+      return this.compressImage(imageUri, preset);
+    } catch (error) {
+      console.error('Smart compression failed:', error);
+      // Fallback to standard post compression
+      return this.compressForPost(imageUri);
+    }
+  }
+
+  /**
+   * Show compression results to user (optional)
+   */
+  static showCompressionResults(result: CompressionResult): void {
+    const savedSpace = result.originalSize - result.compressedSize;
+    const compressionPercent = (result.compressionRatio * 100).toFixed(1);
+    Alert.alert(
+      '🗜️ Image Compressed',
+      `Original: ${this.formatFileSize(result.originalSize)}\n` +
+      `Compressed: ${this.formatFileSize(result.compressedSize)}\n` +
+      `Saved: ${this.formatFileSize(savedSpace)} (${compressionPercent}%)\n` +
+      `Dimensions: ${result.width}×${result.height}`,
+      [{ text: 'OK' }]
+    );
+  }
+}
+
+export default ImageCompressionService;

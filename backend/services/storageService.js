@@ -23,6 +23,19 @@ class StorageService {
         throw new Error('Supabase client not initialized. Please check your configuration.');
       }
 
+      // Validate inputs
+      if (!fileBuffer || !fileBuffer.length) {
+        throw new Error('Invalid file buffer provided');
+      }
+      
+      if (!fileName) {
+        throw new Error('File name is required');
+      }
+      
+      if (!mimeType || !mimeType.startsWith('image/')) {
+        throw new Error('Invalid MIME type - only image files are allowed');
+      }
+
       // Generate unique filename with timestamp
       const timestamp = Date.now();
       const fileExtension = path.extname(fileName);
@@ -30,7 +43,13 @@ class StorageService {
       const uniqueFileName = `${timestamp}-${baseName}${fileExtension}`;
       const filePath = `${folder}/${uniqueFileName}`;
 
-      logger.info('Uploading file to Supabase Storage', { filePath, folder });
+      logger.info('Uploading file to Supabase Storage', { 
+        filePath, 
+        folder, 
+        mimeType, 
+        fileSize: fileBuffer.length,
+        originalName: fileName
+      });
 
       // Upload file to Supabase Storage
       const { data, error } = await supabase.storage
@@ -42,7 +61,15 @@ class StorageService {
         });
 
       if (error) {
-        logger.error('Supabase Storage upload error', { error: error.message, errorDetails: JSON.stringify(error) });
+        logger.error('Supabase Storage upload error', { 
+          error: error.message, 
+          errorDetails: JSON.stringify(error),
+          fileName: fileName,
+          mimeType: mimeType,
+          fileSize: fileBuffer.length,
+          bucketName: this.bucketName,
+          filePath: filePath
+        });
         
         // Check if it's a bucket not found error
         if (error.message?.includes('Bucket not found') || error.statusCode === '404') {
@@ -50,8 +77,18 @@ class StorageService {
         }
         
         // Check if it's a policy error
-        if (error.message?.includes('policy') || error.statusCode === '403') {
+        if (error.message?.includes('policy') || error.message?.includes('access denied') || error.statusCode === '403') {
           throw new Error('Storage access denied. Please configure RLS policies for the storage bucket.');
+        }
+        
+        // Check if it's a file size error
+        if (error.message?.includes('entity too large') || error.message?.includes('Payload too large')) {
+          throw new Error('File too large. Maximum size is 10MB.');
+        }
+        
+        // Check if it's a network error
+        if (error.message?.includes('network') || error.message?.includes('timeout') || error.message?.includes('ECONN')) {
+          throw new Error('Network error during upload. Please check your connection and try again.');
         }
         
         throw new Error(`Upload failed: ${error.message || 'Unknown storage error'}`);
@@ -64,7 +101,12 @@ class StorageService {
 
       const publicUrl = publicUrlData.publicUrl;
 
-      logger.info('File uploaded successfully', { publicUrl, fileName: uniqueFileName });
+      logger.info('File uploaded successfully', { 
+        publicUrl, 
+        fileName: uniqueFileName,
+        fileSize: fileBuffer.length,
+        mimeType
+      });
 
       return {
         success: true,
@@ -77,7 +119,13 @@ class StorageService {
       };
 
     } catch (error) {
-      logger.error('Storage upload error', { error: error.message, stack: error.stack });
+      logger.error('Storage upload error', { 
+        error: error.message, 
+        stack: error.stack,
+        fileName,
+        mimeType,
+        fileSize: fileBuffer?.length
+      });
       throw error;
     }
   }
