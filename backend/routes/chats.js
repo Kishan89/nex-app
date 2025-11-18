@@ -22,7 +22,8 @@ router.post('/:chatId/mark-messages-read', verifyAuthToken, chatController.markM
 router.post('/:chatId/messages', verifyAuthToken, chatController.sendMessage);
 
 // Delete a chat
-router.delete('/:chatId', chatController.deleteChat);
+// Delete a chat (requires authentication so controller can enforce permissions)
+router.delete('/:chatId', verifyAuthToken, chatController.deleteChat);
 
 // Get a single chat by ID - MUST be after all other /:chatId routes
 router.get('/:chatId', optionalAuth, chatController.getChatById);

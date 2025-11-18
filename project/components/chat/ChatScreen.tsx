@@ -48,6 +48,10 @@ interface ChatData {
   userId?: string;
   username?: string;
   isGroup?: boolean;
+  description?: string;
+  memberCount?: number;
+  participants?: any[];
+  createdById?: string;
 }
 interface ChatScreenProps {
   chatData: ChatData;
@@ -780,6 +784,56 @@ const ChatScreen = React.memo(function ChatScreen({
       ]
     );
   }, [chatData.id, chatData.name, onBack, onChatDeleted, user?.id]);
+
+  // Handle leaving a group (member exits without deleting the group)
+  const handleLeaveGroup = useCallback(() => {
+    if (!chatData?.isGroup) {
+      return;
+    }
+
+    Alert.alert(
+      'Leave Group',
+      `Are you sure you want to leave ${chatData.name || 'this group'}? You will no longer receive messages from this group.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: () => {
+            const chatId = String(chatData.id);
+
+            console.log('🚪 [LEAVE GROUP] Starting leave flow for chat:', chatId);
+
+            // Instantly remove from local caches so chat disappears from lists
+            onChatDeleted?.(chatId);
+            chatCache.removeChatFromCache(chatId);
+            chatMessageCache.clearChatCache(chatId);
+            ultraFastChatCache.clearChatCache(chatId);
+
+            if (user?.id) {
+              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+              AsyncStorage.removeItem(`user_chats_${user.id}`).catch(() => {});
+            }
+
+            // Navigate back immediately
+            onBack?.();
+
+            // Background API call to leave the group on the server
+            setTimeout(() => {
+              console.log('🌐 [LEAVE GROUP] Syncing with backend...');
+              apiService.leaveGroup(chatId)
+                .then(() => {
+                  console.log('✅ [LEAVE GROUP] Backend leave successful:', chatId);
+                })
+                .catch((error) => {
+                  console.error('❌ [LEAVE GROUP] Backend leave failed:', error);
+                });
+            }, 100);
+          }
+        }
+      ]
+    );
+  }, [chatData?.id, chatData?.isGroup, chatData?.name, onBack, onChatDeleted, user?.id]);
   const handleSetGroupAvatar = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -1452,16 +1506,43 @@ const ChatScreen = React.memo(function ChatScreen({
           onPress={() => setShowOptionsMenu(false)}
         >
           <View style={[styles.optionsMenu, { backgroundColor: colors.backgroundSecondary }]}>
-            <TouchableOpacity 
-              style={styles.optionItem}
-              onPress={() => {
-                setShowOptionsMenu(false);
-                handleDeleteChat();
-              }}
-            >
-              <Trash2 size={20} color="#ff4444" />
-              <Text style={[styles.optionText, styles.destructiveText]}>Delete Chat</Text>
-            </TouchableOpacity>
+            {chatData.isGroup ? (
+              <>
+                {isAdmin && (
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => {
+                      setShowOptionsMenu(false);
+                      handleDeleteChat();
+                    }}
+                  >
+                    <Trash2 size={20} color="#ff4444" />
+                    <Text style={[styles.optionText, styles.destructiveText]}>Delete Group</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity 
+                  style={styles.optionItem}
+                  onPress={() => {
+                    setShowOptionsMenu(false);
+                    handleLeaveGroup();
+                  }}
+                >
+                  <UserX size={20} color="#ff4444" />
+                  <Text style={[styles.optionText, styles.destructiveText]}>Leave Group</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity 
+                style={styles.optionItem}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  handleDeleteChat();
+                }}
+              >
+                <Trash2 size={20} color="#ff4444" />
+                <Text style={[styles.optionText, styles.destructiveText]}>Delete Chat</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>

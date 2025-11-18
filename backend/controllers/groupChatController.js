@@ -199,6 +199,30 @@ class GroupChatController {
       next(error);
     }
   }
+
+  async leaveGroup(req, res, next) {
+    try {
+      const { userId } = req.user || {};
+      const { groupId } = req.params;
+
+      if (!userId) {
+        throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED || 'Unauthorized');
+      }
+
+      if (!groupId) {
+        throw new BadRequestError('Group ID is required');
+      }
+
+      // Remove the current user from the group participants
+      const updatedChat = await chatService.removeParticipantFromChat(groupId, userId, userId);
+
+      return res
+        .status(HTTP_STATUS.OK)
+        .json(successResponse(updatedChat, 'Left group successfully'));
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new GroupChatController();

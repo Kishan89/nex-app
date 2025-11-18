@@ -4,7 +4,7 @@ const { sendMessageNotification } = require('../services/fcmService');
 const { prisma } = require('../config/database');
 const { createLogger } = require('../utils/logger');
 const { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES, CACHE, PAGINATION, NOTIFICATION } = require('../constants');
-const { BadRequestError, UnauthorizedError, ForbiddenError } = require('../utils/errors');
+const { BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError } = require('../utils/errors');
 
 const logger = createLogger('ChatController');
 
@@ -381,23 +381,45 @@ class ChatController {
   async deleteChat(req, res, next) {
     try {
       const { chatId } = req.params;
-      
-      // Get chat participants before deletion
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        throw new UnauthorizedError(ERROR_MESSAGES.UNAUTHORIZED || 'Unauthorized');
+      }
+
+      if (!chatId) {
+        throw new BadRequestError(ERROR_MESSAGES.CHAT_ID_REQUIRED || 'Chat ID is required');
+      }
+
+      // Load chat with participants to enforce permissions
       const chat = await prisma.chat.findUnique({
         where: { id: chatId },
         include: {
-          participants: {
-            select: { userId: true }
-          }
+          participants: true
         }
       });
-      
-      const participantIds = chat?.participants.map(p => p.userId) || [];
-      
+
+      if (!chat) {
+        throw new NotFoundError(ERROR_MESSAGES.CHAT_NOT_FOUND || 'Chat not found');
+      }
+
+      // User must be a participant of the chat
+      const participant = chat.participants.find(p => p.userId === userId);
+      if (!participant) {
+        throw new ForbiddenError(ERROR_MESSAGES.UNAUTHORIZED || 'You are not a participant of this chat');
+      }
+
+      // For group chats, only admins can delete the chat for everyone
+      if (chat.isGroup && !participant.isAdmin) {
+        throw new ForbiddenError('Only group admins can delete this group');
+      }
+
+      const participantIds = chat.participants.map(p => p.userId) || [];
+
       await chatService.deleteChat(chatId);
-      
+
       res.status(HTTP_STATUS.OK).json(successResponse(null, SUCCESS_MESSAGES.CHAT_DELETED));
-      
+
       // 🚀 REAL-TIME: Emit socket event to all participants
       setImmediate(() => {
         try {

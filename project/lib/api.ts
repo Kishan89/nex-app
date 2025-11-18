@@ -36,6 +36,7 @@ const API_ENDPOINTS = {
     GROUPS: "/groups",
     GROUP_ADD_MEMBER: (groupId: string) => `/groups/${groupId}/members`,
     GROUP_REMOVE_MEMBER: (groupId: string, userId: string) => `/groups/${groupId}/members/${userId}`,
+    GROUP_LEAVE: (groupId: string) => `/groups/${groupId}/leave`,
     POST_COMMENTS: (postId: string) => `/posts/${postId}/comments`,
     DELETE_COMMENT: (postId: string, commentId: string) => `/posts/${postId}/comments/${commentId}`,
     REPORT_COMMENT: (postId: string, commentId: string) => `/posts/${postId}/comments/${commentId}/report`,
@@ -623,6 +624,10 @@ class ApiService {
 
     async removeGroupMember(groupId: string, userId: string): Promise<any> {
         return this.delete(API_ENDPOINTS.GROUP_REMOVE_MEMBER(groupId, userId));
+    }
+
+    async leaveGroup(groupId: string): Promise<any> {
+        return this.post(API_ENDPOINTS.GROUP_LEAVE(groupId), {});
     }
 
     async updateGroupAvatar(groupId: string, avatarUrl: string): Promise<any> {

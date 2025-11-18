@@ -22,6 +22,9 @@ router.post('/:groupId/members', verifyAuthToken, requireGroupAdmin, groupChatCo
 // Remove a member from a group (admin only)
 router.delete('/:groupId/members/:userId', verifyAuthToken, requireGroupAdmin, groupChatController.removeMember.bind(groupChatController));
 
+// Leave a group (any member can leave themselves)
+router.post('/:groupId/leave', verifyAuthToken, groupChatController.leaveGroup.bind(groupChatController));
+
 // Update group avatar (admin only)
 router.put('/:groupId/avatar', verifyAuthToken, requireGroupAdmin, groupChatController.updateGroupAvatar.bind(groupChatController));
 
