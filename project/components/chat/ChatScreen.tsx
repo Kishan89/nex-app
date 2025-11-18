@@ -98,6 +98,7 @@ const ChatScreen = React.memo(function ChatScreen({
   const [isSavingDesc, setIsSavingDesc] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
+  const [filteredMentionMembers, setFilteredMentionMembers] = useState<any[]>([]);
   const [showMentionModal, setShowMentionModal] = useState(false);
   
   useEffect(() => {
@@ -1405,19 +1406,27 @@ const ChatScreen = React.memo(function ChatScreen({
       if (lastWord?.startsWith('@')) {
         if (lastWord.length === 1) {
           // Just typed @, show all members
-          setShowMentionModal(true);
+          setFilteredMentionMembers(groupMembers);
+          setShowMentionModal(groupMembers.length > 0);
         } else if (lastWord.length > 1) {
           // Typing username after @
           const query = lastWord.substring(1).toLowerCase();
-          const filteredMembers = groupMembers.filter((m) =>
-            m.user?.username?.toLowerCase().includes(query)
-          );
-          
+          const filteredMembers = groupMembers.filter((m) => {
+            const username = m?.user?.username;
+            if (!username || typeof username !== 'string') return false;
+            return username.toLowerCase().includes(query);
+          });
+          setFilteredMentionMembers(filteredMembers);
           setShowMentionModal(filteredMembers.length > 0);
         }
       } else {
         setShowMentionModal(false);
+        setFilteredMentionMembers([]);
       }
+    } else {
+      // Not a group or no members
+      setShowMentionModal(false);
+      setFilteredMentionMembers([]);
     }
   }, [chatData?.isGroup, groupMembers]);
 
@@ -1856,23 +1865,12 @@ const ChatScreen = React.memo(function ChatScreen({
 
       {/* Auto-mention suggestions */}
       {showMentionModal && chatData?.isGroup && (
-        <View style={[styles.mentionSuggestions, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-          <FlatList
-            data={groupMembers.filter((m) => {
-              const words = message.split(/\s/);
-              const lastWord = words[words.length - 1];
-              if (lastWord?.startsWith('@')) {
-                if (lastWord.length === 1) {
-                  // Show all members when just @ is typed
-                  return true;
-                }
-                const query = lastWord.substring(1).toLowerCase();
-                return m.user?.username?.toLowerCase().includes(query);
-              }
-              return false;
-            })}
-            keyExtractor={(item, index) => item.userId || `member-${index}`}
-            renderItem={({ item }) => (
+      <View style={[styles.mentionSuggestions, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+      >
+        <FlatList
+          data={filteredMentionMembers}
+          keyExtractor={(item, index) => item.userId || `member-${index}`}
+          renderItem={({ item }) => (
               <TouchableOpacity
                 style={[styles.mentionSuggestionItem, { borderBottomColor: colors.border }]}
                 onPress={() => {
@@ -2055,7 +2053,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   // Auto-mention suggestion styles
   mentionSuggestions: {
     position: 'absolute',
-    bottom: '100%',
+    bottom: 80,
     left: Spacing.md,
     right: Spacing.md,
     maxHeight: 200,

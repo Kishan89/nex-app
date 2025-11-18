@@ -186,6 +186,9 @@ export default function IndividualChatScreen() {
             isGroup: chatData.isGroup || false,
             description: chatData.description || prev?.description || '',
             memberCount: chatData.participants?.length || prev?.memberCount || 0,
+            // Pass through full group info so ChatScreen can enforce admin permissions
+            participants: chatData.participants || prev?.participants || [],
+            createdById: chatData.createdById || prev?.createdById || null,
           }));
           setLoading(false);
           return;
@@ -229,6 +232,10 @@ export default function IndividualChatScreen() {
           lastSeenText: chatFromList.lastSeenText || (chatFromList.isOnline ? 'Online' : 'Last seen recently'),
           userId: userId || prev?.userId || 'unknown',
           isGroup: chatFromList.isGroup || false,
+          description: chatFromList.description || prev?.description || '',
+          memberCount: chatFromList.memberCount || chatFromList.participants?.length || prev?.memberCount || 0,
+          participants: chatFromList.participants || prev?.participants || [],
+          createdById: chatFromList.createdById || prev?.createdById || null,
         }));
         setLoading(false);
         return;

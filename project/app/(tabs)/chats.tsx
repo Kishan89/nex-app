@@ -431,20 +431,11 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           <TouchableOpacity style={styles.actionButton} onPress={handleSearchPress}>
             <Search size={20} color={colors.text} />
           </TouchableOpacity>
-
-
-
-
-          
-          {/* Group chat button commented out per request */}
-          {/**
           <TouchableOpacity style={[styles.actionButton, styles.groupsButton]} onPress={handleGroupsPress}>
             <Users size={20} color="#3B8FE8" />
           </TouchableOpacity>
-          */}
         </View>
       </View>
-      {/* Render based on loading, error, or data */}
       {loading ? (
         <ChatSkeleton />
       ) : error ? (
@@ -465,13 +456,11 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No chats available</Text>
-              {/* Suggestion to create groups commented out */}
-              
+              {/* Suggestion to create groups */}
               <TouchableOpacity style={styles.groupsHint} onPress={handleGroupsPress}>
                 <Users size={16} color={colors.primary} />
                 <Text style={[styles.groupsHintText, { color: colors.primary }]}>Try creating a group chat</Text>
               </TouchableOpacity>
-              
             </View>
           }
           refreshControl={
