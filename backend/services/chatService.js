@@ -281,6 +281,7 @@ class ChatService {
         select: {
           id: true,
           content: true,
+          imageUrl: true,  // Include imageUrl for image messages
           senderId: true,
           createdAt: true,
           status: true,
@@ -309,6 +310,7 @@ class ChatService {
         id: message.id,
         text: message.content,
         content: message.content, // Include both for compatibility
+        imageUrl: message.imageUrl || undefined, // Include image URL if present
         isUser: message.senderId === userId,
         timestamp: message.createdAt.toISOString(),
         status: message.status.toLowerCase(),
@@ -343,9 +345,9 @@ class ChatService {
     const logger = createLogger('ChatService');
     
     try {
-      const { content, chatId, senderId } = messageData;
+      const { content, chatId, senderId, imageUrl } = messageData;
       
-      logger.info('📤 [SEND MESSAGE] Starting message creation', { chatId, senderId, contentLength: content?.length });
+      logger.info('📤 [SEND MESSAGE] Starting message creation', { chatId, senderId, contentLength: content?.length, hasImage: !!imageUrl });
 
       // Validate input
       if (!content || !chatId || !senderId) {
@@ -369,13 +371,20 @@ class ChatService {
       logger.info('✅ [SEND MESSAGE] User verified as participant, creating message...');
   
       // Create message with proper error handling
+      const messageCreateData = {
+        content,
+        chatId,
+        senderId,
+        status: MESSAGE_STATUS.SENT,
+      };
+
+      // Add imageUrl if provided
+      if (imageUrl) {
+        messageCreateData.imageUrl = imageUrl;
+      }
+
       const message = await prisma.message.create({
-        data: {
-          content,
-          chatId,
-          senderId,
-          status: MESSAGE_STATUS.SENT,
-        },
+        data: messageCreateData,
         include: {
           sender: {
             select: {
@@ -396,7 +405,8 @@ class ChatService {
         messageId: message.id, 
         chatId, 
         senderId,
-        timestamp: message.createdAt 
+        timestamp: message.createdAt,
+        hasImage: !!message.imageUrl 
       });
 
       // Parse mentions from message content
@@ -467,6 +477,7 @@ class ChatService {
         id: message.id,
         text: message.content,
         content: message.content, // Include both for compatibility
+        imageUrl: message.imageUrl || undefined, // Include image URL if present
         isUser: true,
         timestamp: message.createdAt.toISOString(),
         status: message.status.toLowerCase(),

@@ -178,7 +178,7 @@ class ChatController {
   async sendMessage(req, res, next) {
     try {
       const { chatId } = req.params;
-      const { content } = req.body;
+      const { content, imageUrl } = req.body;
       const senderId = req.user?.userId || req.body.senderId;
       
       if (!content || !senderId) {
@@ -193,7 +193,7 @@ class ChatController {
         throw new ForbiddenError(ERROR_MESSAGES.NOT_PARTICIPANT);
       }
       
-      const message = await chatService.sendMessage({ content, chatId, senderId });
+      const message = await chatService.sendMessage({ content, chatId, senderId, imageUrl });
       
       // Send raw timestamp - let frontend format it in user's timezone
       res.status(HTTP_STATUS.CREATED).json(message);

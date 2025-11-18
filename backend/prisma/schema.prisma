@@ -135,6 +135,7 @@ model ChatParticipant {
 model Message {
   id         String        @id @default(cuid())
   content    String
+  imageUrl   String?       // Optional image URL for image messages
   senderId   String
   receiverId String?
   chatId     String?
