@@ -419,15 +419,37 @@ class FCMService {
     this.pendingNavigationData = null;
     const { postId, userId, type, chatId, senderId } = data as FCMNotificationData;
     try {
-      // Add a small delay to ensure navigation is ready
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // 🚀 PERFORMANCE: Removed delay - navigate immediately for instant response
       // Check current route to prevent duplicate navigation
       // Note: We'll use a simpler approach to prevent duplicate navigation
       // Handle different notification types with smart navigation
       if (type === 'message' && (chatId || senderId)) {
         const targetChatId = chatId || senderId;
-        // Use replace to prevent stacking multiple screens
-        router.replace(`/chat/${targetChatId}`);
+        
+        // 🚀 PERFORMANCE: Preload chat data for instant opening
+        const { ultraFastChatCache } = require('./ChatCache');
+        
+        // Try to get existing cache or create basic data
+        const cachedData = ultraFastChatCache.getInstantChatData(targetChatId);
+        const chatData = cachedData || {
+          id: targetChatId,
+          name: data.username || 'Chat',
+          avatar: data.avatar || '',
+          username: data.username || 'Chat',
+        };
+        
+        // Use replace to prevent stacking multiple screens with cached params
+        router.replace({
+          pathname: `/chat/${targetChatId}`,
+          params: {
+            cachedName: chatData.name,
+            cachedAvatar: chatData.avatar,
+            cachedIsOnline: 'false',
+            cachedUserId: senderId || 'unknown',
+            cachedIsGroup: 'false',
+            _prefetched: 'true',
+          }
+        });
       } else if ((type === 'like' || type === 'comment') && postId) {
         // Navigate to comments screen for both like and comment notifications
         // Use replace to prevent stacking multiple screens

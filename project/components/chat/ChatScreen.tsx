@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, Send, MoreVertical, Trash2, UserX, Flag, Users, Camera, Edit3 } from 'lucide-react-native';
+import { ArrowLeft, Send, MoreVertical, Trash2, UserX, Flag, Users, Camera, Edit3, Image as ImageIcon, Smile, X } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/context/ThemeContext';
 import { Message } from '@/types';
@@ -39,6 +39,7 @@ import { socketService } from '@/lib/socketService';
 import { messagePersistence } from '@/lib/messagePersistence';
 import { ultraFastChatCache } from '@/lib/ChatCache';
 import { router } from 'expo-router';
+import ImageCompressionService, { CompressionResult } from '@/lib/imageCompression';
 interface ChatData {
   id: string | number;
   name: string;
@@ -100,6 +101,11 @@ const ChatScreen = React.memo(function ChatScreen({
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [filteredMentionMembers, setFilteredMentionMembers] = useState<any[]>([]);
   const [showMentionModal, setShowMentionModal] = useState(false);
+  // Image & emoji state for sending media and reactions
+  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
+  const [pendingImageCompression, setPendingImageCompression] = useState<CompressionResult | null>(null);
+  const [isCompressingImage, setIsCompressingImage] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
   useEffect(() => {
     if (chatData && chatData.isGroup) {
@@ -220,21 +226,16 @@ const ChatScreen = React.memo(function ChatScreen({
     
     console.log('📥 [LOAD MESSAGES] Starting...', { chatId, forceRefresh, currentMessageCount: messages.length });
     
-    // If force refresh, clear ALL caches first BUT preserve temp messages
+    // If force refresh, clear caches strategically to improve performance
     if (forceRefresh) {
-      console.log('🔄 [FORCE REFRESH] Bypassing all caches, fetching from database...');
+      console.log('🔄 [FORCE REFRESH] Strategic cache refresh for better performance...');
       
-      // IMPORTANT: Save temp messages before clearing cache
-      const tempMessages = messages.filter(msg => msg.id.startsWith('temp-'));
-      if (tempMessages.length > 0) {
-        console.log('💾 [PRESERVE] Saving', tempMessages.length, 'temp messages before cache clear');
-      }
-      
-      console.log('🗑️ [CACHE CLEAR] Clearing all caches for chat:', chatId);
-      ultraFastChatCache.clearChatCache(chatId);
+      // PERFORMANCE: Don't clear ultra-fast cache to prevent UI flicker
+      // Only clear old cache to force database refresh
       chatMessageCache.clearChatCache(chatId);
+      console.log('🗑️ [CACHE CLEAR] Cleared old cache, keeping ultra-fast cache for instant display');
       
-      // Don't return, continue to fetch from database
+      // Continue to fetch from database in background
       // Temp messages will be merged with fresh messages later
     } else {
       // PRIORITY 1: Ultra-fast cache (instant load)
@@ -420,8 +421,10 @@ const ChatScreen = React.memo(function ChatScreen({
   }, [user, chatData, isSending, scrollToBottom]);
   // OPTIMISTIC UI MESSAGE SENDING - INSTANT DISPLAY
   const sendMessage = useCallback(async () => {
-    if (!message.trim() || !user || !chatData?.id) return;
-    const messageText = message.trim();
+    const trimmed = message.trim();
+    if (!trimmed && !pendingImageUri) return;
+    if (!user || !chatData?.id) return;
+    const messageText = trimmed;
     let chatId = String(chatData.id);
     const tempId = `temp-${Date.now()}`;
     
@@ -458,10 +461,10 @@ const ChatScreen = React.memo(function ChatScreen({
         const realChatId = await onFirstMessage(messageText);
         console.log('✅ [NEW CHAT] Chat created with ID:', realChatId);
         
-        // 🚀 FIX: Remove temp message since parent already sent it
-        // Socket broadcast will add the real message from server
-        setMessages(prev => prev.filter(msg => msg.id !== tempId));
-        console.log('✅ [NEW CHAT] Temp message removed, waiting for socket broadcast');
+        // 🚀 PERFORMANCE FIX: Keep temp message visible until socket broadcast arrives
+        // This prevents the message from disappearing and ensures instant feedback
+        // The socket listener will replace it with the real message when it arrives
+        console.log('✅ [NEW CHAT] Keeping temp message visible until broadcast arrives');
         
         return;
       } catch (error) {
@@ -479,7 +482,8 @@ const ChatScreen = React.memo(function ChatScreen({
       tempId,
       text: messageText.substring(0, 20) + '...',
       chatId,
-      userId: user.id
+      userId: user.id,
+      hasImage: !!pendingImageUri,
     });
     
     // Create temporary message for INSTANT UI display
@@ -498,7 +502,9 @@ const ChatScreen = React.memo(function ChatScreen({
         username: user.username || 'You',
         avatar: user.avatar || null,
       },
-    };
+      // Optional imageUrl field if your Message type supports it
+      ...(pendingImageUri ? { imageUrl: pendingImageUri } : {} as any),
+    } as any;
     
     console.log('✅ [OPTIMISTIC] Adding temp message to UI:', tempId);
     
@@ -512,8 +518,10 @@ const ChatScreen = React.memo(function ChatScreen({
     // This prevents duplicate messages (temp + server) in global state
     // Tell FCM service that user is sending a message (to suppress notifications)
     fcmService.setUserIsSendingMessage(chatId);
-    // Clear input immediately after message appears in UI
+    // Clear input and pending image immediately after message appears in UI
     setMessage('');
+    setPendingImageUri(null);
+    setPendingImageCompression(null);
     Keyboard.dismiss();
     // 🚀 IMPROVED: Multiple auto-scroll attempts for reliability
     // Immediate scroll
@@ -535,8 +543,32 @@ const ChatScreen = React.memo(function ChatScreen({
         }
         
         let serverResponse = null;
+        let uploadedImageUrl: string | undefined;
+        // If we have an image, upload it first
+        if (pendingImageCompression?.uri) {
+          try {
+            const uploadResp = await apiService.uploadImageFile(pendingImageCompression.uri, 'file', 'chat-images');
+            if (uploadResp?.url) {
+              uploadedImageUrl = uploadResp.url;
+            }
+          } catch (e) {
+            console.error('❌ [IMAGE] Failed to upload chat image:', e);
+          }
+        }
+
         console.log('🔌 [SOCKET] Sending via socket...');
-        serverResponse = await socketService.sendMessage(chatId, messageText, tempId);
+        // Socket doesn't support image URL yet, use API for image messages
+        if (uploadedImageUrl) {
+          console.log('🌐 [API] Using HTTP API for image message...');
+          serverResponse = await apiService.sendMessage(chatId, { 
+            content: messageText || ' ', // Send space if no text (image-only message)
+            chatId: chatId, 
+            senderId: user.id,
+            imageUrl: uploadedImageUrl,
+          });
+        } else {
+          serverResponse = await socketService.sendMessage(chatId, messageText, tempId);
+        }
         console.log('✅ [SOCKET] Socket response:', serverResponse);
         
         // Replace temp message with server message (sender doesn't receive broadcast)
@@ -565,7 +597,8 @@ const ChatScreen = React.memo(function ChatScreen({
               username: user.username || 'You',
               avatar: user.avatar || null,
             },
-          };
+            ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {} as any),
+          } as any;
           
           // Replace temp message with real message
           console.log('🔄 [REPLACE] Replacing temp message with server message', {
@@ -598,7 +631,8 @@ const ChatScreen = React.memo(function ChatScreen({
           serverResponse = await apiService.sendMessage(chatId, { 
             content: messageText, 
             chatId: chatId, 
-            senderId: user.id
+            senderId: user.id,
+            ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {}),
           });
           console.log('✅ [API] API response:', serverResponse);
           
@@ -631,7 +665,8 @@ const ChatScreen = React.memo(function ChatScreen({
                 username: user.username || 'You',
                 avatar: user.avatar || null,
               },
-            };
+              ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {} as any),
+            } as any;
             
             // Replace temp message with real message
             console.log('🔄 [REPLACE HTTP] Replacing temp message with server message', {
@@ -880,6 +915,49 @@ const ChatScreen = React.memo(function ChatScreen({
   const handleComingSoon = (feature: string) => {
     Alert.alert('Coming Soon', `${feature} feature will be available in the next update!`);
   };
+
+  // Handle image picking
+  const handlePickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant camera roll permissions to send images.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        setIsCompressingImage(true);
+        try {
+          // Compress the image
+          const compressed = await ImageCompressionService.compressImage(imageUri);
+          setPendingImageUri(imageUri);
+          setPendingImageCompression(compressed);
+        } catch (error) {
+          console.error('Image compression failed:', error);
+          Alert.alert('Error', 'Failed to compress image');
+        } finally {
+          setIsCompressingImage(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to open image picker');
+    }
+  };
+
+  // Handle emoji insertion
+  const handleAddEmoji = (emoji: string) => {
+    setMessage(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
   const toggleOptionsMenu = useCallback(() => {
     setShowOptionsMenu(!showOptionsMenu);
   }, [showOptionsMenu]);
@@ -1028,21 +1106,70 @@ const ChatScreen = React.memo(function ChatScreen({
       
       // Only add message if it's for this chat
       if (socketMessage.chatId === chatId) {
-        // CRITICAL FIX: Skip messages from current user in socket listener
-        // Sender receives their message via callback response only, NOT via broadcast
-        if (socketMessage.sender?.id === user.id) {
-          console.log('🔕 [SKIP] Message from current user - sender gets message via callback, not broadcast');
+        // 🚀 PERFORMANCE FIX: For new chats, sender also receives message via broadcast
+        // This ensures first message appears immediately without needing to refresh
+        const isSenderMessage = socketMessage.sender?.id === user.id;
+        
+        // If this is a sender's message in a new chat, replace temp message
+        if (isSenderMessage) {
+          console.log('🔄 [NEW CHAT] Replacing temp message with server message for sender');
+          
+          const newMessage: Message = {
+            id: socketMessage.id,
+            text: socketMessage.text || socketMessage.content,
+            isUser: true,
+            timestamp: fixServerTimestamp(socketMessage.timestamp) || formatMessageTime(new Date()),
+            status: 'sent',
+            sender: socketMessage.sender,
+            ...(socketMessage.imageUrl ? { imageUrl: socketMessage.imageUrl } : {}),
+          } as any;
+          
+          setMessages(prev => {
+            // Find and replace any temp message with the same content
+            const hasTempMessage = prev.some(msg => 
+              msg.id.startsWith('temp-') && 
+              msg.text === newMessage.text &&
+              msg.sender?.id === user.id
+            );
+            
+            if (hasTempMessage) {
+              console.log('✅ [REPLACE] Replacing temp message with server message');
+              return prev.map(msg => 
+                (msg.id.startsWith('temp-') && msg.text === newMessage.text && msg.sender?.id === user.id)
+                  ? newMessage
+                  : msg
+              );
+            } else {
+              // No temp message found, just add the new message
+              console.log('➕ [ADD] Adding server message (no temp message found)');
+              return [...prev, newMessage];
+            }
+          });
+          
+          // ⚡ ULTRA-FAST: Update cache
+          ultraFastChatCache.addMessageInstantly(chatId, newMessage);
+          
+          // Update global state
+          setTimeout(() => {
+            addMessageToChat(chatId, newMessage, false);
+          }, 0);
+          
+          // Auto-scroll
+          setTimeout(() => scrollToBottom(true), 50);
+          setTimeout(() => scrollToBottom(true), 150);
           return;
         }
         
+        // For messages from other users, add normally
         const newMessage: Message = {
           id: socketMessage.id,
           text: socketMessage.text || socketMessage.content,
-          isUser: false, // Always false since we skip current user's messages above
+          isUser: false,
           timestamp: fixServerTimestamp(socketMessage.timestamp) || formatMessageTime(new Date()),
-          status: 'delivered', // Always delivered for incoming messages
-          sender: socketMessage.sender
-        };
+          status: 'delivered',
+          sender: socketMessage.sender,
+          ...(socketMessage.imageUrl ? { imageUrl: socketMessage.imageUrl } : {}),
+        } as any;
         
         let shouldUpdateGlobalState = false;
         let finalMessage: Message | null = null;
@@ -1136,183 +1263,228 @@ const ChatScreen = React.memo(function ChatScreen({
   useEffect(() => {
     if (forceInitialRefresh && chatData?.id) {
       console.log('🔄 [FORCE REFRESH] forceInitialRefresh changed to true, reloading messages...');
-      loadMessages(true); // Force refresh from server
-    }
-  }, [forceInitialRefresh, chatData?.id, loadMessages]);
-  
-  // Helper function to render text with clickable links and mentions
-  const renderTextWithLinks = useCallback((text: string, isUserMessage: boolean) => {
-    // Combined regex for URLs and mentions - improved to capture @username properly
-    const urlPattern = /(https?:\/\/[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[^\s]{2,})|(@[a-zA-Z0-9_]+)/g;
-    const matches = [];
-    let match;
-    
-    while ((match = urlPattern.exec(text)) !== null) {
-      matches.push({
-        content: match[0],
-        index: match.index,
-        length: match[0].length,
-        isMention: match[0].startsWith('@')
-      });
-    }
-    
-    if (matches.length === 0) {
-      return text;
-    }
-    
-    const parts = [];
-    let lastIndex = 0;
-    
-    matches.forEach((matchInfo, i) => {
-      // Add text before the match
-      if (matchInfo.index > lastIndex) {
-        parts.push(
-          <Text key={`text-${i}-before`}>
-            {text.substring(lastIndex, matchInfo.index)}
-          </Text>
-        );
-      }
-      
-      if (matchInfo.isMention) {
-        // Render mention with highlight and background
-        parts.push(
-          <Text
-            key={`mention-${i}`}
-            style={{
-              color: isUserMessage ? '#ffffff' : '#3B8FE8',
-              fontWeight: '700',
-              backgroundColor: isUserMessage ? 'rgba(255,255,255,0.2)' : 'rgba(59,143,232,0.15)',
-              paddingHorizontal: 4,
-              paddingVertical: 2,
-              borderRadius: 4,
-            }}
-          >
-            {matchInfo.content}
-          </Text>
-        );
-      } else {
-        // Render clickable URL
-        const url = matchInfo.content;
-        const fullUrl = url.startsWith('http') ? url : `https://${url}`;
-        parts.push(
-          <Text key={`link-${i}`}>
-            <Text
-              style={[styles.linkText, { color: isUserMessage ? '#ffffff' : '#3B8FE8' }]}
-              onPress={() => {
-                Linking.openURL(fullUrl).catch(() => {
-                  Alert.alert('Error', 'Could not open link');
-                });
-              }}
-            >
-              {url}
-            </Text>
-          </Text>
-        );
-      }
-      
-      lastIndex = matchInfo.index + matchInfo.length;
-    });
-    
-    // Add remaining text
-    if (lastIndex < text.length) {
-      parts.push(
-        <Text key="text-end">
-          {text.substring(lastIndex)}
-        </Text>
-      );
-    }
-    
-    return <>{parts}</>;
-  }, []);
-  
-  // Render message item
-  const renderMessage = useCallback(({ item }: { item: Message }) => {
-    const isUserMessage = item.isUser;
-    const isGroupChat = chatData?.isGroup;
+loadMessages(true); // Force refresh from server
+}
+}, [forceInitialRefresh, chatData?.id, loadMessages]);
 
-    return (
-      <View style={[
-        styles.messageContainer,
-        isUserMessage ? styles.userMessage : styles.otherMessage
-      ]}>
-        <View style={styles.messageInnerRow}>
-          {/* Avatar only for LEFT (other users') messages in group chats */}
+// Helper function to render text with clickable links and @mentions
+const renderTextWithLinks = useCallback((text: string, isUserMessage: boolean) => {
+// Combined regex for URLs and mentions - captures @username separately
+const urlPattern = /(https?:\/\/[^\s]+)|([a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[^\s]{2,})|(@[a-zA-Z0-9_]+)/g;
+const matches: { match: string; index: number; length: number }[] = [];
+let match;
+while ((match = urlPattern.exec(text)) !== null) {
+  matches.push({ match: match[0], index: match.index, length: match[0].length });
+}
+
+if (matches.length === 0) {
+  return <Text>{text}</Text>;
+}
+
+const parts: React.ReactNode[] = [];
+let lastIndex = 0;
+
+matches.forEach((matchInfo, index) => {
+  const { match: token, index: tokenIndex } = matchInfo;
+
+  if (tokenIndex > lastIndex) {
+    parts.push(
+      <Text key={`text-${index}`}>
+        {text.substring(lastIndex, tokenIndex)}
+      </Text>
+    );
+  }
+
+  const isMention = token.startsWith('@');
+  const isUrl = !isMention;
+
+  if (isMention) {
+    const username = token.substring(1);
+    
+    const handleMentionPress = async () => {
+      try {
+        console.log('🔍 [MENTION] Searching for username:', username);
+        
+        // First try to find in group members if it's a group chat
+        if (chatData?.isGroup && groupMembers.length > 0) {
+          console.log('👥 [GROUP] Searching in group members:', groupMembers.length);
+          const mentionedMember = groupMembers.find((m: any) => m?.user?.username === username);
+          if (mentionedMember?.userId) {
+            console.log('✅ [GROUP] Found in group:', mentionedMember.userId);
+            router.push(`/profile/${mentionedMember.userId}`);
+            return;
+          }
+        }
+        
+        // If not found in group or not a group chat, search all users
+        console.log('🌐 [API] Searching all users for:', username);
+        const searchResult = await apiService.searchUsers(username);
+        console.log('📦 [API] Search result:', searchResult);
+        
+        if (searchResult?.users && searchResult.users.length > 0) {
+          console.log('👤 [USERS] Found users:', searchResult.users.map((u: any) => u.username));
+          // Find case-insensitive match
+          const match = searchResult.users.find((u: any) => 
+            u.username.toLowerCase() === username.toLowerCase()
+          );
+          if (match) {
+            console.log('✅ [MATCH] Found user:', match.id, match.username);
+            router.push(`/profile/${match.id}`);
+            return;
+          }
+          console.log('❌ [NO MATCH] No exact match found');
+        } else {
+          console.log('❌ [EMPTY] No users returned from search');
+        }
+        
+        // If no exact match found, show alert
+        Alert.alert('User not found', `Could not find user ${username}`);
+      } catch (error) {
+        console.error('❌ [ERROR] Search failed:', error);
+        Alert.alert('Error', 'Could not search for user');
+      }
+    };
+
+    parts.push(
+      <Text
+        key={`mention-${index}`}
+        style={[styles.linkText, { color: isUserMessage ? '#FFD70' : '#3B8FE8' }]}
+        onPress={handleMentionPress}
+      >
+        {token}
+      </Text>
+    );
+  } else if (isUrl) {
+    const url = token.startsWith('http') ? token : `https://${token}`;
+    const fullUrl = url;
+
+    parts.push(
+      <Text key={`url-${index}`}>
+        <Text
+          style={[styles.linkText, { color: isUserMessage ? '#ffffff' : '#3B8FE8' }]}
+          onPress={() => {
+            Linking.openURL(fullUrl).catch(() => {
+              Alert.alert('Error', 'Could not open link');
+            });
+          }}
+        >
+          {url}
+        </Text>
+      </Text>
+    );
+  }
+
+  lastIndex = tokenIndex + matchInfo.length;
+});
+
+if (lastIndex < text.length) {
+  parts.push(
+    <Text key={`text-final`}>
+      {text.substring(lastIndex)}
+    </Text>
+  );
+}
+
+return <Text>{parts}</Text>;
+}, [groupMembers, chatData?.isGroup]);
+
+// Message component - render directly to avoid undefined issues
+const renderMessage = useCallback(({ item }: { item: Message }) => {
+  const isUserMessage = item.isUser;
+  const isGroupChat = chatData?.isGroup;
+
+  return (
+    <View style={[
+      styles.messageContainer,
+      isUserMessage ? styles.userMessage : styles.otherMessage
+    ]}>
+      <View style={styles.messageInnerRow}>
+        {/* Avatar only for LEFT (other users') messages in group chats */}
+        {isGroupChat && !isUserMessage && item.sender && (
+          item.sender.avatar ? (
+            <Image
+              source={{ uri: item.sender.avatar }}
+              style={styles.senderAvatar}
+            />
+          ) : (
+            <Image
+              source={require('@/assets/images/default-avatar.png')}
+              style={styles.senderAvatar}
+            />
+          )
+        )}
+
+        <View style={[
+          styles.messageBubble,
+          isUserMessage 
+            ? [styles.userBubble, { backgroundColor: colors.primary }]
+            : [styles.otherBubble, { backgroundColor: colors.backgroundSecondary }]
+        ]}>
+          {/* Sender name only for LEFT messages in group chats, inside bubble */}
           {isGroupChat && !isUserMessage && item.sender && (
-            item.sender.avatar ? (
-              <Image
-                source={{ uri: item.sender.avatar }}
-                style={styles.senderAvatar}
-              />
-            ) : (
-              <Image
-                source={require('@/assets/images/default-avatar.png')}
-                style={styles.senderAvatar}
-              />
-            )
+            <View style={styles.senderInfoContainer}>
+              <Text
+                style={[
+                  styles.senderName,
+                  // Use app's light blue color for username (same as links)
+                  { color: '#3B8FE8' }
+                ]}
+              >
+                {item.sender.username || 'Unknown'}
+              </Text>
+            </View>
           )}
 
-          <View style={[
-            styles.messageBubble,
-            isUserMessage 
-              ? [styles.userBubble, { backgroundColor: colors.primary }]
-              : [styles.otherBubble, { backgroundColor: colors.backgroundSecondary }]
+          {/* Display image if present */}
+          {item.imageUrl && (
+            <Image
+              source={{ uri: item.imageUrl }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+          )}
+
+          <Text style={[
+            styles.messageText,
+            { color: isUserMessage ? '#ffffff' : colors.text }
           ]}>
-            {/* Sender name only for LEFT messages in group chats, inside bubble */}
-            {isGroupChat && !isUserMessage && item.sender && (
-              <View style={styles.senderInfoContainer}>
-                <Text
-                  style={[
-                    styles.senderName,
-                    // Use app's light blue color for username (same as links)
-                    { color: '#3B8FE8' }
-                  ]}
-                >
-                  {item.sender.username || 'Unknown'}
+            {renderTextWithLinks(item.text, isUserMessage)}
+          </Text>
+          <View style={styles.messageFooter}>
+            <Text style={[
+              styles.messageTime,
+              { color: isUserMessage ? 'rgba(255,255,255,0.7)' : colors.textMuted }
+            ]}>
+              {typeof item.timestamp === 'string' ? item.timestamp : formatMessageTime(item.timestamp)}
+            </Text>
+            {isUserMessage && (
+              <View style={styles.messageStatusContainer}>
+                <Text style={[
+                  styles.messageTicks,
+                  { color: item.status === 'sending' ? '#9e9e9e' : 
+                           item.status === 'failed' ? '#f44336' : 
+                           '#000000' }
+                ]}>
+                  {item.status === 'sending' ? '🕓' : 
+                   item.status === 'sent' ? '✓' : 
+                   item.status === 'failed' ? '❌' : '✓'}
                 </Text>
+                {item.status === 'failed' && (
+                  <TouchableOpacity 
+                    style={styles.retryButton}
+                    onPress={() => retryMessage(item)}
+                  >
+                    <Text style={styles.retryText}>Retry</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
-
-            <Text style={[
-              styles.messageText,
-              { color: isUserMessage ? '#ffffff' : colors.text }
-            ]}>
-              {renderTextWithLinks(item.text, isUserMessage)}
-            </Text>
-            <View style={styles.messageFooter}>
-              <Text style={[
-                styles.messageTime,
-                { color: isUserMessage ? 'rgba(255,255,255,0.7)' : colors.textMuted }
-              ]}>
-                {typeof item.timestamp === 'string' ? item.timestamp : formatMessageTime(item.timestamp)}
-              </Text>
-              {isUserMessage && (
-                <View style={styles.messageStatusContainer}>
-                  <Text style={[
-                    styles.messageTicks,
-                    { color: item.status === 'sending' ? '#9e9e9e' : 
-                             item.status === 'failed' ? '#f44336' : 
-                             '#000000' }
-                  ]}>
-                    {item.status === 'sending' ? '🕓' : 
-                     item.status === 'sent' ? '✓' : 
-                     item.status === 'failed' ? '❌' : '✓'}
-                  </Text>
-                  {item.status === 'failed' && (
-                    <TouchableOpacity 
-                      style={styles.retryButton}
-                      onPress={() => retryMessage(item)}
-                    >
-                      <Text style={styles.retryText}>Retry</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-            </View>
           </View>
         </View>
       </View>
-    );
-  }, [colors, chatData?.isGroup]);
+    </View>
+  );
+}, [colors, chatData?.isGroup, renderTextWithLinks, retryMessage]);
   // Header component - render directly without useMemo to avoid undefined issues
   const renderHeader = () => {
     // Ensure we always have chatData to prevent disappearing header
@@ -1436,20 +1608,64 @@ const ChatScreen = React.memo(function ChatScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.inputContainer}
     >
+      {/* Show pending image preview */}
+      {pendingImageUri && (
+        <View style={[styles.imagePreviewContainer, { backgroundColor: colors.backgroundSecondary }]}>
+          <Image
+            source={{ uri: pendingImageUri }}
+            style={styles.imagePreview}
+            resizeMode="cover"
+          />
+          <TouchableOpacity
+            style={styles.imagePreviewClose}
+            onPress={() => {
+              setPendingImageUri(null);
+              setPendingImageCompression(null);
+            }}
+          >
+            <X size={16} color="#ffffff" />
+          </TouchableOpacity>
+          {isCompressingImage && (
+            <View style={styles.imagePreviewLoading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          )}
+        </View>
+      )}
+
       <View style={[styles.inputWrapper, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+        {/* Emoji picker button - Left */}
+        <TouchableOpacity
+          onPress={() => setShowEmojiPicker(prev => !prev)}
+          style={styles.inputIconButton}
+        >
+          <Smile size={22} color={colors.textMuted} />
+        </TouchableOpacity>
+
         <TextInput
           style={[styles.textInput, { color: colors.text }]}
           value={message}
           onChangeText={handleTextChange}
-          placeholder={chatData?.isGroup ? "Type @ to mention someone..." : "Type a message..."}
+          placeholder="Type a message..."
           placeholderTextColor={colors.textMuted}
-          multiline
+          multiline={false}
           maxLength={1000}
         />
+
+        {/* Image picker button - Center */}
+        <TouchableOpacity
+          onPress={handlePickImage}
+          style={styles.inputIconButton}
+          disabled={isCompressingImage}
+        >
+          <ImageIcon size={22} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* Send button - Right */}
         <TouchableOpacity 
           onPress={sendMessage}
           style={[styles.sendButton, { backgroundColor: colors.primary }]}
-          disabled={!message.trim() || isSending}
+          disabled={(!message.trim() && !pendingImageUri) || isSending || isCompressingImage}
           activeOpacity={0.7}
         >
           <Send size={20} color="#ffffff" />
@@ -1899,6 +2115,31 @@ const ChatScreen = React.memo(function ChatScreen({
           />
         </View>
       )}
+
+      {/* Emoji Picker Modal */}
+      {showEmojiPicker && (
+        <View style={[styles.emojiPickerContainer, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+          <View style={styles.emojiPickerHeader}>
+            <Text style={[styles.emojiPickerTitle, { color: colors.text }]}>Pick an Emoji</Text>
+            <TouchableOpacity onPress={() => setShowEmojiPicker(false)}>
+              <X size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.emojiPickerScroll} contentContainerStyle={styles.emojiPickerContent}>
+            <View style={styles.emojiGrid}>
+              {['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😋', '😎', '🤔', '🤐', '😏', '😬', '🙄', '😌', '😔', '😴', '🤯', '🥳', '👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👏', '🙌', '👐', '🙏', '💪', '👀', '👁️', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💔', '💕', '💞', '💓', '💗', '💖', '💘', '✨', '⭐', '🌟', '💫', '🔥', '💯', '✅', '❌', '❗', '❓', '💬', '💭', '🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🎱', '🎮', '🎯', '🎲', '🎸', '🎹', '🎤', '🎧', '🎵', '🎶', '☕', '🍕', '🍔', '🍟', '🌭', '🍿', '🧋', '🍺', '🍻', '🥂', '🍷', '🍾', '🍹', '🍰', '🎂', '🧁', '🍪', '🍩', '🍫', '🍬', '🍭', '🌍', '🌎', '🌏', '🗺️', '🏔️', '⛰️', '🌋', '🏕️', '🏖️', '🏝️', '🏠', '🏡', '🏢', '🏣', '🏤', '🏥', '🏦', '🏨', '🏩', '🏪', '🏫', '🏬', '🏭', '🏯', '🏰', '💒', '🗼', '🗽', '⛪', '🕌', '🛕', '🕍', '⛩️', '🕋', '⛲', '⛺', '🌁', '🌃', '🏙️', '🌄', '🌅', '🌆', '🌇', '🌉', '🌌', '🎠', '🎡', '🎢', '💈', '🎪', '🚂', '🚃', '🚄', '🚅', '🚆', '🚇', '🚈', '🚉', '🚊', '🚝', '🚞', '🚋', '🚌', '🚍', '🚎', '🚐', '🚑', '🚒', '🚓', '🚔', '🚕', '🚖', '🚗', '🚘', '🚙', '🚚', '🚛', '🚜', '🏎️', '🏍️', '🛵', '🚏', '🛣️', '🛤️', '🛢️', '⛽', '🚨', '🚥', '🚦', '🛑', '🚧', '⚓', '⛵', '🛶', '🚤', '🛳️', '⛴️', '🛥️', '🚢', '✈️', '🛩️', '🛫', '🛬', '💺', '🚁', '🚟', '🚠', '🚡', '🛰️', '🚀', '🛸'].map((emoji, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.emojiButton}
+                  onPress={() => handleAddEmoji(emoji)}
+                >
+                  <Text style={styles.emojiText}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      )}
     </SafeAreaView>
   );
 });
@@ -2011,6 +2252,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: FontSizes.md,
     lineHeight: 20,
   },
+  messageImage: {
+    width: 250,
+    height: 200,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.xs,
+    backgroundColor: '#f0f0f0',
+  },
   linkText: {
     textDecorationLine: 'underline',
     fontWeight: FontWeights.semibold,
@@ -2038,17 +2286,19 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   inputWrapper: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: BorderRadius.xl,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
+    minHeight: 48,
   },
   textInput: {
     flex: 1,
     fontSize: FontSizes.md,
-    maxHeight: 100,
-    marginRight: Spacing.sm,
+    height: 40,
+    paddingVertical: Spacing.xs,
+    marginHorizontal: Spacing.xs,
   },
   // Auto-mention suggestion styles
   mentionSuggestions: {
@@ -2430,6 +2680,92 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: FontSizes.xs,
     fontWeight: FontWeights.semibold,
     marginTop: 2,
+  },
+  // Image preview and emoji picker styles
+  imagePreviewContainer: {
+    padding: Spacing.md,
+    marginBottom: Spacing.xs,
+    borderRadius: BorderRadius.md,
+    position: 'relative',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 150,
+    borderRadius: BorderRadius.md,
+  },
+  imagePreviewClose: {
+    position: 'absolute',
+    top: Spacing.md + 8,
+    right: Spacing.md + 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePreviewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: BorderRadius.md,
+  },
+  inputIconButton: {
+    padding: Spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emojiPickerContainer: {
+    position: 'absolute',
+    bottom: 80,
+    left: Spacing.md,
+    right: Spacing.md,
+    height: 300,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  emojiPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  emojiPickerTitle: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
+  },
+  emojiPickerScroll: {
+    flex: 1,
+  },
+  emojiPickerContent: {
+    padding: Spacing.sm,
+  },
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  emojiButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 2,
+  },
+  emojiText: {
+    fontSize: 24,
   },
 });
 export default ChatScreen;

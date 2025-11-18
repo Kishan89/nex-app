@@ -126,15 +126,16 @@ export default function IndividualChatScreen() {
     
     if (!id) return;
     
-    // 🚀 OPTIMISTIC LOADING: Use cached data from params if available
+    // 🚀 PERFORMANCE: Use cached data from params if available
     const cachedName = params.cachedName as string;
     const cachedAvatar = params.cachedAvatar as string;
     const cachedIsOnline = params.cachedIsOnline === 'true';
     const cachedUserId = params.cachedUserId as string;
     const cachedIsGroup = params.cachedIsGroup === 'true';
+    const isPrefetched = params._prefetched === 'true';
     
     if (cachedName) {
-      console.log('Using cached data:', { cachedName, cachedUserId, cachedIsGroup, cachedAvatar });
+      console.log('🚀 [PERFORMANCE] Using cached data:', { cachedName, cachedUserId, cachedIsGroup, cachedAvatar, isPrefetched });
       setChatData({
         id: id as string,
         name: cachedName,
@@ -149,6 +150,12 @@ export default function IndividualChatScreen() {
         memberCount: 0,
       });
       setLoading(false);
+      
+      // 🚀 PERFORMANCE: Skip API call if data is prefetched (from notification)
+      if (isPrefetched) {
+        console.log('🚀 [PERFORMANCE] Skipping API call - data already prefetched');
+        return;
+      }
     }
     
     try {

@@ -150,6 +150,31 @@ class SocketService {
       
       if (!isSenderStrict && !isInCurrentChat) {
         console.log('📬 [SOCKET] Showing notification banner for message from:', message.sender?.username);
+        
+        // 🚀 PERFORMANCE: Preload chat data for instant navigation
+        const chatId = message.chatId;
+        const { ultraFastChatCache } = require('./ChatCache');
+        
+        // Cache the chat data immediately for instant loading when user clicks
+        const chatData = {
+          id: chatId,
+          name: message.sender?.username || 'User',
+          avatar: message.sender?.avatar || '',
+          username: message.sender?.username || 'User',
+          isOnline: true,
+          lastSeen: 'recently',
+        };
+        
+        // Preload message in cache for instant display
+        ultraFastChatCache.addMessageInstantly(chatId, {
+          id: message.id,
+          text: message.text || message.content || '',
+          isUser: false,
+          timestamp: message.timestamp || new Date().toISOString(),
+          status: 'delivered',
+          sender: message.sender,
+        });
+        
         DeviceEventEmitter.emit('showNotificationBanner', {
           title: message.sender?.username || 'New Message',
           body: message.text || message.content || 'sent you a message',
@@ -161,9 +186,19 @@ class SocketService {
             avatar: message.sender?.avatar,
           },
           onPress: () => {
-            // Navigate to chat
+            // 🚀 OPTIMIZED: Instant navigation with cached data
             const router = require('expo-router').router;
-            router.push(`/chat/${message.chatId}`);
+            router.push({
+              pathname: `/chat/${chatId}`,
+              params: {
+                cachedName: chatData.name,
+                cachedAvatar: chatData.avatar,
+                cachedIsOnline: 'true',
+                cachedUserId: message.sender?.id || 'unknown',
+                cachedIsGroup: 'false',
+                _prefetched: 'true', // Flag to skip unnecessary loading
+              }
+            });
           }
         });
       } else if (isSenderStrict) {

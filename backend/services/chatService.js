@@ -409,12 +409,14 @@ class ChatService {
         hasImage: !!message.imageUrl 
       });
 
-      // Parse mentions from message content
+      // Parse mentions from message content (only if content exists)
       const mentionRegex = /@(\w+)/g;
       const mentionedUsernames = [];
       let match;
-      while ((match = mentionRegex.exec(content)) !== null) {
-        mentionedUsernames.push(match[1]);
+      if (content && content.trim()) {
+        while ((match = mentionRegex.exec(content)) !== null) {
+          mentionedUsernames.push(match[1]);
+        }
       }
 
       // Update message with mentions

@@ -181,8 +181,13 @@ class ChatController {
       const { content, imageUrl } = req.body;
       const senderId = req.user?.userId || req.body.senderId;
       
-      if (!content || !senderId) {
-        throw new BadRequestError(ERROR_MESSAGES.CONTENT_REQUIRED);
+      // Allow messages with either content or imageUrl (or both)
+      if ((!content || !content.trim()) && !imageUrl) {
+        throw new BadRequestError('Message must have either text content or an image');
+      }
+      
+      if (!senderId) {
+        throw new BadRequestError(ERROR_MESSAGES.USER_ID_REQUIRED);
       }
 
       const chatParticipant = await prisma.chatParticipant.findFirst({
@@ -211,7 +216,8 @@ class ChatController {
               timestamp: message.timestamp, // Send raw ISO timestamp
               status: message.status,
               sender: message.sender,
-              chatId
+              chatId,
+              imageUrl: message.imageUrl || undefined, // Include image URL for image messages
             };
             
             // Get sender's socket to use broadcast (excludes sender automatically)

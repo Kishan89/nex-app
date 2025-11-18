@@ -74,6 +74,7 @@ export interface Message {
   timestamp: string;
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   sender?: User;
+  imageUrl?: string; // Support for image messages
 }
 export interface CreateMessageData {
   content: string;
