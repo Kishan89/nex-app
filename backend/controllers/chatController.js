@@ -201,6 +201,12 @@ class ChatController {
       const message = await chatService.sendMessage({ content, chatId, senderId, imageUrl });
       
       // Send raw timestamp - let frontend format it in user's timezone
+      logger.info('📤 [CONTROLLER] Sending message response', {
+        messageId: message.id,
+        hasImage: !!message.imageUrl,
+        imagePreview: message.imageUrl ? message.imageUrl.substring(0, 50) + '...' : undefined,
+        textPreview: message.text ? message.text.substring(0, 20) + '...' : '(no text)'
+      });
       res.status(HTTP_STATUS.CREATED).json(message);
       
       setImmediate(async () => {

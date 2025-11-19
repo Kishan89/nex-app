@@ -495,8 +495,8 @@ class ChatService {
   
       const formattedMessage = {
         id: message.id,
-        text: message.content,
-        content: message.content, // Include both for compatibility
+        text: message.content || '', // Ensure we always have text, even if empty
+        content: message.content || '', // Include both for compatibility
         imageUrl: message.imageUrl || undefined, // Include image URL if present
         isUser: true,
         timestamp: message.createdAt.toISOString(),
@@ -508,7 +508,11 @@ class ChatService {
         }
       };
       
-      logger.info('✅ [SEND MESSAGE] Message formatted and ready to return', { messageId: message.id });
+      logger.info('✅ [SEND MESSAGE] Message formatted and ready to return', { 
+        messageId: message.id,
+        hasImage: !!formattedMessage.imageUrl,
+        imagePreview: formattedMessage.imageUrl ? formattedMessage.imageUrl.substring(0, 50) + '...' : undefined
+      });
       
       return formattedMessage;
     } catch (error) {

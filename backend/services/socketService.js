@@ -159,15 +159,16 @@ class SocketService {
         // Send raw ISO timestamp - let frontend format it in user's timezone
         const socketMessage = {
           id: message.id,
-          text: message.content || message.text,
-          content: message.content || message.text,
+          text: message.content || message.text || '', // Ensure we always have text
+          content: message.content || message.text || '', // Include both for compatibility
           isUser: false, // Will be determined by receiver
           timestamp: message.timestamp, // Send raw timestamp
           status: MESSAGE_STATUS.DELIVERED, // Mark as delivered since saved to DB
           sender: message.sender,
           chatId,
           tempMessageId, // Include temp ID for replacement
-          mentions: message.mentions || [] // Include mentions for highlighting
+          mentions: message.mentions || [], // Include mentions for highlighting
+          ...(message.imageUrl ? { imageUrl: message.imageUrl } : {}) // Include image URL if present
         };
 
         // Broadcast message to OTHER users in the chat (excluding sender to prevent duplicates)
@@ -177,7 +178,9 @@ class SocketService {
           messageId: message.id, 
           senderId: userId,
           socketId: socket.id,
-          roomName: `chat:${chatId}`
+          roomName: `chat:${chatId}`,
+          hasImage: !!socketMessage.imageUrl,
+          imagePreview: socketMessage.imageUrl ? socketMessage.imageUrl.substring(0, 50) + '...' : undefined
         });
         
         // Use broadcast flag to exclude the sender's socket
