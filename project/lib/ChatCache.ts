@@ -89,7 +89,7 @@ class UltraFastChatCache {
     try {
       const cachedChat: CachedChat = {
         chatId,
-        messages: messages.slice(-100), // Keep only last 100 messages
+        messages: messages, // Keep ALL messages - don't slice to prevent duplicate detection issues
         lastUpdated: Date.now(),
         chatData: {
           id: chatData.id || chatId,
@@ -125,14 +125,17 @@ class UltraFastChatCache {
   addMessageInstantly(chatId: string, message: Message) {
     const cached = this.memoryCache.get(chatId);
     if (cached) {
-      const exists = cached.messages.some(msg => msg.id === message.id);
+      // Check for both exact ID match and temp ID match to prevent duplicates
+      const exists = cached.messages.some(msg => 
+        msg.id === message.id || 
+        (msg.id.startsWith('temp_') && msg.text === message.text && msg.sender?.id === message.sender?.id)
+      );
       if (!exists) {
         cached.messages.push(message);
         cached.lastUpdated = Date.now();
 
-        if (cached.messages.length > 100) {
-          cached.messages = cached.messages.slice(-100);
-        }
+        // Keep ALL messages - don't slice to prevent duplicate detection issues
+        // The full message history is needed for proper temp message replacement
 
         this.memoryCache.set(chatId, cached);
 

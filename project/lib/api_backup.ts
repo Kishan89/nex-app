@@ -36,7 +36,7 @@ const API_ERRORS = {
 type CreatePostData = { content: string; userId: string; imageUrl?: string; };
 type RegisterData = { username: string; email: string; password: string; };
 type LoginData = { email: string; password: string; };
-type MessageData = { chatId: string; senderId: string; content: string; };
+type MessageData = { chatId: string; senderId: string; content: string; imageUrl?: string; tempMessageId?: string };
 export type ProfileData = {
     id: string; username: string; email: string; bio?: string; avatar_url?: string;
     banner_url?: string; xp?: number; posts_count?: number; followers_count?: number;

@@ -67,17 +67,15 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       return;
     }
     
-    // 🚀 INSTANT: Load from cache first (0ms delay)
+    // 🚀 INSTANT: Load from cache first (0ms delay) for instant display
     const cachedData = await chatCache.getCachedChats();
     if (cachedData && cachedData.chats.length > 0) {
       setChats(cachedData.chats);
       setLoading(false);
-      
-      // If not forcing refresh, just use cache and return
-      if (!forceRefresh) {
-        return;
-      }
     }
+    
+    // Always refresh from server to get fresh lastMessage data (fixes stale "No messages yet" cache)
+    // This ensures image-only messages show "Photo" instead of "No messages yet"
     
     // Background refresh from server (only if force refresh or no cache)
     try {

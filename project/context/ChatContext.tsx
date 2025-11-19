@@ -135,7 +135,34 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addedCount++;
     });
     // Convert back to array and sort by creation time
-    const mergedMessages = Array.from(messageMap.values());
+    let mergedMessages = Array.from(messageMap.values());
+    
+    // 🔒 CRITICAL: Remove temp messages when their server versions exist
+    // This prevents duplicate temp + server messages from appearing together
+    mergedMessages = mergedMessages.filter(msg => {
+      // Keep all non-temp messages
+      if (!msg.id.startsWith('temp_')) return true;
+      
+      // For temp messages, check if a matching server message exists
+      // Match by: same sender + (same text OR both have images)
+      const hasServerVersion = mergedMessages.some(serverMsg => 
+        !serverMsg.id.startsWith('temp_') &&
+        serverMsg.sender?.id === msg.sender?.id &&
+        (
+          // Text match (for text messages)
+          serverMsg.text === msg.text ||
+          // Image match (for image messages - both have imageUrl)
+          (msg.imageUrl && serverMsg.imageUrl)
+        )
+      );
+      
+      if (hasServerVersion) {
+        return false; // Remove this temp message
+      }
+      
+      return true;
+    });
+    
     // Sort messages chronologically
     mergedMessages.sort((a, b) => {
       // Temp messages should appear at the end (most recent)
@@ -209,6 +236,38 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // No global messages, use server messages
       finalMessages = serverMessages;
     }
+    
+    // 🔒 CRITICAL: Remove temp messages when their server versions arrive
+    // This prevents duplicate temp + server messages from appearing together
+    finalMessages = finalMessages.filter(msg => {
+      // Keep all non-temp messages
+      if (!msg.id.startsWith('temp_')) return true;
+      
+      // For temp messages, check if a matching server message exists
+      // Match by: same sender + (same text OR both have images)
+      const hasServerVersion = finalMessages.some(serverMsg => 
+        !serverMsg.id.startsWith('temp_') &&
+        serverMsg.sender?.id === msg.sender?.id &&
+        (
+          // Text match (for text messages)
+          serverMsg.text === msg.text ||
+          // Image match (for image messages - both have imageUrl)
+          (msg.imageUrl && serverMsg.imageUrl)
+        )
+      );
+      
+      if (hasServerVersion) {
+        console.log('🧹 [MERGE] Removing temp message - server version exists', {
+          tempId: msg.id,
+          textPreview: (msg.text || '').substring(0, 30) + '...',
+          hasImage: !!msg.imageUrl
+        });
+        return false;
+      }
+      
+      return true;
+    });
+    
     // Update global state
     setGlobalChatMessages(prev => ({
       ...prev,
@@ -255,4 +314,101 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Add socket message to global store
           addMessageToChat(socketMessage.chatId, newMessage);
           // Update unread counts (always update since it's from another user)
-          if (true) {            refreshUnreadCounts();          }        });        socketInitialized.current = true;        // Global socket listener initialized        // Cleanup function        return () => {          unsubscribeMessages();          processedMessageIds.current.clear();          socketInitialized.current = false;        };      } catch (error) {        // Failed to initialize global socket listener      }    };    initializeSocket();  }, [user?.id, addMessageToChat, refreshUnreadCounts]);  // Load initial data - with proper cleanup on user change  useEffect(() => {    if (user?.id) {      // Reset everything first to ensure clean state      setTotalUnreadCount(0);      setChatReadCounts({});      setGlobalChatMessages({});      processedMessageIds.current.clear();      // Then load fresh data      loadReadCounts().then((counts) => {        refreshUnreadCounts();      });    } else {      // User logged out - ensure everything is cleared      setTotalUnreadCount(0);      setChatReadCounts({});      setGlobalChatMessages({});      processedMessageIds.current.clear();    }  }, [user?.id, loadReadCounts, refreshUnreadCounts]);  // Refresh counts periodically  useEffect(() => {    if (!user?.id) return;    const interval = setInterval(() => {      refreshUnreadCounts();    }, 30000); // Refresh every 30 seconds    return () => clearInterval(interval);  }, [user?.id, refreshUnreadCounts]);  // Cleanup function for user logout/login  const cleanupAllChatData = useCallback(async () => {    // Cleaning up all chat data    // Clear global state    setGlobalChatMessages({});    setChatReadCounts({});    setTotalUnreadCount(0);    // Clear processed message IDs    processedMessageIds.current.clear();    // Reset socket initialization flag    socketInitialized.current = false;    // Clear AsyncStorage cache    try {      if (user?.id) {        const keys = await AsyncStorage.getAllKeys();        const chatKeys = keys.filter(key =>           key.startsWith('chat_messages_') ||           key.startsWith(`chat_read_counts_${user.id}`)        );        if (chatKeys.length > 0) {          await AsyncStorage.multiRemove(chatKeys);          // Cleared cache entries        }      }    } catch (error) {      // Failed to clear chat cache    }  }, [user?.id]);  // Listen for user changes and cleanup when user logs out  useEffect(() => {    // If user becomes null (logout), cleanup everything    if (!user?.id && (Object.keys(globalChatMessages).length > 0 || Object.keys(chatReadCounts).length > 0)) {      cleanupAllChatData();    }  }, [user?.id, globalChatMessages, chatReadCounts, cleanupAllChatData]);  const value: ChatContextType = {    totalUnreadCount,    chatReadCounts,    updateReadCount,    refreshUnreadCounts,    markChatAsRead,    getChatMessages,    addMessageToChat,    clearChatMessages,    mergeServerMessages,  };  return (    <ChatContext.Provider value={value}>      {children}    </ChatContext.Provider>  );};
+          if (true) {
+            refreshUnreadCounts();
+          }
+        });
+        socketInitialized.current = true;
+        // Global socket listener initialized
+        // Cleanup function
+        return () => {
+          unsubscribeMessages();
+          processedMessageIds.current.clear();
+          socketInitialized.current = false;
+        };
+      } catch (error) {
+        // Failed to initialize global socket listener
+      }
+    };
+    initializeSocket();
+  }, [user?.id, addMessageToChat, refreshUnreadCounts]);
+  // Load initial data - with proper cleanup on user change
+  useEffect(() => {
+    if (user?.id) {
+      // Reset everything first to ensure clean state
+      setTotalUnreadCount(0);
+      setChatReadCounts({});
+      setGlobalChatMessages({});
+      processedMessageIds.current.clear();
+      // Then load fresh data
+      loadReadCounts().then((counts) => {
+        refreshUnreadCounts();
+      });
+    } else {
+      // User logged out - ensure everything is cleared
+      setTotalUnreadCount(0);
+      setChatReadCounts({});
+      setGlobalChatMessages({});
+      processedMessageIds.current.clear();
+    }
+  }, [user?.id, loadReadCounts, refreshUnreadCounts]);
+  // Refresh counts periodically
+  useEffect(() => {
+    if (!user?.id) return;
+    const interval = setInterval(() => {
+      refreshUnreadCounts();
+    }, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [user?.id, refreshUnreadCounts]);
+  // Cleanup function for user logout/login
+  const cleanupAllChatData = useCallback(async () => {
+    // Cleaning up all chat data
+    // Clear global state
+    setGlobalChatMessages({});
+    setChatReadCounts({});
+    setTotalUnreadCount(0);
+    // Clear processed message IDs
+    processedMessageIds.current.clear();
+    // Reset socket initialization flag
+    socketInitialized.current = false;
+    // Clear AsyncStorage cache
+    try {
+      if (user?.id) {
+        const keys = await AsyncStorage.getAllKeys();
+        const chatKeys = keys.filter(key => 
+          key.startsWith('chat_messages_') || 
+          key.startsWith(`chat_read_counts_${user.id}`)
+        );
+        if (chatKeys.length > 0) {
+          await AsyncStorage.multiRemove(chatKeys);
+          // Cleared cache entries
+        }
+      }
+    } catch (error) {
+      // Failed to clear chat cache
+    }
+  }, [user?.id]);
+  // Listen for user changes and cleanup when user logs out
+  useEffect(() => {
+    // If user becomes null (logout), cleanup everything
+    if (!user?.id && (Object.keys(globalChatMessages).length > 0 || Object.keys(chatReadCounts).length > 0)) {
+      cleanupAllChatData();
+    }
+  }, [user?.id, globalChatMessages, chatReadCounts, cleanupAllChatData]);
+  const value: ChatContextType = {
+    totalUnreadCount,
+    chatReadCounts,
+    updateReadCount,
+    refreshUnreadCounts,
+    markChatAsRead,
+    getChatMessages,
+    addMessageToChat,
+    clearChatMessages,
+    mergeServerMessages,
+  };
+  return (
+    <ChatContext.Provider value={value}>
+      {children}
+    </ChatContext.Provider>
+  );
+};

@@ -542,7 +542,7 @@ const ChatScreen = React.memo(function ChatScreen({
     setMessages(prev => {
       // Check if temp ID exists
       if (prev.some(msg => msg.id === tempId)) {
-        console.log('⚠️ [SKIP] Temp exists');
+        console.log('⚠️ [SKIP] Temp exists - preventing duplicate add', { tempId, currentCount: prev.length });
         return prev;
       }
       
@@ -554,11 +554,17 @@ const ChatScreen = React.memo(function ChatScreen({
           (msg.status === 'sending' || msg.id.startsWith('temp-'))
         );
         if (duplicateImage) {
-          console.log('⚠️ [SKIP] Duplicate image');
+          console.log('⚠️ [SKIP] Duplicate image - preventing duplicate add', { imageUri: capturedImageUri });
           return prev;
         }
       }
       
+      console.log('✅ [ADD TEMP] Adding temp message to state', { 
+        tempId, 
+        previousCount: prev.length, 
+        newCount: prev.length + 1,
+        messageText: messageText.substring(0, 30) + '...'
+      });
       return [...prev, tempMessage];
     });
     // ⚡ ULTRA-FAST: Add to ultra-fast cache instantly
@@ -638,6 +644,7 @@ const ChatScreen = React.memo(function ChatScreen({
             content: messageText || '', // Empty string for image-only
             chatId: chatId, 
             senderId: user.id,
+            tempMessageId: tempId,
             imageUrl: uploadedImageUrl,
           });
           console.log('✅ [API] Image message response:', {
@@ -690,15 +697,50 @@ const ChatScreen = React.memo(function ChatScreen({
           console.log('🔄 [REPLACE] Replacing temp message with server message', {
             tempId,
             serverMessageId: serverMessage.id,
-            timestamp: serverMessage.timestamp
+            timestamp: serverMessage.timestamp,
+            hasImage: !!serverMessage.imageUrl
           });
           
           setMessages(prev => {
             const messageExists = prev.some(msg => msg.id === serverMessage.id);
             if (messageExists) {
-              console.log('⚠️ [SKIP] Server message exists');
+              // Server message is already present - clean up any matching temp messages
+              const cleaned = prev.filter(msg => {
+                if (!msg.id.startsWith('temp_')) return true;
+                // Remove temp messages from current user with same text
+                if (msg.sender?.id === user.id && msg.text === serverMessage.text) {
+                  console.log('🧹 [CLEAN TEMP] Removing temp message since server message already exists', {
+                    tempIdCandidate: msg.id,
+                    serverMessageId: serverMessage.id,
+                    textPreview: (serverMessage.text || '').substring(0, 30) + '...'
+                  });
+                  return false;
+                }
+                return true;
+              });
+              if (cleaned.length !== prev.length) {
+                console.log('✅ [CLEAN TEMP] Temp duplicates removed while keeping server message', {
+                  serverMessageId: serverMessage.id,
+                  beforeCount: prev.length,
+                  afterCount: cleaned.length
+                });
+                return cleaned;
+              }
+              console.log('⚠️ [SKIP] Server message exists - preventing duplicate', { 
+                serverMessageId: serverMessage.id,
+                currentCount: prev.length 
+              });
               return prev;
             }
+
+            // Check if temp exists
+            const hadTemp = prev.some(msg => msg.id === tempId);
+            console.log('🔍 [REPLACE CHECK]', { 
+              hadTemp, 
+              tempId, 
+              currentCount: prev.length,
+              messageIds: prev.map(m => m.id).slice(-3) // Last 3 message IDs for context
+            });
 
             // Replace temp message if present
             let replaced = prev.map(msg => msg.id === tempId ? serverMessage : msg);
@@ -710,6 +752,10 @@ const ChatScreen = React.memo(function ChatScreen({
                 if (msg.id === serverMessage.id) return true;
                 // Remove other entries (temps or duplicates) from same sender with same image
                 if (msg.id !== serverMessage.id && msg.imageUrl === serverMessage.imageUrl && msg.sender?.id === user.id) {
+                  console.log('🗑️ [DEDUPE] Removing duplicate image message', { 
+                    removedId: msg.id, 
+                    keptId: serverMessage.id 
+                  });
                   return false;
                 }
                 return true;
@@ -717,17 +763,25 @@ const ChatScreen = React.memo(function ChatScreen({
             }
 
             // If temp wasn't present and we didn't replace anything, append server message
-            const hadTemp = prev.some(msg => msg.id === tempId);
             if (!hadTemp) {
               // Avoid appending if an identical image message already exists
               const duplicateImage = prev.some(msg => msg.imageUrl && serverMessage.imageUrl && msg.imageUrl === serverMessage.imageUrl && msg.sender?.id === user.id);
               if (!duplicateImage) {
+                console.log('✅ [APPEND] Temp not found, appending server message', { 
+                  serverMessageId: serverMessage.id,
+                  newCount: replaced.length + 1
+                });
                 return [...replaced, serverMessage];
               }
+              console.log('⚠️ [SKIP APPEND] Duplicate image found', { serverMessageId: serverMessage.id });
               return replaced;
             }
 
-            console.log('✅ [REPLACE] Temp replaced');
+            console.log('✅ [REPLACE] Temp replaced successfully', { 
+              tempId, 
+              serverMessageId: serverMessage.id,
+              newCount: replaced.length
+            });
             return replaced;
           });
           
@@ -750,6 +804,7 @@ const ChatScreen = React.memo(function ChatScreen({
             content: messageText || '', // Empty string for image-only
             chatId: chatId, 
             senderId: user.id,
+            tempMessageId: tempId,
             ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {}),
           });
           console.log('✅ [API] API response:', serverResponse);
@@ -796,9 +851,43 @@ const ChatScreen = React.memo(function ChatScreen({
             setMessages(prev => {
               const messageExists = prev.some(msg => msg.id === serverMessage.id);
               if (messageExists) {
-                console.log('⚠️ [SKIP] Server message exists');
+                // Server message is already present - clean up any matching temp messages
+                const cleaned = prev.filter(msg => {
+                  if (!msg.id.startsWith('temp_')) return true;
+                  // Remove temp messages from current user with same text
+                  if (msg.sender?.id === user.id && msg.text === serverMessage.text) {
+                    console.log('🧹 [CLEAN TEMP HTTP] Removing temp message since server message already exists', {
+                      tempIdCandidate: msg.id,
+                      serverMessageId: serverMessage.id,
+                      textPreview: (serverMessage.text || '').substring(0, 30) + '...'
+                    });
+                    return false;
+                  }
+                  return true;
+                });
+                if (cleaned.length !== prev.length) {
+                  console.log('✅ [CLEAN TEMP HTTP] Temp duplicates removed while keeping server message', {
+                    serverMessageId: serverMessage.id,
+                    beforeCount: prev.length,
+                    afterCount: cleaned.length
+                  });
+                  return cleaned;
+                }
+                console.log('⚠️ [SKIP HTTP] Server message exists - preventing duplicate', { 
+                  serverMessageId: serverMessage.id,
+                  currentCount: prev.length 
+                });
                 return prev;
               }
+
+              // Check if temp exists
+              const hadTemp = prev.some(msg => msg.id === tempId);
+              console.log('🔍 [REPLACE HTTP CHECK]', { 
+                hadTemp, 
+                tempId, 
+                currentCount: prev.length,
+                messageIds: prev.map(m => m.id).slice(-3)
+              });
 
               // Replace temp message if present
               let replaced = prev.map(msg => msg.id === tempId ? serverMessage : msg);
@@ -808,22 +897,34 @@ const ChatScreen = React.memo(function ChatScreen({
                 replaced = replaced.filter(msg => {
                   if (msg.id === serverMessage.id) return true;
                   if (msg.id !== serverMessage.id && msg.imageUrl === serverMessage.imageUrl && msg.sender?.id === user.id) {
+                    console.log('🗑️ [DEDUPE HTTP] Removing duplicate image message', { 
+                      removedId: msg.id, 
+                      keptId: serverMessage.id 
+                    });
                     return false;
                   }
                   return true;
                 });
               }
 
-              const hadTemp = prev.some(msg => msg.id === tempId);
               if (!hadTemp) {
                 const duplicateImage = prev.some(msg => msg.imageUrl && serverMessage.imageUrl && msg.imageUrl === serverMessage.imageUrl && msg.sender?.id === user.id);
                 if (!duplicateImage) {
+                  console.log('✅ [APPEND HTTP] Temp not found, appending server message', { 
+                    serverMessageId: serverMessage.id,
+                    newCount: replaced.length + 1
+                  });
                   return [...replaced, serverMessage];
                 }
+                console.log('⚠️ [SKIP APPEND HTTP] Duplicate image found', { serverMessageId: serverMessage.id });
                 return replaced;
               }
 
-              console.log('✅ [REPLACE] Temp replaced');
+              console.log('✅ [REPLACE HTTP] Temp replaced successfully', { 
+                tempId, 
+                serverMessageId: serverMessage.id,
+                newCount: replaced.length
+              });
               return replaced;
             });
             
@@ -917,6 +1018,7 @@ const ChatScreen = React.memo(function ChatScreen({
               content: messageText || '',
               chatId: chatId, 
               senderId: user.id
+              , tempMessageId: failedMessage.id
             });
           }
         }
@@ -1139,7 +1241,7 @@ const ChatScreen = React.memo(function ChatScreen({
   // Handle emoji insertion
   const handleAddEmoji = (emoji: string) => {
     setMessage(prev => prev + emoji);
-    setShowEmojiPicker(false);
+    // Don't close emoji picker - user can select multiple emojis
   };
 
   const toggleOptionsMenu = useCallback(() => {
@@ -1285,137 +1387,144 @@ const ChatScreen = React.memo(function ChatScreen({
         currentUserId: user.id,
         isFromCurrentUser: socketMessage.sender?.id === user.id,
         text: socketMessage.text?.substring(0, 20) + '...',
-        chatId: socketMessage.chatId
+        chatId: socketMessage.chatId,
+        senderIdType: typeof socketMessage.sender?.id,
+        currentUserIdType: typeof user.id,
+        senderIdString: String(socketMessage.sender?.id),
+        currentUserIdString: String(user.id)
       });
-      
-      // Only add message if it's for this chat
-      if (socketMessage.chatId === chatId) {
-        const isSenderMessage = socketMessage.sender?.id === user.id;
 
+      const isSender = socketMessage.sender?.id === user.id || String(socketMessage.sender?.id) === String(user.id);
+
+      // If the incoming message is from the current user, we should attempt to
+      // match & replace any optimistic temp message so the UI doesn't show a
+      // duplicate. If we cannot match, it's safe to skip adding it because
+      // the server will be reflected by the API response path or force refresh.
+      if (isSender && socketMessage.chatId === chatId) {
+        console.log('🔍 [SELF] Incoming server message for current user - attempting to match temp');
+
+        const serverMsg: Message = {
+          id: socketMessage.id,
+          text: socketMessage.text || socketMessage.content || '',
+          isUser: true,
+          timestamp: fixServerTimestamp(socketMessage.timestamp) || formatMessageTime(new Date()),
+          status: 'sent',
+          sender: socketMessage.sender,
+          ...(socketMessage.imageUrl ? { imageUrl: socketMessage.imageUrl } : {}),
+        } as any;
+
+        // 1) If server includes tempMessageId, prefer direct replacement
+        if (socketMessage.tempMessageId) {
+          const temp = socketMessage.tempMessageId;
+          setMessages(prev => {
+            // If server message already exists, skip
+            if (prev.some(msg => msg.id === serverMsg.id)) return prev;
+            // Replace temp with server message
+            const replaced = prev.map(msg => msg.id === temp ? serverMsg : msg);
+            // Remove any other temps with same image
+            if (serverMsg.imageUrl) {
+              return replaced.filter(msg => !(msg.id.startsWith('temp_') && msg.imageUrl === serverMsg.imageUrl && msg.sender?.id === user.id));
+            }
+            return replaced;
+          });
+          ultraFastChatCache.replaceMessageInstantly(chatId, socketMessage.tempMessageId, serverMsg);
+          console.log('✅ [REPLACE SOCKET] Replaced temp from socket tempMessageId:', socketMessage.tempMessageId);
+          // Add to global state to update chat previews and ensure global caches are synced.
+          setTimeout(() => addMessageToChat(chatId, serverMsg, false), 0);
+          return; // Don't append / global add
+        }
+
+        // 2) If no tempMessageId, try to match by imageUrl
+        if (socketMessage.imageUrl) {
+          let matched = false;
+          setMessages(prev => {
+            const mapped = prev.map(msg => {
+              if (!matched && msg.id.startsWith('temp_') && msg.imageUrl === socketMessage.imageUrl && msg.sender?.id === user.id) {
+                matched = true;
+                return serverMsg;
+              }
+              return msg;
+            });
+            if (matched) {
+              // remove other temps with same image
+              return mapped.filter(msg => !(msg.id.startsWith('temp_') && msg.imageUrl === socketMessage.imageUrl && msg.sender?.id === user.id));
+            }
+            return prev;
+          });
+          if (matched) {
+            ultraFastChatCache.replaceAnyTempWithImage(chatId, socketMessage.imageUrl, serverMsg);
+            console.log('✅ [REPLACE SOCKET] Replaced temp by image via socket');
+            setTimeout(() => addMessageToChat(chatId, serverMsg, false), 0);
+            return;
+          }
+        }
+
+        // 3) Try text match heuristic
+        if (socketMessage.text && socketMessage.text.trim() !== '') {
+          let matched = false;
+          setMessages(prev => prev.map(msg => {
+            if (!matched && msg.id.startsWith('temp_') && msg.text === socketMessage.text && msg.sender?.id === user.id) {
+              matched = true;
+              return serverMsg;
+            }
+            return msg;
+          }));
+          if (matched) {
+            ultraFastChatCache.replaceAnyTempByText(chatId, socketMessage.text, serverMsg);
+            console.log('✅ [REPLACE SOCKET] Replaced temp by text via socket');
+            setTimeout(() => addMessageToChat(chatId, serverMsg, false), 0);
+            return;
+          }
+        }
+
+        // If nothing matched, skip adding new message - server will be added via other flows
+        console.log('🔕 [SOCKET] No matching temp found for sender message - skipping append');
+        return;
+      }
+      
+      // Only add message if it's for this chat AND it's from another user
+      if (socketMessage.chatId === chatId) {
         // Prepare server message object
         const newMessage: Message = {
           id: socketMessage.id,
           text: socketMessage.text || socketMessage.content || '',
-          isUser: socketMessage.sender?.id === user.id,
+          isUser: false, // This is from another user
           timestamp: fixServerTimestamp(socketMessage.timestamp) || formatMessageTime(new Date()),
           status: 'delivered',
           sender: socketMessage.sender,
           ...(socketMessage.imageUrl ? { imageUrl: socketMessage.imageUrl } : {}),
         } as any;
 
-        // If message ID already exists, skip entirely
+        // Add message from other users
         setMessages(prev => {
+          // Skip if message ID already exists
           if (prev.some(msg => msg.id === newMessage.id)) {
-            console.log('❌ [SKIP] Message ID already exists:', newMessage.id);
+            console.log('❌ [SKIP] Message ID already exists - preventing duplicate', { 
+              messageId: newMessage.id,
+              currentCount: prev.length
+            });
             return prev;
           }
-
-          // If the server message is from the current user, attempt to match & replace temp messages
-          if (isSenderMessage) {
-            console.log('🔍 [SELF] Incoming server message is from current user — attempting to match temp messages');
-
-            // 1) If server echoed tempMessageId, replace that exact temp
-            const tempIdFromSocket = socketMessage.tempMessageId;
-            if (tempIdFromSocket) {
-              const replaced = prev.map(msg => msg.id === tempIdFromSocket ? newMessage : msg);
-              // Remove any other temp messages with same imageUrl from same sender
-              if (newMessage.imageUrl) {
-                const deduped = replaced.filter(msg => {
-                  if (msg.id === newMessage.id) return true;
-                  if (msg.imageUrl === newMessage.imageUrl && msg.sender?.id === user.id && msg.id.startsWith('temp_')) {
-                    return false;
-                  }
-                  return true;
-                });
-                ultraFastChatCache.replaceMessageInstantly(chatId, tempIdFromSocket, newMessage);
-                console.log('✅ [REPLACE SOCKET] Replaced temp by tempId via socket:', tempIdFromSocket);
-                return deduped;
-              }
-              ultraFastChatCache.replaceMessageInstantly(chatId, tempIdFromSocket, newMessage);
-              console.log('✅ [REPLACE SOCKET] Replaced temp by tempId via socket:', tempIdFromSocket);
-              return replaced;
-            }
-
-            // 2) If no tempMessageId, attempt to match by imageUrl (strong heuristic)
-            if (newMessage.imageUrl) {
-              let replaced = false;
-              const mapped = prev.map(msg => {
-                if (!replaced && msg.id.startsWith('temp_') && msg.imageUrl && msg.imageUrl === newMessage.imageUrl && msg.sender?.id === user.id) {
-                  replaced = true;
-                  return newMessage;
-                }
-                return msg;
-              });
-              if (replaced) {
-                // Also remove any remaining temp duplicates for same image
-                const deduped = mapped.filter(msg => {
-                  if (msg.id === newMessage.id) return true;
-                  if (msg.id.startsWith('temp_') && msg.imageUrl === newMessage.imageUrl && msg.sender?.id === user.id) {
-                    return false;
-                  }
-                  return true;
-                });
-                // Update ultra-fast cache conservatively
-                ultraFastChatCache.replaceAnyTempWithImage(chatId, newMessage.imageUrl, newMessage);
-                console.log('✅ [REPLACE SOCKET] Replaced temp by imageUrl via socket');
-                return deduped;
-              }
-            }
-
-            // 3) Text-only heuristic: match same text and sending status
-            if (newMessage.text && newMessage.text.trim() !== '') {
-              let replaced = false;
-              const mapped = prev.map(msg => {
-                if (!replaced && msg.id.startsWith('temp_') && msg.text && msg.text === newMessage.text && msg.sender?.id === user.id && msg.status === 'sending') {
-                  replaced = true;
-                  return newMessage;
-                }
-                return msg;
-              });
-              if (replaced) {
-                ultraFastChatCache.replaceAnyTempByText(chatId, newMessage.text, newMessage);
-                console.log('✅ [REPLACE SOCKET] Replaced temp by text via socket');
-                return mapped.filter((m, i) => true);
-              }
-            }
-
-            // 4) No matching temp found — append server message but avoid creating duplicates by image
-            if (newMessage.imageUrl) {
-              const duplicateImage = prev.some(msg => msg.imageUrl === newMessage.imageUrl && msg.sender?.id === user.id && msg.id === newMessage.id);
-              if (duplicateImage) {
-                console.log('❌ [SKIP] Duplicate image server message detected, skipping append');
-                return prev;
-              }
-            }
-
-            console.log('ℹ️ [APPEND SELF] No temp matched, appending server message for sender');
-            ultraFastChatCache.addMessageInstantly(chatId, newMessage);
-            // Append at end
-            return [...prev, newMessage];
-          }
-
-          // For messages from other users, add normally
-          console.log('ℹ️ [APPEND OTHER] Appending message from other user');
-          ultraFastChatCache.addMessageInstantly(chatId, newMessage);
+          
+          console.log('✅ [ADD OTHER USER] Adding message from other user', { 
+            messageId: newMessage.id,
+            senderId: newMessage.sender?.id,
+            previousCount: prev.length,
+            newCount: prev.length + 1,
+            text: newMessage.text.substring(0, 30) + '...'
+          });
           return [...prev, newMessage];
         });
         
-        // Update global state AFTER setState completes (avoids React warning)
-        // Note: Global ChatContext listener already handles this for incoming messages
-        // No need to add here since we skip current user messages in socket listener
-        // For messages from other users, add to global state. For current user's server messages
-        // addMessageToChat is still useful for backend sync but skip when we've already managed replacement.
-        if (!isSenderMessage) {
-          setTimeout(() => {
-            addMessageToChat(chatId, newMessage, false);
-          }, 0);
-        } else {
-          // If sender's message arrived via socket and we replaced a temp, ensure global state reflects final message
-          setTimeout(() => {
-            addMessageToChat(chatId, newMessage, false);
-          }, 50);
-        }
-        // 🚀 IMPROVED: Auto-scroll to bottom with multiple attempts
+        // Update caches
+        ultraFastChatCache.addMessageInstantly(chatId, newMessage);
+        
+        // Update global state
+        setTimeout(() => {
+          addMessageToChat(chatId, newMessage, false);
+        }, 0);
+        
+        // Auto-scroll to bottom
         setTimeout(() => scrollToBottom(true), 50);
         setTimeout(() => scrollToBottom(true), 150);
       }
