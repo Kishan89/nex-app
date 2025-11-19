@@ -227,6 +227,7 @@ class ChatController {
               status: message.status,
               sender: message.sender,
               chatId,
+                     tempMessageId: req.body?.tempMessageId,
               imageUrl: message.imageUrl || undefined, // Include image URL for image messages
             };
             
