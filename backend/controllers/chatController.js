@@ -182,9 +182,13 @@ class ChatController {
       const senderId = req.user?.userId || req.body.senderId;
       
       // Allow messages with either content or imageUrl (or both)
-      if ((!content || !content.trim()) && !imageUrl) {
+      // For image-only messages, content can be empty or whitespace
+      if (!imageUrl && (!content || !content.trim())) {
         throw new BadRequestError('Message must have either text content or an image');
       }
+      
+      // Clean content: if it's only whitespace and we have an image, set to empty string
+      const cleanContent = (content && content.trim()) ? content.trim() : '';
       
       if (!senderId) {
         throw new BadRequestError(ERROR_MESSAGES.USER_ID_REQUIRED);
@@ -198,7 +202,7 @@ class ChatController {
         throw new ForbiddenError(ERROR_MESSAGES.NOT_PARTICIPANT);
       }
       
-      const message = await chatService.sendMessage({ content, chatId, senderId, imageUrl });
+      const message = await chatService.sendMessage({ content: cleanContent, chatId, senderId, imageUrl });
       
       // Send raw timestamp - let frontend format it in user's timezone
       logger.info('📤 [CONTROLLER] Sending message response', {

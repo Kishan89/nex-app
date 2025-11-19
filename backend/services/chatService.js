@@ -355,9 +355,8 @@ class ChatService {
         imageUrlPreview: imageUrl ? imageUrl.substring(0, 50) + '...' : undefined
       });
 
-      // Validate input
-      // Allow messages with either content or imageUrl (or both)
-      if ((!content || !content.trim()) && !imageUrl) {
+      // Validate input - allow image-only messages
+      if (!imageUrl && (!content || !content.trim())) {
         logger.error('❌ [SEND MESSAGE] Missing required fields', { content: !!content, chatId: !!chatId, senderId: !!senderId, imageUrl: !!imageUrl });
         throw new Error('Message must have either text content or an image');
       }

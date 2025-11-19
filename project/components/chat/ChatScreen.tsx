@@ -358,7 +358,8 @@ const ChatScreen = React.memo(function ChatScreen({
             isUser: msg.isUser || msg.senderId === user.id,
             timestamp: processedTimestamp,
             status: (msg.status || 'read').toLowerCase() as 'sending' | 'sent' | 'delivered' | 'read',
-            sender: msg.sender
+            sender: msg.sender,
+            ...(msg.imageUrl ? { imageUrl: msg.imageUrl } : {})
           };
         });
         // Sort messages by timestamp (chronological order)
@@ -541,7 +542,7 @@ const ChatScreen = React.memo(function ChatScreen({
     // Create temporary message for INSTANT UI display
     const tempMessage: Message = {
       id: tempId,
-      text: messageText,
+      text: messageText || '', // Empty string for image-only messages
       isUser: true,
       timestamp: new Date().toLocaleTimeString([], {
         hour: 'numeric',
@@ -651,7 +652,7 @@ const ChatScreen = React.memo(function ChatScreen({
         if (uploadedImageUrl) {
           console.log('🌐 [API] Using HTTP API for image message...');
           serverResponse = await apiService.sendMessage(chatId, { 
-            content: messageText || '', // Send empty string if no text (image-only message)
+            content: messageText || '', // Empty string for image-only
             chatId: chatId, 
             senderId: user.id,
             imageUrl: uploadedImageUrl,
@@ -678,7 +679,7 @@ const ChatScreen = React.memo(function ChatScreen({
               
           const serverMessage: Message = {
             id: serverResponse.messageId,
-            text: messageText,
+            text: messageText || '', // Empty string for image-only
             isUser: true,
             timestamp: formattedTimestamp,
             status: 'sent',
@@ -740,7 +741,7 @@ const ChatScreen = React.memo(function ChatScreen({
         if (!serverResponse || !serverResponse.success) {
           console.log('🌐 [API] Falling back to HTTP API...');
           serverResponse = await apiService.sendMessage(chatId, { 
-            content: messageText || '', // Send empty string if no text
+            content: messageText || '', // Empty string for image-only
             chatId: chatId, 
             senderId: user.id,
             ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {}),
@@ -767,7 +768,7 @@ const ChatScreen = React.memo(function ChatScreen({
                 
             const serverMessage: Message = {
               id: realMessageId,
-              text: messageText,
+              text: messageText || '', // Empty string for image-only
               isUser: true,
               timestamp: formattedTimestamp,
               status: 'sent',
@@ -1570,12 +1571,15 @@ const renderMessage = useCallback(({ item }: { item: Message }) => {
             />
           )}
 
-          <Text style={[
-            styles.messageText,
-            { color: isUserMessage ? '#ffffff' : colors.text }
-          ]}>
-            {renderTextWithLinks(item.text, isUserMessage)}
-          </Text>
+          {/* Only show text if not empty (image-only message) */}
+          {item.text && (
+            <Text style={[
+              styles.messageText,
+              { color: isUserMessage ? '#ffffff' : colors.text }
+            ]}>
+              {renderTextWithLinks(item.text, isUserMessage)}
+            </Text>
+          )}
           <View style={styles.messageFooter}>
             <Text style={[
               styles.messageTime,
@@ -2383,7 +2387,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     height: 200,
     borderRadius: BorderRadius.md,
     marginBottom: Spacing.xs,
-    backgroundColor: '#f0f0f0',
   },
   linkText: {
     textDecorationLine: 'underline',
