@@ -121,12 +121,22 @@ class ChatService {
           }
         }
 
+        let lastMessageText = 'No messages yet';
+        if (lastMessage) {
+          const content = lastMessage.content || '';
+          if (content.trim() !== '') {
+            lastMessageText = content;
+          } else if (lastMessage.imageUrl) {
+            lastMessageText = 'Photo';
+          }
+        }
+
         return {
           id: chat.id,
           name,
           username,
           userId: userIdForChat,
-          lastMessage: lastMessage?.content || 'No messages yet',
+          lastMessage: lastMessageText,
           time: lastMessage ? formatTimeAgo(lastMessage.createdAt) : '',
           avatar,
           isOnline,
@@ -651,6 +661,7 @@ class ChatService {
             select: {
               id: true,
               content: true,
+              imageUrl: true,
               createdAt: true,
               senderId: true,
               status: true,

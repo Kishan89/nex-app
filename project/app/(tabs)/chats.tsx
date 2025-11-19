@@ -38,6 +38,16 @@ type Chat = {
   lastSeenText?: string;
   isGroup?: boolean;
 };
+const getLastMessagePreview = (socketMessage: any): string => {
+  const rawText = (socketMessage.text || socketMessage.content || '').trim();
+  if (rawText.length > 0) {
+    return rawText;
+  }
+  if (socketMessage.imageUrl) {
+    return 'Photo';
+  }
+  return '';
+};
 const ChatsScreen = React.memo(function ChatsScreen() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,11 +142,12 @@ const ChatsScreen = React.memo(function ChatsScreen() {
     if (!user) return;
     const handleNewMessage = (socketMessage: any) => {
       const chatId = String(socketMessage.chatId);
+      const previewText = getLastMessagePreview(socketMessage);
       
       // Update chat cache immediately
       chatCache.addMessageToCache(
         chatId,
-        socketMessage.text || socketMessage.content,
+        previewText,
         socketMessage.sender?.id,
         user?.id
       );
@@ -185,7 +196,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           if (String(chat.id) === chatId) {
             return {
               ...chat,
-              lastMessage: socketMessage.text || socketMessage.content,
+              lastMessage: previewText,
               time: 'now',
               unread: socketMessage.sender?.id !== user?.id ? (chat.unread || 0) + 1 : chat.unread || 0
             };

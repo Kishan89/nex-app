@@ -177,6 +177,72 @@ class UltraFastChatCache {
     }
   }
 
+  // Replace any temp message that matches an imageUrl with the real message
+  replaceAnyTempWithImage(chatId: string, imageUrl: string, realMessage: Message) {
+    const cached = this.memoryCache.get(chatId);
+    if (!cached) return;
+
+    let replaced = false;
+    // Replace the first matching temp, and remove other temps with same image
+    const newMessages: Message[] = [];
+    for (const msg of cached.messages) {
+      if (!replaced && msg.id.startsWith('temp_') && msg.imageUrl && msg.imageUrl === imageUrl) {
+        newMessages.push(realMessage);
+        replaced = true;
+        continue;
+      }
+      // Skip other temps with same imageUrl from same sender
+      if (msg.id.startsWith('temp_') && msg.imageUrl && msg.imageUrl === imageUrl && msg.sender?.id === realMessage.sender?.id) {
+        continue;
+      }
+      newMessages.push(msg);
+    }
+
+    if (replaced) {
+      cached.messages = newMessages;
+      cached.lastUpdated = Date.now();
+      this.memoryCache.set(chatId, cached);
+      // Update preview
+      const last = cached.messages[cached.messages.length - 1];
+      if (last) {
+        this.chatPreviews.set(chatId, { chatId, lastMessage: last, unreadCount: 0, chatData: cached.chatData });
+      }
+      AsyncStorage.setItem(`ultra_chat_${chatId}`, JSON.stringify(cached)).catch(() => {});
+    }
+  }
+
+  // Replace any temp message that matches text with the real message (heuristic)
+  replaceAnyTempByText(chatId: string, text: string, realMessage: Message) {
+    const cached = this.memoryCache.get(chatId);
+    if (!cached) return;
+
+    let replaced = false;
+    const newMessages: Message[] = cached.messages.map(msg => {
+      if (!replaced && msg.id.startsWith('temp_') && msg.text && msg.text === text && msg.sender?.id === realMessage.sender?.id) {
+        replaced = true;
+        return realMessage;
+      }
+      return msg;
+    }).filter(msg => {
+      // Remove any leftover temps with same text from same sender
+      if (msg.id.startsWith('temp_') && msg.text === text && msg.sender?.id === realMessage.sender?.id) {
+        return false;
+      }
+      return true;
+    });
+
+    if (replaced) {
+      cached.messages = newMessages;
+      cached.lastUpdated = Date.now();
+      this.memoryCache.set(chatId, cached);
+      const last = cached.messages[cached.messages.length - 1];
+      if (last) {
+        this.chatPreviews.set(chatId, { chatId, lastMessage: last, unreadCount: 0, chatData: cached.chatData });
+      }
+      AsyncStorage.setItem(`ultra_chat_${chatId}`, JSON.stringify(cached)).catch(() => {});
+    }
+  }
+
   // Get all chat previews for chat list
   getAllChatPreviews(): ChatPreview[] {
     return Array.from(this.chatPreviews.values()).sort((a, b) => {
