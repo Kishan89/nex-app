@@ -441,7 +441,8 @@ const ChatsScreen = React.memo(function ChatsScreen() {
             <Search size={20} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionButton, styles.groupsButton]} onPress={handleGroupsPress}>
-            <Users size={20} color="#3B8FE8" />
+            <Users size={20} color="#FFFFFF" />
+            <Text style={styles.groupsButtonText}>Groups</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -528,9 +529,20 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     ...Shadows.small,
   },
   groupsButton: {
-    backgroundColor: '#3B8FE8' + '20',
-    borderWidth: 1,
-    borderColor: '#3B8FE8' + '40',
+    flexDirection: 'row',
+    width: 'auto',
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#3B8FE8', // Solid primary color
+    paddingHorizontal: Spacing.md,
+    borderWidth: 0,
+    ...Shadows.medium, // Increased shadow for prominence
+  },
+  groupsButtonText: {
+    color: '#FFFFFF',
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.bold,
+    marginLeft: Spacing.xs,
   },
   chatsList: {
     flex: 1,
