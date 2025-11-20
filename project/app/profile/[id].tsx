@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Info, Heart, MessageCircle, Bookmark, Edit, ArrowLeft, PenTool, UserPlus, UserMinus, UserCircle, X } from 'lucide-react-native';
 import PostCard from '../../components/PostCard';
 import ProfileCompletionBanner from '../../components/ProfileCompletionBanner';
+import ImageViewer from '@/components/ImageViewer';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import apiService, { ProfileData as ApiProfileData } from '@/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -57,6 +58,8 @@ export default function ProfileScreen() {
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<NormalizedPost | null>(null);
   const [showBanner, setShowBanner] = useState(true);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [viewerImageUri, setViewerImageUri] = useState('');
   const isMyProfile = user?.id === userId;
 
   // Function to get medal emoji for top 3 XP users
@@ -570,13 +573,22 @@ export default function ProfileScreen() {
         </View>
         {/* Profile Image Section - Separate from banner */}
         <View style={styles.profileImageSection}>
-          <View style={styles.profileImageContainer}>
+          <TouchableOpacity 
+            style={styles.profileImageContainer}
+            onPress={() => {
+              if (avatarUri && avatarUri !== 'https://via.placeholder.com/150') {
+                setViewerImageUri(avatarUri);
+                setShowImageViewer(true);
+              }
+            }}
+            activeOpacity={0.8}
+          >
             <Image 
               source={avatarUri && avatarUri !== 'https://via.placeholder.com/150' ? { uri: avatarUri } : require('@/assets/images/default-avatar.png')} 
               style={styles.profileImage}
               resizeMode="cover"
             />
-          </View>
+          </TouchableOpacity>
         </View>
         <View style={styles.profileSection}>
           {/* Profile Header with Action Buttons */}
@@ -709,6 +721,13 @@ export default function ProfileScreen() {
         onShare={handleSharePost}
         onReport={handleReportPost}
         onDelete={handleDeletePostInModal}
+      />
+
+      {/* Image Viewer Modal */}
+      <ImageViewer 
+        visible={showImageViewer}
+        imageUri={viewerImageUri}
+        onClose={() => setShowImageViewer(false)}
       />
     </SafeAreaView>
   );

@@ -16,6 +16,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { apiService } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
+import ImageViewer from '@/components/ImageViewer';
 
 interface GroupInfoModalProps {
   visible: boolean;
@@ -41,6 +42,8 @@ export default function GroupInfoModal({
   const [description, setDescription] = useState('');
   const [avatar, setAvatar] = useState('');
   const [members, setMembers] = useState<any[]>([]);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [viewerImageUri, setViewerImageUri] = useState('');
 
   useEffect(() => {
     if (groupData) {
@@ -226,8 +229,15 @@ export default function GroupInfoModal({
           {/* Group Avatar */}
           <TouchableOpacity
             style={styles.avatarContainer}
-            onPress={handlePickImage}
-            disabled={!editing}
+            onPress={() => {
+              if (editing) {
+                handlePickImage();
+              } else if (avatar && avatar.trim() !== '') {
+                // Show fullscreen image viewer when not editing
+                setViewerImageUri(avatar);
+                setShowImageViewer(true);
+              }
+            }}
           >
             {avatar ? (
               <Image source={{ uri: avatar }} style={styles.avatar} />
@@ -365,6 +375,13 @@ export default function GroupInfoModal({
             </TouchableOpacity>
           )}
         </ScrollView>
+
+        {/* Image Viewer Modal */}
+        <ImageViewer 
+          visible={showImageViewer}
+          imageUri={viewerImageUri}
+          onClose={() => setShowImageViewer(false)}
+        />
       </View>
     </Modal>
   );

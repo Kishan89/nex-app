@@ -28,6 +28,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { Message } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useChatContext } from '@/context/ChatContext';
+import ImageViewer from '@/components/ImageViewer';
 // Memory management will be handled by regular setTimeout for now
 import { apiService } from '@/lib/api';
 import { chatMessageCache } from '@/store/chatMessageCache';
@@ -107,6 +108,7 @@ const ChatScreen = React.memo(function ChatScreen({
   const [isCompressingImage, setIsCompressingImage] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+  const [showImageViewer, setShowImageViewer] = useState(false);
   const lastSentMessageRef = useRef<{ text: string; timestamp: number } | null>(null);
   
   useEffect(() => {
@@ -1839,21 +1841,20 @@ const renderMessage = useCallback(({ item }: { item: Message }) => {
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <ArrowLeft size={24} color={colors?.text || '#fff'} />
         </TouchableOpacity>
+        
+        {/* Avatar - Click to go to user profile */}
         <TouchableOpacity 
-          style={styles.profileSection}
+          style={styles.avatarButton}
           onPress={() => {
-            console.log('Header clicked', { isGroup: chatData.isGroup, userId: displayUserId, name: displayName });
-            if (chatData.isGroup) {
-              setShowGroupInfo(true);
-            } else if (displayUserId && displayUserId !== 'unknown' && displayUserId !== 'loading') {
+            console.log('Avatar clicked', { isGroup: chatData.isGroup, userId: displayUserId });
+            if (!chatData.isGroup && displayUserId && displayUserId !== 'unknown' && displayUserId !== 'loading') {
               console.log('Navigating to profile:', displayUserId);
               router.push(`/profile/${displayUserId}`);
-            } else {
-              console.log('Cannot navigate - invalid userId:', displayUserId);
+            } else if (chatData.isGroup) {
+              console.log('Group chat - opening group info');
+              setShowGroupInfo(true);
             }
           }}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           {displayAvatar && displayAvatar.trim() !== '' ? (
             <Image 
@@ -1873,6 +1874,25 @@ const renderMessage = useCallback(({ item }: { item: Message }) => {
               )}
             </View>
           )}
+        </TouchableOpacity>
+
+        {/* Profile Info - Click to open group info or profile */}
+        <TouchableOpacity 
+          style={styles.profileSection}
+          onPress={() => {
+            console.log('Header clicked', { isGroup: chatData.isGroup, userId: displayUserId, name: displayName });
+            if (chatData.isGroup) {
+              setShowGroupInfo(true);
+            } else if (displayUserId && displayUserId !== 'unknown' && displayUserId !== 'loading') {
+              console.log('Navigating to profile:', displayUserId);
+              router.push(`/profile/${displayUserId}`);
+            } else {
+              console.log('Cannot navigate - invalid userId:', displayUserId);
+            }
+          }}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <View style={styles.profileInfo}>
             <Text style={[styles.name, { color: colors?.text || '#fff' }]} numberOfLines={1}>
               {displayName}
@@ -2445,17 +2465,15 @@ const renderMessage = useCallback(({ item }: { item: Message }) => {
         </View>
       )}
 
-      {/* Full Screen Image Modal */}
-      <Modal visible={!!fullScreenImage} transparent animationType="fade" onRequestClose={() => setFullScreenImage(null)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
-          <TouchableOpacity style={{ position: 'absolute', top: 40, right: 20, zIndex: 1 }} onPress={() => setFullScreenImage(null)}>
-            <X size={30} color="#ffffff" />
-          </TouchableOpacity>
-          {fullScreenImage && (
-            <Image source={{ uri: fullScreenImage }} style={{ width: '100%', height: '80%' }} resizeMode="contain" />
-          )}
-        </View>
-      </Modal>
+      {/* Full Screen Image Viewer Modal */}
+      <ImageViewer 
+        visible={showImageViewer}
+        imageUri={fullScreenImage || ''}
+        onClose={() => {
+          setShowImageViewer(false);
+          setFullScreenImage(null);
+        }}
+      />
 
       {/* Emoji Picker Modal */}
       {showEmojiPicker && (
@@ -2500,10 +2518,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: Spacing.xs,
     marginRight: Spacing.sm,
   },
+  avatarButton: {
+    padding: Spacing.xs,
+  },
   profileSection: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: Spacing.sm,
   },
   avatar: {
     width: 40,

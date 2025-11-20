@@ -14,6 +14,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Search, MessageCircle, Plus, Users } from 'lucide-react-native';
 import { ChatSkeleton } from '../../components/skeletons';
+import ImageViewer from '@/components/ImageViewer';
 import { apiService } from '../../lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useChatContext } from '@/context/ChatContext';
@@ -44,8 +45,18 @@ const getLastMessagePreview = (socketMessage: any): string => {
     return rawText;
   }
   if (socketMessage.imageUrl) {
-    return 'Photo';
+    return '📷 Photo';
   }
+  return '';
+};
+
+// Helper to normalize lastMessage from chat objects
+const normalizeLastMessage = (chat: Chat): string => {
+  if (chat.lastMessage && chat.lastMessage.trim().length > 0) {
+    return chat.lastMessage;
+  }
+  // If lastMessage is empty but there might be an image, we need to check the actual messages
+  // For now, return empty and let it show as "No messages yet"
   return '';
 };
 const ChatsScreen = React.memo(function ChatsScreen() {
@@ -53,6 +64,8 @@ const ChatsScreen = React.memo(function ChatsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [viewerImageUri, setViewerImageUri] = useState('');
   const { user } = useAuth();
   const { chatReadCounts, markChatAsRead, refreshUnreadCounts, addMessageToChat } = useChatContext();
   const { colors, isDark } = useTheme();
@@ -372,16 +385,24 @@ const ChatsScreen = React.memo(function ChatsScreen() {
         <View style={styles.avatarContainer}>
           {item.isGroup ? (
             item.avatar && item.avatar.trim() !== '' ? (
-              <Image 
-                source={{ uri: item.avatar }} 
-                style={styles.avatar}
-                onError={(e) => {
-                  console.log('❌ Group avatar failed to load:', item.avatar, e.nativeEvent.error);
+              <TouchableOpacity 
+                onPress={() => {
+                  setViewerImageUri(item.avatar);
+                  setShowImageViewer(true);
                 }}
-                onLoad={() => {
-                  console.log('✅ Group avatar loaded:', item.avatar);
-                }}
-              />
+                activeOpacity={0.7}
+              >
+                <Image 
+                  source={{ uri: item.avatar }} 
+                  style={styles.avatar}
+                  onError={(e) => {
+                    console.log('❌ Group avatar failed to load:', item.avatar, e.nativeEvent.error);
+                  }}
+                  onLoad={() => {
+                    console.log('✅ Group avatar loaded:', item.avatar);
+                  }}
+                />
+              </TouchableOpacity>
             ) : (
               <View style={[styles.avatar, styles.groupAvatarPlaceholder]}>
                 <Users size={24} color={colors.primary} />
@@ -414,7 +435,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
             style={[styles.lastMessage, effectiveUnread > 0 && styles.unreadMessage]} 
             numberOfLines={1}
           >
-            {item.lastMessage}
+            {item.lastMessage || '📷 Photo'}
           </Text>
           {/* {item.lastSeenText && effectiveUnread === 0 && (
             <Text style={styles.lastSeen}>{item.lastSeenText}</Text>
@@ -484,6 +505,13 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           }
         />
       )}
+
+      {/* Image Viewer Modal */}
+      <ImageViewer 
+        visible={showImageViewer}
+        imageUri={viewerImageUri}
+        onClose={() => setShowImageViewer(false)}
+      />
     </SafeAreaView>
   );
 });
