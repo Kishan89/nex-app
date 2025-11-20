@@ -1763,7 +1763,13 @@ const renderMessage = useCallback(({ item }: { item: Message }) => {
 
           {/* Display image if present */}
           {item.imageUrl && (
-            <TouchableOpacity onPress={() => setFullScreenImage(item.imageUrl!)} activeOpacity={0.9}>
+            <TouchableOpacity 
+              onPress={() => {
+                setFullScreenImage(item.imageUrl!);
+                setShowImageViewer(true);
+              }} 
+              activeOpacity={0.9}
+            >
               <Image
                 source={{ uri: item.imageUrl }}
                 style={styles.messageImage}

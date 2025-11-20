@@ -7,6 +7,7 @@ import { apiService } from '@/lib/api';
 import { router } from 'expo-router';
 import { Spacing, FontSizes, FontWeights, BorderRadius, Shadows } from '@/constants/theme';
 import { GroupListSkeleton } from '@/components/skeletons';
+import ImageViewer from '@/components/ImageViewer';
 
 interface GroupItem {
   id: string | number;
@@ -26,6 +27,8 @@ const GroupListScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [viewerImageUri, setViewerImageUri] = useState('');
 
   const loadGroups = useCallback(async () => {
     if (!user) {
@@ -90,10 +93,18 @@ const GroupListScreen = () => {
       >
         <View style={styles.avatarContainer}>
           {(item.avatar && item.avatar.trim() !== '') ? (
-            <Image 
-              source={{ uri: item.avatar }} 
-              style={styles.avatar}
-            />
+            <TouchableOpacity
+              onPress={() => {
+                setViewerImageUri(item.avatar!);
+                setShowImageViewer(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <Image 
+                source={{ uri: item.avatar }} 
+                style={styles.avatar}
+              />
+            </TouchableOpacity>
           ) : (
             <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + (colors.background === '#ffffff' ? '15' : '20') }]}>
               <Users size={24} color={colors.primary} />
@@ -188,6 +199,13 @@ const GroupListScreen = () => {
           }
         />
       )}
+
+      {/* Image Viewer Modal */}
+      <ImageViewer 
+        visible={showImageViewer}
+        imageUri={viewerImageUri}
+        onClose={() => setShowImageViewer(false)}
+      />
     </SafeAreaView>
   );
 };

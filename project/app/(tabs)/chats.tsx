@@ -410,10 +410,18 @@ const ChatsScreen = React.memo(function ChatsScreen() {
             )
           ) : (
             item.avatar && item.avatar.trim() !== '' ? (
-              <Image 
-                source={{ uri: item.avatar }} 
-                style={styles.avatar}
-              />
+              <TouchableOpacity 
+                onPress={() => {
+                  setViewerImageUri(item.avatar);
+                  setShowImageViewer(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <Image 
+                  source={{ uri: item.avatar }} 
+                  style={styles.avatar}
+                />
+              </TouchableOpacity>
             ) : (
               <Image 
                 source={require('@/assets/images/default-avatar.png')} 
@@ -435,7 +443,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
             style={[styles.lastMessage, effectiveUnread > 0 && styles.unreadMessage]} 
             numberOfLines={1}
           >
-            {item.lastMessage || '📷 Photo'}
+            {item.lastMessage && item.lastMessage.trim() !== '' ? item.lastMessage : 'No messages yet'}
           </Text>
           {/* {item.lastSeenText && effectiveUnread === 0 && (
             <Text style={styles.lastSeen}>{item.lastSeenText}</Text>

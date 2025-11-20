@@ -56,6 +56,7 @@ class ChatService {
               select: {
                 id: true,
                 content: true,
+                imageUrl: true,
                 createdAt: true,
                 senderId: true,
                 status: true,
@@ -127,7 +128,7 @@ class ChatService {
           if (content.trim() !== '') {
             lastMessageText = content;
           } else if (lastMessage.imageUrl) {
-            lastMessageText = 'Photo';
+            lastMessageText = '📷 Photo';
           }
         }
 
