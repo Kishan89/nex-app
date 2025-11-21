@@ -1993,8 +1993,9 @@ const renderMessage = useCallback(({ item }: { item: Message }) => {
         <TouchableOpacity
           onPress={() => setShowEmojiPicker(prev => !prev)}
           style={styles.inputIconButton}
+          activeOpacity={0.7}
         >
-          <Smile size={22} color={colors.textMuted} />
+          <Smile size={24} color={colors.textMuted} />
         </TouchableOpacity>
 
         <TextInput
@@ -2012,18 +2013,23 @@ const renderMessage = useCallback(({ item }: { item: Message }) => {
           onPress={handlePickImage}
           style={styles.inputIconButton}
           disabled={isCompressingImage}
+          activeOpacity={0.7}
         >
-          <ImageIcon size={22} color={colors.textMuted} />
+          <ImageIcon size={24} color={isCompressingImage ? colors.textMuted + '50' : colors.textMuted} />
         </TouchableOpacity>
 
         {/* Send button - Right */}
         <TouchableOpacity 
           onPress={sendMessage}
-          style={[styles.sendButton, { backgroundColor: colors.primary }]}
+          style={[styles.sendButton, { 
+            backgroundColor: (!message.trim() && !pendingImageUri) || isSending || isCompressingImage 
+              ? colors.textMuted + '40' 
+              : colors.primary 
+          }]}
           disabled={(!message.trim() && !pendingImageUri) || isSending || isCompressingImage}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
-          <Send size={20} color="#ffffff" />
+          <Send size={18} color="#ffffff" />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -2650,22 +2656,30 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   inputContainer: {
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingBottom: Platform.OS === 'ios' ? Spacing.lg : Spacing.md,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: BorderRadius.xl,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    minHeight: 48,
+    borderRadius: 28,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    minHeight: 52,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
   },
   textInput: {
     flex: 1,
     fontSize: FontSizes.md,
-    height: 40,
-    paddingVertical: Spacing.xs,
+    minHeight: 40,
+    maxHeight: 100,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
     marginHorizontal: Spacing.xs,
   },
   // Auto-mention suggestion styles
@@ -2706,11 +2720,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: FontWeights.medium,
   },
   sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: Spacing.xs,
   },
   modalOverlay: {
     flex: 1,
@@ -3084,9 +3099,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   inputIconButton: {
-    padding: Spacing.xs,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    marginHorizontal: 2,
   },
   emojiPickerContainer: {
     position: 'absolute',
