@@ -136,7 +136,7 @@ export default function GroupInfoModal({
           style: 'destructive',
           onPress: async () => {
             try {
-              await apiService.removeMemberFromGroup(groupId, memberId);
+              await apiService.removeGroupMember(groupId, memberId);
               setMembers(members.filter((m) => m.userId !== memberId));
               Alert.alert('Success', 'Member removed');
             } catch (error: any) {
@@ -161,7 +161,7 @@ export default function GroupInfoModal({
           style: 'destructive',
           onPress: async () => {
             try {
-              await apiService.deleteGroup(groupId);
+              await apiService.deleteChat(groupId);
               Alert.alert('Success', 'Group deleted successfully');
               onClose();
             } catch (error: any) {
@@ -264,7 +264,7 @@ export default function GroupInfoModal({
               <TextInput
                 style={[
                   styles.input,
-                  { backgroundColor: colors.card, color: colors.text },
+                  { backgroundColor: colors.backgroundSecondary, color: colors.text },
                 ]}
                 value={name}
                 onChangeText={setName}
@@ -286,7 +286,7 @@ export default function GroupInfoModal({
                 style={[
                   styles.input,
                   styles.textArea,
-                  { backgroundColor: colors.card, color: colors.text },
+                  { backgroundColor: colors.backgroundSecondary, color: colors.text },
                 ]}
                 value={description}
                 onChangeText={setDescription}
