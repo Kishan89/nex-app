@@ -346,6 +346,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
     // Mark chat as read using context (pass current unread count)
     const currentUnreadCount = chat.unread || 0;
     markChatAsRead(String(chat.id), currentUnreadCount);
+    
     // Mark chat as read locally (optimistic update)
     setChats(prevChats => 
       prevChats.map(c => 
@@ -354,12 +355,10 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           : c
       )
     );
-    // Mark messages as read on server
-    try {
-      await apiService.markMessagesAsRead(String(chat.id));
-    } catch (error) {
-      // Even if server call fails, keep local state updated
-    }
+    
+    // Mark messages as read on server (background)
+    apiService.markMessagesAsRead(String(chat.id)).catch(() => {});
+    
     // Navigate to standalone chat screen with cached data for instant display
     router.push({
       pathname: `/chat/${chat.id}`,
@@ -372,9 +371,11 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       }
     });
   };
+
   const handleSearchPress = () => {
     router.push('/search-users');
   };
+
   const renderChatItem = ({ item }: { item: Chat }) => {
     const effectiveUnread = item.unread || 0;
     return (

@@ -26,6 +26,11 @@ class UltraFastChatCache {
   private memoryCache = new Map<string, CachedChat>();
   private chatPreviews = new Map<string, ChatPreview>();
   private initialized = false;
+  
+  // LRU tracking for cache eviction
+  private readonly MAX_CACHED_CHATS = 20;
+  private readonly MAX_MESSAGES_PER_CHAT = 100;
+  private lruTracker = new Map<string, number>(); // chatId -> lastAccessTime
 
   // Initialize cache from AsyncStorage
   async initialize() {
@@ -65,9 +70,34 @@ class UltraFastChatCache {
     }
   }
 
+  // Evict least recently used chat when cache is full
+  private evictLRU() {
+    if (this.memoryCache.size >= this.MAX_CACHED_CHATS) {
+      let oldestChatId = '';
+      let oldestTime = Infinity;
+      
+      for (const [chatId, timestamp] of this.lruTracker.entries()) {
+        if (timestamp < oldestTime) {
+          oldestTime = timestamp;
+          oldestChatId = chatId;
+        }
+      }
+      
+      if (oldestChatId) {
+        this.memoryCache.delete(oldestChatId);
+        this.chatPreviews.delete(oldestChatId);
+        this.lruTracker.delete(oldestChatId);
+        AsyncStorage.removeItem(`ultra_chat_${oldestChatId}`).catch(() => {});
+      }
+    }
+  }
+
   // Get messages instantly from memory cache
   getInstantMessages(chatId: string): Message[] {
     try {
+      // Update LRU tracker on access
+      this.lruTracker.set(chatId, Date.now());
+      
       const cached = this.memoryCache.get(chatId);
       if (cached && cached.messages && Array.isArray(cached.messages)) {
         return cached.messages;
@@ -89,7 +119,7 @@ class UltraFastChatCache {
     try {
       const cachedChat: CachedChat = {
         chatId,
-        messages: messages, // Keep ALL messages - don't slice to prevent duplicate detection issues
+        messages: messages, // Keep all messages for now - limiting caused issues
         lastUpdated: Date.now(),
         chatData: {
           id: chatData.id || chatId,
@@ -100,6 +130,12 @@ class UltraFastChatCache {
           lastSeen: chatData.lastSeen,
         },
       };
+
+      // Update LRU tracker
+      this.lruTracker.set(chatId, Date.now());
+      
+      // Evict if cache is full
+      this.evictLRU();
 
       this.memoryCache.set(chatId, cachedChat);
 
@@ -283,6 +319,43 @@ class UltraFastChatCache {
         return AsyncStorage.multiRemove(chatKeys);
       })
       .catch(() => {});
+  }
+
+  // Batch preload top N chats for instant access
+  async preloadTopChats(chatIds: string[]) {
+    const top5 = chatIds.slice(0, 5);
+    
+    const promises = top5.map(async chatId => {
+      // Skip if already in memory
+      if (this.memoryCache.has(chatId)) {
+        this.lruTracker.set(chatId, Date.now());
+        return;
+      }
+      
+      // Load from AsyncStorage
+      try {
+        const stored = await AsyncStorage.getItem(`ultra_chat_${chatId}`);
+        if (stored) {
+          const data: CachedChat = JSON.parse(stored);
+          this.memoryCache.set(chatId, data);
+          this.lruTracker.set(chatId, Date.now());
+          
+          if (data.messages.length > 0) {
+            const lastMessage = data.messages[data.messages.length - 1];
+            this.chatPreviews.set(chatId, {
+              chatId,
+              lastMessage,
+              unreadCount: 0,
+              chatData: data.chatData,
+            });
+          }
+        }
+      } catch (error) {
+        // Silent fail
+      }
+    });
+    
+    await Promise.all(promises);
   }
 
   // Get cache statistics

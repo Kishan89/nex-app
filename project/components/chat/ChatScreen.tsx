@@ -110,6 +110,8 @@ const ChatScreen = React.memo(function ChatScreen({
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [showImageViewer, setShowImageViewer] = useState(false);
   const lastSentMessageRef = useRef<{ text: string; timestamp: number } | null>(null);
+
+
   
   useEffect(() => {
     if (chatData && chatData.isGroup) {
@@ -198,6 +200,73 @@ const ChatScreen = React.memo(function ChatScreen({
     } catch (error) {
       }
   }, []);
+
+  // 🚀 REAL-TIME: Listen for new messages via socket
+  useEffect(() => {
+    if (!chatData?.id || !user?.id) return;
+
+    const handleNewMessage = (socketMessage: any) => {
+      // Only handle messages for this chat
+      if (String(socketMessage.chatId) !== String(chatData.id)) return;
+      
+      // Skip messages from current user (handled optimistically)
+      if (socketMessage.sender?.id === user.id) return;
+
+      console.log('📨 [SOCKET] Received new message in ChatScreen:', socketMessage.id);
+
+      const formattedTimestamp = socketMessage.timestamp 
+        ? new Date(socketMessage.timestamp).toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          })
+        : new Date().toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+
+      const newMessage: Message = {
+        id: socketMessage.id,
+        text: socketMessage.text || socketMessage.content,
+        isUser: false,
+        timestamp: formattedTimestamp,
+        status: 'delivered',
+        sender: socketMessage.sender,
+        imageUrl: socketMessage.imageUrl
+      };
+
+      setMessages(prev => {
+        // Deduplicate
+        if (prev.some(m => m.id === newMessage.id)) {
+          return prev;
+        }
+        
+        // Add new message
+        const updated = [...prev, newMessage];
+        
+        // Sort to be safe (though usually appending is enough)
+        return updated.sort((a, b) => {
+          if (a.id.startsWith('temp_')) return 1;
+          if (b.id.startsWith('temp_')) return -1;
+          return compareTimestamps(a.timestamp, b.timestamp);
+        });
+      });
+      
+      // Update ultra-fast cache
+      ultraFastChatCache.addMessageInstantly(String(chatData.id), newMessage);
+      
+      // Scroll to bottom
+      setTimeout(() => scrollToBottom(true), 100);
+    };
+
+    // Subscribe to socket updates
+    const unsubscribe = socketService.onNewMessage(handleNewMessage);
+    
+    return () => {
+      unsubscribe();
+    };
+  }, [chatData?.id, user?.id, scrollToBottom]);
   // 🚀 IMPROVED: Auto-scroll whenever messages change with better timing
   useEffect(() => {
     if (messages.length > 0) {
@@ -256,17 +325,16 @@ const ChatScreen = React.memo(function ChatScreen({
         // Don't filter them out or messages will disappear after sending
         setMessages(ultraFastCached);
         setLoading(false);
-        // Background refresh with debounce to prevent multiple rapid calls
-        if (!isSending) {
-          // Use a ref to track if we've already scheduled a refresh
-          if (!refreshScheduledRef.current) {
-            refreshScheduledRef.current = true;
-            setTimeout(() => {
-              refreshScheduledRef.current = false;
-              loadMessages(true);
-            }, 300);
-          }
-        }
+        // ? FIX: Auto-refresh disabled - was causing messages to disappear
+        // if (!isSending) {
+        //   if (!refreshScheduledRef.current) {
+        //     refreshScheduledRef.current = true;
+        //     setTimeout(() => {
+        //       refreshScheduledRef.current = false;
+        //       loadMessages(true);
+        //     }, 300);
+        //   }
+        // }
         return;
       }
       // PRIORITY 2: Try to get from global state first (instant)
@@ -280,16 +348,16 @@ const ChatScreen = React.memo(function ChatScreen({
           // Cache in ultra-fast cache (including temp messages for now)
           ultraFastChatCache.cacheMessages(chatId, globalMessages, chatData);
           // Background refresh with debounce to prevent multiple rapid calls
-          if (!isSending) {
-            // Use a ref to track if we've already scheduled a refresh
-            if (!refreshScheduledRef.current) {
-              refreshScheduledRef.current = true;
-              setTimeout(() => {
-                refreshScheduledRef.current = false;
-                loadMessages(true);
-              }, 300);
-            }
-          }
+          // ✅ FIX: Disabled auto-refresh to prevent lag
+          // if (!isSending) {
+          //   if (!refreshScheduledRef.current) {
+          //     refreshScheduledRef.current = true;
+          //     setTimeout(() => {
+          //       refreshScheduledRef.current = false;
+          //       loadMessages(true);
+          //     }, 300);
+          //   }
+          // }
           return;
         }
       } catch (error) {
@@ -303,17 +371,16 @@ const ChatScreen = React.memo(function ChatScreen({
         setLoading(false);
         // Upgrade to ultra-fast cache (including temp messages for now)
         ultraFastChatCache.cacheMessages(chatId, cachedMessages.messages, chatData);
-        // Background refresh with debounce to prevent multiple rapid calls
-        if (!isSending) {
-          // Use a ref to track if we've already scheduled a refresh
-          if (!refreshScheduledRef.current) {
-            refreshScheduledRef.current = true;
-            setTimeout(() => {
-              refreshScheduledRef.current = false;
-              loadMessages(true);
-            }, 300);
-          }
-        }
+        // ? FIX: Auto-refresh disabled - was causing messages to disappear
+        // if (!isSending) {
+        //   if (!refreshScheduledRef.current) {
+        //     refreshScheduledRef.current = true;
+        //     setTimeout(() => {
+        //       refreshScheduledRef.current = false;
+        //       loadMessages(true);
+        //     }, 300);
+        //   }
+        // }
         return;
       }
     }
@@ -342,39 +409,34 @@ const ChatScreen = React.memo(function ChatScreen({
       
       if (chatMessages.length > 0) {
         const formattedMessages: Message[] = chatMessages.map((msg: any) => {
-          // Use the original timestamp from server or create a unique timestamp based on message ID
           let processedTimestamp: string;
+          let rawTimestamp: Date;
+          
           if (msg.timestamp) {
-            // If server provides timestamp, use fixServerTimestamp to convert UTC to IST
+            rawTimestamp = new Date(msg.timestamp);
             processedTimestamp = fixServerTimestamp(msg.timestamp);
           } else {
-            // If no timestamp, create a unique one based on message ID to avoid all showing same time
-            const baseTime = new Date();
-            // Add a small offset based on message ID to make timestamps unique
-            const offset = parseInt(msg.id.toString().slice(-2) || '0') * 1000; // Use last 2 digits of ID
-            baseTime.setTime(baseTime.getTime() - offset);
-            processedTimestamp = formatMessageTime(baseTime);
+            rawTimestamp = new Date();
+            processedTimestamp = formatMessageTime(rawTimestamp);
           }
+          
           return {
             id: msg.id,
             text: msg.text || msg.content,
             isUser: msg.isUser || msg.senderId === user.id,
             timestamp: processedTimestamp,
+            rawTimestamp: rawTimestamp.getTime(),
             status: (msg.status || 'read').toLowerCase() as 'sending' | 'sent' | 'delivered' | 'read',
             sender: msg.sender,
             ...(msg.imageUrl ? { imageUrl: msg.imageUrl } : {})
           };
         });
-        // Sort messages by timestamp (chronological order)
         formattedMessages.sort((a, b) => {
-          // Keep temp messages at the end
           if (a.id.startsWith('temp_') && !b.id.startsWith('temp_')) return 1;
           if (!a.id.startsWith('temp_') && b.id.startsWith('temp_')) return -1;
-          // For non-temp messages, sort by actual timestamp
           if (!a.id.startsWith('temp_') && !b.id.startsWith('temp_')) {
-            return compareTimestamps(a.timestamp, b.timestamp);
+            return (a.rawTimestamp || 0) - (b.rawTimestamp || 0);
           }
-          // For temp messages, sort by ID (which includes timestamp)
           return a.id.localeCompare(b.id);
         });
         // IMPROVED: Merge server messages with global state and local messages
@@ -428,25 +490,21 @@ const ChatScreen = React.memo(function ChatScreen({
     if (!user || !chatData?.id) return;
     
     // 🔒 CRITICAL: Prevent duplicate sends (debounce check)
-    const now = Date.now();
+    const nowTimestamp = Date.now();
     if (lastSentMessageRef.current) {
       const { text: lastText, timestamp: lastTimestamp } = lastSentMessageRef.current;
       // Prevent sending same message within 1 second (duplicate prevention)
-      if (lastText === trimmed && now - lastTimestamp < 1000) {
+      if (lastText === trimmed && nowTimestamp - lastTimestamp < 1000) {
         console.log('⚠️ [DUPLICATE PREVENTION] Same message sent within 1 second, skipping');
         return;
       }
     }
     
-    // 🔒 CRITICAL: Set sending state to prevent background refresh interference
-    if (isSending) {
-      console.log('⚠️ [ALREADY SENDING] Message send in progress, skipping');
-      return;
-    }
-    setIsSending(true);
+    // Remove isSending check - allow multiple messages to be sent simultaneously
+    // Each message will be queued and sent in background
     
     // Record this message send
-    lastSentMessageRef.current = { text: trimmed, timestamp: now };
+    lastSentMessageRef.current = { text: trimmed, timestamp: nowTimestamp };
     
     const messageText = trimmed;
     let chatId = String(chatData.id);
@@ -494,8 +552,6 @@ const ChatScreen = React.memo(function ChatScreen({
         // The socket listener will replace it with the real message when it arrives
         console.log('✅ [NEW CHAT] Keeping temp message visible until broadcast arrives');
         
-        // Reset sending state
-        setIsSending(false);
         return;
       } catch (error) {
         console.error('❌ [NEW CHAT] Failed to create chat:', error);
@@ -503,8 +559,6 @@ const ChatScreen = React.memo(function ChatScreen({
         // Restore the message in input
         setMessage(messageText);
         setMessages(prev => prev.filter(msg => msg.id !== tempId));
-        // Reset sending state
-        setIsSending(false);
         return;
       }
     }
@@ -519,15 +573,17 @@ const ChatScreen = React.memo(function ChatScreen({
     });
     
     // Create temporary message for INSTANT UI display
+    const currentTime = new Date();
     const tempMessage: Message = {
       id: tempId,
       text: messageText || '', // Empty string for image-only messages
       isUser: true,
-      timestamp: new Date().toLocaleTimeString([], {
+      timestamp: currentTime.toLocaleTimeString([], {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true
       }),
+      rawTimestamp: currentTime.getTime(),
       status: 'sending', // Gray clock icon 🕓
       sender: {
         id: user.id,
@@ -669,23 +725,19 @@ const ChatScreen = React.memo(function ChatScreen({
         // Replace temp message with server message (sender doesn't receive broadcast)
         if (serverResponse && serverResponse.success && serverResponse.messageId) {
           // Format timestamp from server (ISO) to local time
-          const formattedTimestamp = serverResponse.timestamp 
-            ? new Date(serverResponse.timestamp).toLocaleTimeString([], {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-              })
-            : new Date().toLocaleTimeString([], {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-              });
+          const rawTime = serverResponse.timestamp ? new Date(serverResponse.timestamp) : new Date();
+          const formattedTimestamp = rawTime.toLocaleTimeString([], {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
               
           const serverMessage: Message = {
             id: serverResponse.messageId,
             text: messageText || '', // Empty string for image-only
             isUser: true,
             timestamp: formattedTimestamp,
+            rawTimestamp: rawTime.getTime(),
             status: 'sent',
             sender: {
               id: user.id,
@@ -795,8 +847,6 @@ const ChatScreen = React.memo(function ChatScreen({
           // This prevents duplicate messages in global state
           console.log('⏭️ [SKIP GLOBAL] Skipping global state update to prevent duplicates');
           
-          // ✅ SUCCESS: Reset sending state
-          setIsSending(false);
           return; // Exit early on socket success
         }
         
@@ -817,23 +867,19 @@ const ChatScreen = React.memo(function ChatScreen({
             const realMessageId = serverResponse.messageId || serverResponse.id;
             
             // Format timestamp from server (ISO) to local time
-            const formattedTimestamp = serverResponse.timestamp 
-              ? new Date(serverResponse.timestamp).toLocaleTimeString([], {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                })
-              : new Date().toLocaleTimeString([], {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                });
+            const rawTime = serverResponse.timestamp ? new Date(serverResponse.timestamp) : new Date();
+            const formattedTimestamp = rawTime.toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            });
                 
             const serverMessage: Message = {
               id: realMessageId,
               text: messageText || '', // Empty string for image-only
               isUser: true,
               timestamp: formattedTimestamp,
+              rawTimestamp: rawTime.getTime(),
               status: 'sent',
               sender: {
                 id: user.id,
@@ -938,16 +984,9 @@ const ChatScreen = React.memo(function ChatScreen({
             // This prevents duplicate messages in global state
             console.log('⏭️ [SKIP GLOBAL HTTP] Skipping global state update to prevent duplicates');
             
-            // ✅ SUCCESS: Reset sending state
-            setIsSending(false);
           } else {
-            // ❌ FAILED: Reset sending state
-            setIsSending(false);
             throw new Error('Invalid server response');
           }
-        } else {
-          // ❌ FAILED: Reset sending state
-          setIsSending(false);
         }
       } catch (error) {
         console.error('❌ [SEND ERROR] Message send failed:', error);
@@ -958,8 +997,6 @@ const ChatScreen = React.memo(function ChatScreen({
             status: 'failed' // ❌ Red X icon
           } : msg
         ));
-        // ❌ FAILED: Reset sending state
-        setIsSending(false);
       }
     };
     // Start backend work immediately but don't block UI
@@ -1405,11 +1442,13 @@ const ChatScreen = React.memo(function ChatScreen({
       if (isSender && socketMessage.chatId === chatId) {
         console.log('🔍 [SELF] Incoming server message for current user - attempting to match temp');
 
+        const rawTime = socketMessage.timestamp ? new Date(socketMessage.timestamp) : new Date();
         const serverMsg: Message = {
           id: socketMessage.id,
           text: socketMessage.text || socketMessage.content || '',
           isUser: true,
           timestamp: fixServerTimestamp(socketMessage.timestamp) || formatMessageTime(new Date()),
+          rawTimestamp: rawTime.getTime(),
           status: 'sent',
           sender: socketMessage.sender,
           ...(socketMessage.imageUrl ? { imageUrl: socketMessage.imageUrl } : {}),
@@ -1487,14 +1526,16 @@ const ChatScreen = React.memo(function ChatScreen({
       // Only add message if it's for this chat AND it's from another user
       if (socketMessage.chatId === chatId) {
         // Prepare server message object
+        const rawTime = socketMessage.timestamp ? new Date(socketMessage.timestamp) : new Date();
         const newMessage: Message = {
           id: socketMessage.id,
           text: socketMessage.text || socketMessage.content || '',
           isUser: false, // This is from another user
           timestamp: fixServerTimestamp(socketMessage.timestamp) || formatMessageTime(new Date()),
+          rawTimestamp: rawTime.getTime(),
           status: 'delivered',
           sender: socketMessage.sender,
-          ...(socketMessage.imageUrl ? { imageUrl: socketMessage.imageUrl } : {}),
+          imageUrl: socketMessage.imageUrl || undefined,
         } as any;
 
         // Add message from other users
@@ -1779,7 +1820,7 @@ const renderMessage = useCallback(({ item }: { item: Message }) => {
           )}
 
           {/* Only show text if not empty (image-only message) */}
-          {item.text && (
+          {item.text && item.text.trim() !== '' && (
             <Text style={[
               styles.messageText,
               { color: isUserMessage ? '#ffffff' : colors.text }
@@ -2057,7 +2098,7 @@ const renderMessage = useCallback(({ item }: { item: Message }) => {
         removeClippedSubviews={false}
         maxToRenderPerBatch={50}
         windowSize={20}
-        initialNumToRender={50}
+        initialNumToRender={200}
         updateCellsBatchingPeriod={0}
         getItemLayout={undefined}
         extraData={messages}
@@ -3155,3 +3196,4 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
 });
 export default ChatScreen;
+

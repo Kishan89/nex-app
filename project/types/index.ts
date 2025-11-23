@@ -72,6 +72,7 @@ export interface Message {
   text: string;
   isUser: boolean;
   timestamp: string;
+  rawTimestamp?: number; // Raw timestamp for sorting
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   sender?: User;
   imageUrl?: string; // Support for image messages
