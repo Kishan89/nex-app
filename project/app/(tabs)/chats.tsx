@@ -216,15 +216,17 @@ const ChatsScreen = React.memo(function ChatsScreen() {
           }
           return chat;
         });
-        // Sort chats by most recent message - prioritize 'now' time
+        // Sort chats by most recent message using proper timestamp comparison
         return updatedChats.sort((a, b) => {
-          // Chats with 'now' time should be at the top
+          // Always prioritize 'now' messages at the top
           if (a.time === 'now' && b.time !== 'now') return -1;
           if (a.time !== 'now' && b.time === 'now') return 1;
-          // If both have 'now' or neither, maintain order
-          if (a.lastMessage && !b.lastMessage) return -1;
-          if (!a.lastMessage && b.lastMessage) return 1;
-          return 0;
+          
+          // For other messages, use actual timestamp comparison
+          const aTime = a.time === 'now' ? Date.now() : new Date().getTime();
+          const bTime = b.time === 'now' ? Date.now() : new Date().getTime();
+          
+          return bTime - aTime; // Most recent first
         });
       });
       // Refresh unread counts in context for bottom navigation sync

@@ -43,6 +43,7 @@ import { router } from 'expo-router';
 import ImageCompressionService, { CompressionResult } from '@/lib/imageCompression';
 import { ImageMessageFixer } from '@/lib/imageMessageFix';
 import { chatMessageSync } from '@/lib/chatMessageSync';
+import { TimestampFix } from '@/lib/timestampFix';
 interface ChatData {
   id: string | number;
   name: string;
@@ -225,11 +226,16 @@ const ChatScreen = React.memo(function ChatScreen({
           // Add new message
           const updated = [...prev, newMessage];
           
-          // Sort messages
+          // Sort messages chronologically
           return updated.sort((a, b) => {
-            if (a.id.startsWith('temp_')) return 1;
-            if (b.id.startsWith('temp_')) return -1;
-            return compareTimestamps(a.timestamp, b.timestamp);
+            // Temp messages go to end
+            if (a.id.startsWith('temp_') && !b.id.startsWith('temp_')) return 1;
+            if (!a.id.startsWith('temp_') && b.id.startsWith('temp_')) return -1;
+            
+            // Use proper timestamp comparison
+            const aTime = new Date(a.timestamp).getTime();
+            const bTime = new Date(b.timestamp).getTime();
+            return aTime - bTime; // Chronological order
           });
         });
         
@@ -411,16 +417,10 @@ const ChatScreen = React.memo(function ChatScreen({
             ...(msg.imageUrl ? { imageUrl: msg.imageUrl } : {})
           };
         });
-        formattedMessages.sort((a, b) => {
-          if (a.id.startsWith('temp_') && !b.id.startsWith('temp_')) return 1;
-          if (!a.id.startsWith('temp_') && b.id.startsWith('temp_')) return -1;
-          if (!a.id.startsWith('temp_') && !b.id.startsWith('temp_')) {
-            return (a.rawTimestamp || 0) - (b.rawTimestamp || 0);
-          }
-          return a.id.localeCompare(b.id);
-        });
+        // Use timestamp fix for proper sorting
+        const sortedMessages = TimestampFix.sortMessages(formattedMessages);
         // IMPROVED: Merge server messages with global state and local messages
-        let finalMessages = mergeServerMessages(chatId, formattedMessages);
+        let finalMessages = mergeServerMessages(chatId, sortedMessages);
         
         // Don't merge temp messages on force refresh - they should be replaced by real messages
         
