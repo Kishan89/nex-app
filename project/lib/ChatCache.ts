@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Message } from '@/types';
+import { ImageMessageFixer } from './imageMessageFix';
 
 interface CachedChat {
   chatId: string;
@@ -117,9 +118,12 @@ class UltraFastChatCache {
   // Cache messages with instant memory update
   async cacheMessages(chatId: string, messages: Message[], chatData: any) {
     try {
+      // Fix all image URLs before caching
+      const fixedMessages = ImageMessageFixer.fixMessagesImageUrls(messages);
+      
       const cachedChat: CachedChat = {
         chatId,
-        messages: messages, // Keep all messages for now - limiting caused issues
+        messages: fixedMessages, // Use fixed messages
         lastUpdated: Date.now(),
         chatData: {
           id: chatData.id || chatId,
@@ -161,13 +165,16 @@ class UltraFastChatCache {
   addMessageInstantly(chatId: string, message: Message) {
     const cached = this.memoryCache.get(chatId);
     if (cached) {
+      // Fix image URL before adding
+      const fixedMessage = ImageMessageFixer.fixMessageImageUrl(message);
+      
       // Check for both exact ID match and temp ID match to prevent duplicates
       const exists = cached.messages.some(msg => 
-        msg.id === message.id || 
-        (msg.id.startsWith('temp_') && msg.text === message.text && msg.sender?.id === message.sender?.id)
+        msg.id === fixedMessage.id || 
+        (msg.id.startsWith('temp_') && msg.text === fixedMessage.text && msg.sender?.id === fixedMessage.sender?.id)
       );
       if (!exists) {
-        cached.messages.push(message);
+        cached.messages.push(fixedMessage);
         cached.lastUpdated = Date.now();
 
         // Keep ALL messages - don't slice to prevent duplicate detection issues
@@ -177,7 +184,7 @@ class UltraFastChatCache {
 
         this.chatPreviews.set(chatId, {
           chatId,
-          lastMessage: message,
+          lastMessage: fixedMessage,
           unreadCount: 0,
           chatData: cached.chatData,
         });
@@ -225,14 +232,116 @@ class UltraFastChatCache {
     // Replace the first matching temp, and remove other temps with same image
     const newMessages: Message[] = [];
     for (const msg of cached.messages) {
-      if (!replaced && msg.id.startsWith('temp_') && msg.imageUrl && msg.imageUrl === imageUrl) {
+      // 🔧 IMPROVED: Better matching for temp image messages
+      if (!replaced && msg.id.startsWith('temp_') && msg.imageUrl && 
+          (msg.imageUrl === imageUrl || // Direct URL match
+           (msg.sender?.id === realMessage.sender?.id && msg.imageUrl.includes('file://') && realMessage.imageUrl))) { // Local vs remote URL
         newMessages.push(realMessage);
         replaced = true;
+        console.log('✅ [CACHE REPLACE IMAGE] Replaced temp image message', {
+          tempId: msg.id,
+          realId: realMessage.id,
+          tempUrl: msg.imageUrl?.substring(0, 30) + '...',
+          realUrl: realMessage.imageUrl?.substring(0, 30) + '...'
+        });
         continue;
       }
       // Skip other temps with same imageUrl from same sender
-      if (msg.id.startsWith('temp_') && msg.imageUrl && msg.imageUrl === imageUrl && msg.sender?.id === realMessage.sender?.id) {
+      if (msg.id.startsWith('temp_') && msg.imageUrl && msg.sender?.id === realMessage.sender?.id &&
+          (msg.imageUrl === imageUrl || (msg.imageUrl.includes('file://') && realMessage.imageUrl))) {
+        console.log('🗑️ [CACHE CLEANUP] Removing duplicate temp image', { tempId: msg.id });
         continue;
+      }
+      newMessages.push(msg);
+    }
+
+    if (replaced) {
+      cached.messages = newMessages;
+      cached.lastUpdated = Date.now();
+      this.memoryCache.set(chatId, cached);
+      // Update preview
+      const last = cached.messages[cached.messages.length - 1];
+      if (last) {
+        this.chatPreviews.set(chatId, { chatId, lastMessage: last, unreadCount: 0, chatData: cached.chatData });
+      }
+      AsyncStorage.setItem(`ultra_chat_${chatId}`, JSON.stringify(cached)).catch(() => {});
+    }
+  }
+
+  // Replace any temp image message from the same sender (for when URLs don't match)
+  replaceAnyTempImageBySender(chatId: string, senderId: string, realMessage: Message) {
+    const cached = this.memoryCache.get(chatId);
+    if (!cached) return;
+
+    let replaced = false;
+    const newMessages: Message[] = [];
+    for (const msg of cached.messages) {
+      // 🔧 IMPROVED: Replace the first temp image message from the same sender
+      if (!replaced && msg.id.startsWith('temp_') && msg.imageUrl && msg.sender?.id === senderId) {
+        newMessages.push(realMessage);
+        replaced = true;
+        console.log('✅ [CACHE REPLACE SENDER] Replaced temp image by sender', {
+          tempId: msg.id,
+          realId: realMessage.id,
+          senderId,
+          tempUrl: msg.imageUrl?.substring(0, 30) + '...',
+          realUrl: realMessage.imageUrl?.substring(0, 30) + '...'
+        });
+        continue;
+      }
+      // Skip other temp image messages from same sender to avoid duplicates
+      if (replaced && msg.id.startsWith('temp_') && msg.imageUrl && msg.sender?.id === senderId) {
+        console.log('🗑️ [CACHE CLEANUP SENDER] Removing duplicate temp image from sender', { tempId: msg.id });
+        continue;
+      }
+      newMessages.push(msg);
+    }
+
+    if (replaced) {
+      cached.messages = newMessages;
+      cached.lastUpdated = Date.now();
+      this.memoryCache.set(chatId, cached);
+      // Update preview
+      const last = cached.messages[cached.messages.length - 1];
+      if (last) {
+        this.chatPreviews.set(chatId, { chatId, lastMessage: last, unreadCount: 0, chatData: cached.chatData });
+      }
+      AsyncStorage.setItem(`ultra_chat_${chatId}`, JSON.stringify(cached)).catch(() => {});
+    }
+  }
+
+  // Replace temp image message by timestamp proximity (for better matching)
+  replaceAnyTempImageByTime(chatId: string, senderId: string, realMessage: Message, toleranceMs: number = 30000) {
+    const cached = this.memoryCache.get(chatId);
+    if (!cached || !realMessage.rawTimestamp) return;
+
+    let replaced = false;
+    const newMessages: Message[] = [];
+    for (const msg of cached.messages) {
+      // Replace temp image message from same sender within time tolerance
+      if (!replaced && msg.id.startsWith('temp_') && msg.imageUrl && 
+          msg.sender?.id === senderId && msg.rawTimestamp) {
+        const timeDiff = Math.abs(realMessage.rawTimestamp - msg.rawTimestamp);
+        if (timeDiff <= toleranceMs) {
+          newMessages.push(realMessage);
+          replaced = true;
+          console.log('✅ [CACHE REPLACE TIME] Replaced temp image by time proximity', {
+            tempId: msg.id,
+            realId: realMessage.id,
+            timeDiff,
+            toleranceMs
+          });
+          continue;
+        }
+      }
+      // Skip other matching temps to avoid duplicates
+      if (replaced && msg.id.startsWith('temp_') && msg.imageUrl && 
+          msg.sender?.id === senderId && msg.rawTimestamp) {
+        const timeDiff = Math.abs(realMessage.rawTimestamp - msg.rawTimestamp);
+        if (timeDiff <= toleranceMs) {
+          console.log('🗑️ [CACHE CLEANUP TIME] Removing duplicate temp by time', { tempId: msg.id });
+          continue;
+        }
       }
       newMessages.push(msg);
     }

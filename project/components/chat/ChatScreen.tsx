@@ -41,6 +41,7 @@ import { messagePersistence } from '@/lib/messagePersistence';
 import { ultraFastChatCache } from '@/lib/ChatCache';
 import { router } from 'expo-router';
 import ImageCompressionService, { CompressionResult } from '@/lib/imageCompression';
+import { ImageMessageFixer } from '@/lib/imageMessageFix';
 interface ChatData {
   id: string | number;
   name: string;
@@ -590,8 +591,8 @@ const ChatScreen = React.memo(function ChatScreen({
         username: user.username || 'You',
         avatar: user.avatar || null,
       },
-      // Optional imageUrl field if your Message type supports it
-      ...(capturedImageUri ? { imageUrl: capturedImageUri } : {} as any),
+      // Store local URI with validation
+      ...(ImageMessageFixer.validateImageUrl(capturedImageUri).isValid ? { imageUrl: capturedImageUri } : {} as any),
     } as any;
     
     console.log('✅ [OPTIMISTIC] Adding temp message to UI:', tempId);
@@ -604,15 +605,14 @@ const ChatScreen = React.memo(function ChatScreen({
         return prev;
       }
       
-      // For images, check if same image is being sent
+      // 🔒 CRITICAL: For images, be more lenient to prevent disappearing
+      // Only skip if exact same temp ID exists, not just same image URI
       if (capturedImageUri) {
-        const duplicateImage = prev.some(msg => 
-          msg.imageUrl === capturedImageUri && 
-          msg.sender?.id === user.id && 
-          (msg.status === 'sending' || msg.id.startsWith('temp-'))
+        const exactDuplicate = prev.some(msg => 
+          msg.id === tempId // Only check for exact same temp ID
         );
-        if (duplicateImage) {
-          console.log('⚠️ [SKIP] Duplicate image - preventing duplicate add', { imageUri: capturedImageUri });
+        if (exactDuplicate) {
+          console.log('⚠️ [SKIP] Exact duplicate temp ID - preventing duplicate add', { tempId });
           return prev;
         }
       }
@@ -621,7 +621,8 @@ const ChatScreen = React.memo(function ChatScreen({
         tempId, 
         previousCount: prev.length, 
         newCount: prev.length + 1,
-        messageText: messageText.substring(0, 30) + '...'
+        messageText: messageText.substring(0, 30) + '...',
+        hasImage: !!capturedImageUri
       });
       return [...prev, tempMessage];
     });
@@ -660,7 +661,7 @@ const ChatScreen = React.memo(function ChatScreen({
         // If we have an image, upload it first
         if (capturedImageCompression) {
           // Check if we have a valid URI in the compression result
-          if (capturedImageCompression.uri) {
+          if (capturedImageCompression.uri && capturedImageCompression.uri.trim() !== '') {
             try {
               console.log('📤 [IMAGE] Uploading image from compression result:', {
                 hasUri: !!capturedImageCompression.uri,
@@ -675,28 +676,36 @@ const ChatScreen = React.memo(function ChatScreen({
               
               const uploadResp = await Promise.race([uploadPromise, timeoutPromise]) as any;
               
-              if (uploadResp?.url) {
+              if (uploadResp?.url && uploadResp.url.trim() !== '') {
                 uploadedImageUrl = uploadResp.url;
                 console.log('✅ [IMAGE] Upload successful:', uploadedImageUrl.substring(0, 50) + '...');
               } else {
-                throw new Error('Upload response missing URL');
+                throw new Error('Upload response missing URL or empty URL');
               }
             } catch (e: any) {
               console.error('❌ [IMAGE] Failed to upload chat image:', e);
               const errorMessage = e.message || 'Failed to upload image. Please try again.';
               Alert.alert('Error', errorMessage);
-              // Re-throw to stop message sending
-              throw e;
+              // Mark temp message as failed instead of throwing
+              setMessages(prev => prev.map(msg => 
+                msg.id === tempId ? { ...msg, status: 'failed' } : msg
+              ));
+              return; // Exit early instead of throwing
             }
           } else {
             console.warn('⚠️ [IMAGE] Compression result missing URI:', capturedImageCompression);
-            throw new Error('Image compression failed - no URI generated');
+            // Mark temp message as failed
+            setMessages(prev => prev.map(msg => 
+              msg.id === tempId ? { ...msg, status: 'failed' } : msg
+            ));
+            Alert.alert('Error', 'Image compression failed - please try again');
+            return; // Exit early
           }
         }
 
         console.log('🔌 [SOCKET] Sending via socket...');
         // Socket doesn't support image URL yet, use API for image messages
-        if (uploadedImageUrl) {
+        if (uploadedImageUrl && uploadedImageUrl.trim() !== '') {
           console.log('🌐 [API] Using HTTP API for image message...');
           const httpResponse: any = await apiService.sendMessage(chatId, { 
             content: messageText || '', // Empty string for image-only
@@ -709,6 +718,7 @@ const ChatScreen = React.memo(function ChatScreen({
             id: httpResponse?.id,
             timestamp: httpResponse?.timestamp,
             hasImage: !!httpResponse?.imageUrl,
+            imageUrl: httpResponse?.imageUrl?.substring(0, 50) + '...'
           });
 
           // Normalize HTTP response to match socket ack shape so shared logic below can be reused
@@ -752,100 +762,95 @@ const ChatScreen = React.memo(function ChatScreen({
             tempId,
             serverMessageId: serverMessage.id,
             timestamp: serverMessage.timestamp,
-            hasImage: !!serverMessage.imageUrl
+            hasImage: !!serverMessage.imageUrl,
+            tempImageUrl: capturedImageUri ? capturedImageUri.substring(0, 50) + '...' : 'none',
+            serverImageUrl: serverMessage.imageUrl ? serverMessage.imageUrl.substring(0, 50) + '...' : 'none'
           });
           
           setMessages(prev => {
+            // First, check if server message already exists
             const messageExists = prev.some(msg => msg.id === serverMessage.id);
             if (messageExists) {
-              // Server message is already present - clean up any matching temp messages
-              const cleaned = prev.filter(msg => {
-                if (!msg.id.startsWith('temp_')) return true;
-                // Remove temp messages from current user with same text
-                if (msg.sender?.id === user.id && msg.text === serverMessage.text) {
-                  console.log('🧹 [CLEAN TEMP] Removing temp message since server message already exists', {
-                    tempIdCandidate: msg.id,
+              console.log('⚠️ [SKIP] Server message already exists', { serverMessageId: serverMessage.id });
+              // Clean up any temp messages that might be duplicates
+              return prev.filter(msg => {
+                if (msg.id === tempId) {
+                  console.log('🧹 [CLEAN] Removing temp message since server exists', { tempId });
+                  return false;
+                }
+                return true;
+              });
+            }
+
+            // 🔧 IMPROVED: Better temp message replacement for images
+            let found = false;
+            const updated = prev.map(msg => {
+              // Direct ID match (preferred)
+              if (msg.id === tempId) {
+                found = true;
+                console.log('✅ [REPLACE DIRECT] Found temp message by ID, replacing with server message', {
+                  tempId,
+                  serverMessageId: serverMessage.id,
+                  hadTempImage: !!msg.imageUrl,
+                  hasServerImage: !!serverMessage.imageUrl
+                });
+                return serverMessage;
+              }
+              
+              // 🔧 IMPROVED: For image messages, match by sender, timestamp proximity, and image presence
+              if (!found && uploadedImageUrl && msg.id.startsWith('temp_') && 
+                  msg.sender?.id === user.id && msg.imageUrl) {
+                // Check if this temp message was created recently (within last 30 seconds)
+                const tempTime = msg.rawTimestamp || 0;
+                const serverTime = serverMessage.rawTimestamp || Date.now();
+                const timeDiff = Math.abs(serverTime - tempTime);
+                
+                if (timeDiff < 30000) { // 30 seconds tolerance
+                  found = true;
+                  console.log('✅ [REPLACE IMAGE] Found temp image message by sender and time, replacing with server message', {
+                    tempId: msg.id,
                     serverMessageId: serverMessage.id,
-                    textPreview: (serverMessage.text || '').substring(0, 30) + '...'
+                    tempImageUrl: msg.imageUrl?.substring(0, 30) + '...',
+                    serverImageUrl: serverMessage.imageUrl?.substring(0, 30) + '...',
+                    timeDiff
                   });
-                  return false;
+                  return serverMessage;
                 }
-                return true;
-              });
-              if (cleaned.length !== prev.length) {
-                console.log('✅ [CLEAN TEMP] Temp duplicates removed while keeping server message', {
-                  serverMessageId: serverMessage.id,
-                  beforeCount: prev.length,
-                  afterCount: cleaned.length
-                });
-                return cleaned;
               }
-              console.log('⚠️ [SKIP] Server message exists - preventing duplicate', { 
+              
+              return msg;
+            });
+
+            if (!found) {
+              console.log('⚠️ [NOT FOUND] Temp message not found, appending server message', {
+                tempId,
                 serverMessageId: serverMessage.id,
-                currentCount: prev.length 
+                currentMessageIds: prev.map(m => m.id).slice(-3)
               });
-              return prev;
+              return [...prev, serverMessage];
             }
 
-            // Check if temp exists
-            const hadTemp = prev.some(msg => msg.id === tempId);
-            console.log('🔍 [REPLACE CHECK]', { 
-              hadTemp, 
-              tempId, 
-              currentCount: prev.length,
-              messageIds: prev.map(m => m.id).slice(-3) // Last 3 message IDs for context
-            });
-
-            // Replace temp message if present
-            let replaced = prev.map(msg => msg.id === tempId ? serverMessage : msg);
-
-            // If server message has an image, remove any other temp messages with the same image (dedupe)
-            if (serverMessage.imageUrl) {
-              replaced = replaced.filter(msg => {
-                // Keep the official server message
-                if (msg.id === serverMessage.id) return true;
-                // Remove other entries (temps or duplicates) from same sender with same image
-                if (msg.id !== serverMessage.id && msg.imageUrl === serverMessage.imageUrl && msg.sender?.id === user.id) {
-                  console.log('🗑️ [DEDUPE] Removing duplicate image message', { 
-                    removedId: msg.id, 
-                    keptId: serverMessage.id 
-                  });
-                  return false;
-                }
-                return true;
-              });
-            }
-
-            // If temp wasn't present and we didn't replace anything, append server message
-            if (!hadTemp) {
-              // Avoid appending if an identical image message already exists
-              const duplicateImage = prev.some(msg => msg.imageUrl && serverMessage.imageUrl && msg.imageUrl === serverMessage.imageUrl && msg.sender?.id === user.id);
-              if (!duplicateImage) {
-                console.log('✅ [APPEND] Temp not found, appending server message', { 
-                  serverMessageId: serverMessage.id,
-                  newCount: replaced.length + 1
-                });
-                return [...replaced, serverMessage];
-              }
-              console.log('⚠️ [SKIP APPEND] Duplicate image found', { serverMessageId: serverMessage.id });
-              return replaced;
-            }
-
-            console.log('✅ [REPLACE] Temp replaced successfully', { 
-              tempId, 
+            console.log('✅ [SUCCESS] Temp message replaced successfully', {
+              tempId,
               serverMessageId: serverMessage.id,
-              newCount: replaced.length
+              messageCount: updated.length
             });
-            return replaced;
+            return updated;
           });
           
-          // Update cache
+          // 🔧 IMPROVED: Better cache replacement for images
           ultraFastChatCache.replaceMessageInstantly(chatId, tempId, serverMessage);
-          console.log('✅ [REPLACE] Temp message replaced in cache');
-          
-          // 🔒 DON'T add to global state here - it will be added via socket broadcast or loadMessages
-          // This prevents duplicate messages in global state
-          console.log('⏭️ [SKIP GLOBAL] Skipping global state update to prevent duplicates');
+          if (serverMessage.imageUrl) {
+            // Also try sender-based replacement for image messages
+            ultraFastChatCache.replaceAnyTempImageBySender(chatId, user.id, serverMessage);
+            // Additional fallback: replace any temp with local image URI
+            if (capturedImageUri) {
+              ultraFastChatCache.replaceAnyTempWithImage(chatId, capturedImageUri, serverMessage);
+            }
+            // Extra safety: replace by timestamp proximity for images
+            ultraFastChatCache.replaceAnyTempImageByTime(chatId, user.id, serverMessage, 30000);
+          }
+          console.log('✅ [CACHE] Temp message replaced in cache');
           
           return; // Exit early on socket success
         }
@@ -937,47 +942,59 @@ const ChatScreen = React.memo(function ChatScreen({
                 messageIds: prev.map(m => m.id).slice(-3)
               });
 
-              // Replace temp message if present
-              let replaced = prev.map(msg => msg.id === tempId ? serverMessage : msg);
-
-              // Dedupe by imageUrl for image messages
-              if (serverMessage.imageUrl) {
-                replaced = replaced.filter(msg => {
-                  if (msg.id === serverMessage.id) return true;
-                  if (msg.id !== serverMessage.id && msg.imageUrl === serverMessage.imageUrl && msg.sender?.id === user.id) {
-                    console.log('🗑️ [DEDUPE HTTP] Removing duplicate image message', { 
-                      removedId: msg.id, 
-                      keptId: serverMessage.id 
-                    });
-                    return false;
-                  }
-                  return true;
-                });
-              }
-
-              if (!hadTemp) {
-                const duplicateImage = prev.some(msg => msg.imageUrl && serverMessage.imageUrl && msg.imageUrl === serverMessage.imageUrl && msg.sender?.id === user.id);
-                if (!duplicateImage) {
-                  console.log('✅ [APPEND HTTP] Temp not found, appending server message', { 
-                    serverMessageId: serverMessage.id,
-                    newCount: replaced.length + 1
+              // 🔧 IMPROVED: Better temp message replacement for HTTP responses
+              let found = false;
+              const updated = prev.map(msg => {
+                // Direct ID match (preferred)
+                if (msg.id === tempId) {
+                  found = true;
+                  console.log('✅ [REPLACE HTTP DIRECT] Found temp by ID, replacing', {
+                    tempId,
+                    serverMessageId: serverMessage.id
                   });
-                  return [...replaced, serverMessage];
+                  return serverMessage;
                 }
-                console.log('⚠️ [SKIP APPEND HTTP] Duplicate image found', { serverMessageId: serverMessage.id });
-                return replaced;
+                
+                // 🔧 FALLBACK: For image messages, match by sender and image presence
+                if (!found && serverMessage.imageUrl && msg.id.startsWith('temp_') && 
+                    msg.sender?.id === user.id && msg.imageUrl) {
+                  found = true;
+                  console.log('✅ [REPLACE HTTP IMAGE] Found temp image by sender, replacing', {
+                    tempId: msg.id,
+                    serverMessageId: serverMessage.id
+                  });
+                  return serverMessage;
+                }
+                
+                return msg;
+              });
+
+              if (!found) {
+                console.log('✅ [APPEND HTTP] Temp not found, appending server message', { 
+                  serverMessageId: serverMessage.id,
+                  newCount: updated.length + 1
+                });
+                return [...updated, serverMessage];
               }
 
               console.log('✅ [REPLACE HTTP] Temp replaced successfully', { 
                 tempId, 
                 serverMessageId: serverMessage.id,
-                newCount: replaced.length
+                newCount: updated.length
               });
-              return replaced;
+              return updated;
             });
             
-            // Update cache
+            // 🔧 IMPROVED: Better cache replacement for HTTP responses
             ultraFastChatCache.replaceMessageInstantly(chatId, tempId, serverMessage);
+            if (serverMessage.imageUrl) {
+              // Also try sender-based replacement for image messages
+              ultraFastChatCache.replaceAnyTempImageBySender(chatId, user.id, serverMessage);
+              // Additional fallback: replace any temp with local image URI
+              if (capturedImageUri) {
+                ultraFastChatCache.replaceAnyTempWithImage(chatId, capturedImageUri, serverMessage);
+              }
+            }
             console.log('✅ [REPLACE HTTP] Temp message replaced in cache');
             
             // 🔒 DON'T add to global state here - it will be added via socket broadcast or loadMessages
@@ -994,7 +1011,9 @@ const ChatScreen = React.memo(function ChatScreen({
         setMessages(prev => prev.map(msg => 
           msg.id === tempId ? {
             ...msg,
-            status: 'failed' // ❌ Red X icon
+            status: 'failed', // ❌ Red X icon
+            // Preserve image URL for retry
+            ...(capturedImageUri && capturedImageUri.trim() !== '' ? { imageUrl: capturedImageUri } : {})
           } : msg
         ));
       }
@@ -1475,44 +1494,62 @@ const ChatScreen = React.memo(function ChatScreen({
           return; // Don't append / global add
         }
 
-        // 2) If no tempMessageId, try to match by imageUrl
+        // 2) If no tempMessageId, try to match by imageUrl for image messages
         if (socketMessage.imageUrl) {
           let matched = false;
           setMessages(prev => {
-            const mapped = prev.map(msg => {
-              if (!matched && msg.id.startsWith('temp_') && msg.imageUrl === socketMessage.imageUrl && msg.sender?.id === user.id) {
+            const updated = prev.map(msg => {
+              if (!matched && msg.id.startsWith('temp_') && msg.imageUrl && msg.sender?.id === user.id) {
+                // For image messages, match by sender since temp has local URI and server has remote URL
                 matched = true;
+                console.log('✅ [SOCKET] Matched temp image message by sender', { tempId: msg.id, serverId: serverMsg.id });
                 return serverMsg;
               }
               return msg;
             });
-            if (matched) {
-              // remove other temps with same image
-              return mapped.filter(msg => !(msg.id.startsWith('temp_') && msg.imageUrl === socketMessage.imageUrl && msg.sender?.id === user.id));
-            }
-            return prev;
+            return updated;
           });
           if (matched) {
-            ultraFastChatCache.replaceAnyTempWithImage(chatId, socketMessage.imageUrl, serverMsg);
-            console.log('✅ [REPLACE SOCKET] Replaced temp by image via socket');
+            console.log('✅ [REPLACE SOCKET] Replaced temp image message via socket');
+            setTimeout(() => addMessageToChat(chatId, serverMsg, false), 0);
+            return;
+          }
+          
+          // Fallback: Try to replace by sender for image messages in state
+          let fallbackMatched = false;
+          setMessages(prev => {
+            const updated = prev.map(msg => {
+              if (!fallbackMatched && msg.id.startsWith('temp_') && msg.imageUrl && msg.sender?.id === user.id) {
+                fallbackMatched = true;
+                console.log('✅ [SOCKET FALLBACK] Matched temp image by sender', { tempId: msg.id, serverId: serverMsg.id });
+                return serverMsg;
+              }
+              return msg;
+            });
+            return updated;
+          });
+          
+          if (fallbackMatched) {
+            ultraFastChatCache.replaceAnyTempImageBySender(chatId, user.id, serverMsg);
+            console.log('✅ [REPLACE SOCKET] Replaced temp image by sender via socket');
             setTimeout(() => addMessageToChat(chatId, serverMsg, false), 0);
             return;
           }
         }
 
-        // 3) Try text match heuristic
+        // 3) Try text match heuristic for text messages
         if (socketMessage.text && socketMessage.text.trim() !== '') {
           let matched = false;
           setMessages(prev => prev.map(msg => {
             if (!matched && msg.id.startsWith('temp_') && msg.text === socketMessage.text && msg.sender?.id === user.id) {
               matched = true;
+              console.log('✅ [SOCKET] Matched temp text message', { tempId: msg.id, serverId: serverMsg.id });
               return serverMsg;
             }
             return msg;
           }));
           if (matched) {
-            ultraFastChatCache.replaceAnyTempByText(chatId, socketMessage.text, serverMsg);
-            console.log('✅ [REPLACE SOCKET] Replaced temp by text via socket');
+            console.log('✅ [REPLACE SOCKET] Replaced temp text message via socket');
             setTimeout(() => addMessageToChat(chatId, serverMsg, false), 0);
             return;
           }
@@ -1759,6 +1796,15 @@ return <Text>{parts}</Text>;
 const renderMessage = useCallback(({ item }: { item: Message }) => {
   const isUserMessage = item.isUser;
   const isGroupChat = chatData?.isGroup;
+  
+  // Validate and fix image URL
+  const shouldShowImage = ImageMessageFixer.shouldShowImage(item);
+  const safeImageUrl = ImageMessageFixer.getSafeImageUrl(item);
+  
+  // Log any image issues for debugging
+  if (item.imageUrl && !shouldShowImage) {
+    ImageMessageFixer.logImageIssue(item, 'renderMessage');
+  }
 
   return (
     <View style={[
@@ -1802,30 +1848,57 @@ const renderMessage = useCallback(({ item }: { item: Message }) => {
             </View>
           )}
 
-          {/* Display image if present */}
-          {item.imageUrl && (
+          {/* Display image if valid */}
+          {shouldShowImage && safeImageUrl && (
             <TouchableOpacity 
               onPress={() => {
-                setFullScreenImage(item.imageUrl!);
+                setFullScreenImage(safeImageUrl);
                 setShowImageViewer(true);
               }} 
               activeOpacity={0.9}
             >
               <Image
-                source={{ uri: item.imageUrl }}
+                source={{ uri: safeImageUrl }}
                 style={styles.messageImage}
                 resizeMode="cover"
+                onError={(error) => {
+                  console.log('❌ [IMAGE ERROR] Failed to load message image:', {
+                    messageId: item.id,
+                    imageUrl: safeImageUrl?.substring(0, 50) + '...',
+                    originalUrl: item.imageUrl,
+                    error: error.nativeEvent.error
+                  });
+                }}
+                onLoad={() => {
+                  console.log('✅ [IMAGE LOADED] Message image loaded successfully:', {
+                    messageId: item.id,
+                    imageUrl: safeImageUrl?.substring(0, 50) + '...'
+                  });
+                }}
               />
             </TouchableOpacity>
           )}
 
-          {/* Only show text if not empty (image-only message) */}
-          {item.text && item.text.trim() !== '' && (
+          {/* Show text if present, or handle image-only messages */}
+          {item.text && item.text.trim() !== '' ? (
             <Text style={[
               styles.messageText,
               { color: isUserMessage ? '#ffffff' : colors.text }
             ]}>
               {renderTextWithLinks(item.text, isUserMessage)}
+            </Text>
+          ) : shouldShowImage ? (
+            // Image-only message - no text needed
+            null
+          ) : (
+            // Fallback for messages with no valid content
+            <Text style={[
+              styles.messageText,
+              { color: isUserMessage ? 'rgba(255,255,255,0.7)' : colors.textMuted, fontStyle: 'italic' }
+            ]}>
+              {item.status === 'sending' ? 'Sending...' : 
+               item.status === 'failed' ? 'Failed to send' : 
+               'Message content unavailable'}
             </Text>
           )}
           <View style={styles.messageFooter}>
