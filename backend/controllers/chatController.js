@@ -289,7 +289,7 @@ class ChatController {
             }
           }
           
-          await this.sendMessageNotification(chatId, senderId, content);
+          await this.sendMessageNotification(chatId, senderId, cleanContent, imageUrl);
         } catch (backgroundError) {
           logger.error('Background message processing failed:', backgroundError);
         }
@@ -303,7 +303,7 @@ class ChatController {
   /**
    * Send push notification for new message
    */
-  async sendMessageNotification(chatId, senderId, content) {
+  async sendMessageNotification(chatId, senderId, content, imageUrl = null) {
     try {
       const chat = await prisma.chat.findUnique({
         where: { id: chatId },
@@ -345,7 +345,8 @@ class ChatController {
         senderId,
         sender.username,
         content,
-        chatId
+        chatId,
+        imageUrl
       );
 
       if (!result.success && result.message !== 'No FCM tokens found') {
@@ -356,7 +357,8 @@ class ChatController {
               senderId,
               sender.username,
               content,
-              chatId
+              chatId,
+              imageUrl
             );
           } catch (retryError) {
             logger.warn('Notification retry failed', retryError);

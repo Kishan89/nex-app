@@ -8,6 +8,7 @@ import { useChatContext } from '../../context/ChatContext';
 import { Colors } from '../../constants/theme';
 import { fcmService } from '../../lib/fcmService';
 import { chatCache } from '@/store/chatCache';
+import { notificationChatLoader } from '../../lib/notificationChatLoader';
 
 export default function IndividualChatScreen() {
   const params = useLocalSearchParams();
@@ -16,9 +17,10 @@ export default function IndividualChatScreen() {
   const { user } = useAuth();
   const { refreshUnreadCounts, markChatAsRead: markChatAsReadContext } = useChatContext();
   const [chatData, setChatData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [isFromNotification, setIsFromNotification] = useState(false);
   const [forceRefresh, setForceRefresh] = useState(false);
+  const [preloadComplete, setPreloadComplete] = useState(false);
   const lastAppStateRef = useRef(AppState.currentState);
   
   // Check if this is a new chat (id = 'new' with user data in params)
@@ -121,10 +123,47 @@ export default function IndividualChatScreen() {
         userId: params.userId as string,
       });
       setLoading(false);
+      setPreloadComplete(true);
       return;
     }
     
     if (!id) return;
+    
+    // Check if this is from notification and preload if needed
+    const fromNotification = params.fromNotification === 'true';
+    if (fromNotification && !preloadComplete) {
+      console.log('🔔 [NOTIFICATION] Preloading chat data for smooth navigation...');
+      try {
+        const preloadedData = await notificationChatLoader.preloadChatData(id as string);
+        if (preloadedData) {
+          console.log('✅ [PRELOAD] Chat data preloaded successfully');
+          setChatData({
+            id: preloadedData.id,
+            name: preloadedData.name,
+            username: preloadedData.username || preloadedData.name,
+            avatar: preloadedData.avatar || '',
+            isOnline: preloadedData.isOnline || false,
+            lastSeen: preloadedData.lastSeen || 'recently',
+            lastSeenText: preloadedData.isOnline ? 'Online' : 'Last seen recently',
+            userId: preloadedData.userId || 'unknown',
+            isGroup: preloadedData.isGroup || false,
+            description: preloadedData.description || '',
+            memberCount: preloadedData.memberCount || 0,
+            participants: preloadedData.participants || [],
+            createdById: preloadedData.createdById || null,
+          });
+          setLoading(false);
+          setPreloadComplete(true);
+          
+          // Preload messages in background
+          notificationChatLoader.preloadMessages(id as string, user.id).catch(console.error);
+          return;
+        }
+      } catch (error) {
+        console.error('❌ [PRELOAD] Failed to preload chat data:', error);
+        // Continue with normal loading
+      }
+    }
     
     // 🚀 PERFORMANCE: Use cached data from params if available
     const cachedName = params.cachedName as string;
@@ -379,6 +418,11 @@ export default function IndividualChatScreen() {
           onFirstMessage={isNewChat ? handleFirstMessage : undefined}
           onChatDeleted={handleChatDeleted}
         />
+      ) : loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Loading chat...</Text>
+        </View>
       ) : (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load chat</Text>

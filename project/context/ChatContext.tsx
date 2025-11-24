@@ -6,6 +6,7 @@ import { socketService, SocketMessage } from '../lib/socketService';
 import { Message } from '../types';
 import { logger } from '../lib/logger';
 import { getCurrentTimestamp, fixServerTimestamp } from '../lib/timestampUtils';
+import { chatContextFix } from '../lib/chatContextFix';
 interface ChatContextType {
   totalUnreadCount: number;
   chatReadCounts: Record<string, number>;
@@ -281,53 +282,50 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize global socket listener
   useEffect(() => {
     if (!user?.id || socketInitialized.current) return;
-    // Initializing global socket listener
+    // Enhanced socket listener with fix
     const initializeSocket = async () => {
       try {
         // Ensure socket is connected
         if (!socketService.isSocketConnected()) {
           await socketService.connect();
         }
-        // Set up global message listener
-        const unsubscribeMessages = socketService.onNewMessage((socketMessage: SocketMessage) => {
-          // CRITICAL FIX: Skip messages from current user in global listener
-          // Current user gets their messages via callback response only, not broadcast
-          if (socketMessage.sender?.id === user?.id) {
-            console.log('🔕 [GLOBAL] Skipping message from current user - sender gets via callback');
-            return;
-          }
-          
-          // Check for duplicate processing
-          if (processedMessageIds.current.has(socketMessage.id)) {
-            return; // Silent skip - don't log every duplicate
-          }
-          // Mark as processed
-          processedMessageIds.current.add(socketMessage.id);
-          const newMessage: Message = {
-            id: socketMessage.id,
-            text: socketMessage.text || socketMessage.content,
-            isUser: false, // Always false since we skip current user above
-            timestamp: fixServerTimestamp(socketMessage.timestamp) || socketMessage.timestamp,
-            status: 'delivered', // Always delivered for incoming messages
-            sender: socketMessage.sender
-          };
-          // Add socket message to global store
-          addMessageToChat(socketMessage.chatId, newMessage);
-          // Update unread counts (always update since it's from another user)
-          if (true) {
+        
+        // Use enhanced message handler
+        const cleanup = chatContextFix.setupGlobalMessageHandler(
+          user.id,
+          (chatId: string, socketMessage: any) => {
+            // Check for duplicate processing
+            if (processedMessageIds.current.has(socketMessage.id)) {
+              return;
+            }
+            
+            // Mark as processed
+            processedMessageIds.current.add(socketMessage.id);
+            
+            const newMessage: Message = {
+              id: socketMessage.id,
+              text: socketMessage.text || socketMessage.content,
+              isUser: false,
+              timestamp: fixServerTimestamp(socketMessage.timestamp) || socketMessage.timestamp,
+              status: 'delivered',
+              sender: socketMessage.sender,
+              imageUrl: socketMessage.imageUrl
+            };
+            
+            // Add to global store
+            addMessageToChat(chatId, newMessage);
+            
+            // Update unread counts
             refreshUnreadCounts();
           }
-        });
+        );
+        
         socketInitialized.current = true;
-        // Global socket listener initialized
-        // Cleanup function
-        return () => {
-          unsubscribeMessages();
-          processedMessageIds.current.clear();
-          socketInitialized.current = false;
-        };
+        
+        return cleanup;
       } catch (error) {
-        // Failed to initialize global socket listener
+        console.error('Failed to initialize socket listener:', error);
+        return () => {};
       }
     };
     initializeSocket();

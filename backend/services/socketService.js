@@ -372,7 +372,8 @@ class SocketService {
         senderId,
         sender.username,
         content,
-        chatId
+        chatId,
+        message.imageUrl || null
       );
 
       // Note: Socket real-time updates are already handled by new_message event

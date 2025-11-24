@@ -42,6 +42,7 @@ import { ultraFastChatCache } from '@/lib/ChatCache';
 import { router } from 'expo-router';
 import ImageCompressionService, { CompressionResult } from '@/lib/imageCompression';
 import { ImageMessageFixer } from '@/lib/imageMessageFix';
+import { chatMessageSync } from '@/lib/chatMessageSync';
 interface ChatData {
   id: string | number;
   name: string;
@@ -202,70 +203,48 @@ const ChatScreen = React.memo(function ChatScreen({
       }
   }, []);
 
-  // 🚀 REAL-TIME: Listen for new messages via socket
+  // 🚀 REAL-TIME: Enhanced message synchronization
   useEffect(() => {
     if (!chatData?.id || !user?.id) return;
 
-    const handleNewMessage = (socketMessage: any) => {
-      // Only handle messages for this chat
-      if (String(socketMessage.chatId) !== String(chatData.id)) return;
-      
-      // Skip messages from current user (handled optimistically)
-      if (socketMessage.sender?.id === user.id) return;
-
-      console.log('📨 [SOCKET] Received new message in ChatScreen:', socketMessage.id);
-
-      const formattedTimestamp = socketMessage.timestamp 
-        ? new Date(socketMessage.timestamp).toLocaleTimeString([], {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          })
-        : new Date().toLocaleTimeString([], {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
+    const chatId = String(chatData.id);
+    
+    // Start real-time sync
+    chatMessageSync.startSync({
+      chatId,
+      userId: user.id,
+      onMessageReceived: (newMessage) => {
+        console.log('📨 [SYNC] New message received:', newMessage.id);
+        
+        setMessages(prev => {
+          // Deduplicate
+          if (prev.some(m => m.id === newMessage.id)) {
+            return prev;
+          }
+          
+          // Add new message
+          const updated = [...prev, newMessage];
+          
+          // Sort messages
+          return updated.sort((a, b) => {
+            if (a.id.startsWith('temp_')) return 1;
+            if (b.id.startsWith('temp_')) return -1;
+            return compareTimestamps(a.timestamp, b.timestamp);
           });
-
-      const newMessage: Message = {
-        id: socketMessage.id,
-        text: socketMessage.text || socketMessage.content,
-        isUser: false,
-        timestamp: formattedTimestamp,
-        status: 'delivered',
-        sender: socketMessage.sender,
-        imageUrl: socketMessage.imageUrl
-      };
-
-      setMessages(prev => {
-        // Deduplicate
-        if (prev.some(m => m.id === newMessage.id)) {
-          return prev;
-        }
-        
-        // Add new message
-        const updated = [...prev, newMessage];
-        
-        // Sort to be safe (though usually appending is enough)
-        return updated.sort((a, b) => {
-          if (a.id.startsWith('temp_')) return 1;
-          if (b.id.startsWith('temp_')) return -1;
-          return compareTimestamps(a.timestamp, b.timestamp);
         });
-      });
-      
-      // Update ultra-fast cache
-      ultraFastChatCache.addMessageInstantly(String(chatData.id), newMessage);
-      
-      // Scroll to bottom
-      setTimeout(() => scrollToBottom(true), 100);
-    };
-
-    // Subscribe to socket updates
-    const unsubscribe = socketService.onNewMessage(handleNewMessage);
+        
+        // Scroll to bottom
+        setTimeout(() => scrollToBottom(true), 100);
+      },
+      onMessageUpdated: (updatedMessages) => {
+        console.log('🔄 [SYNC] Messages updated from sync:', updatedMessages.length);
+        setMessages(updatedMessages);
+        setTimeout(() => scrollToBottom(true), 100);
+      }
+    });
     
     return () => {
-      unsubscribe();
+      chatMessageSync.stopSync(chatId);
     };
   }, [chatData?.id, user?.id, scrollToBottom]);
   // 🚀 IMPROVED: Auto-scroll whenever messages change with better timing
@@ -1649,13 +1628,11 @@ const ChatScreen = React.memo(function ChatScreen({
         socketService.joinChat(String(chatData.id));
       }
       
-      // If coming from notification or forceInitialRefresh is true, reload messages
-      if (forceInitialRefresh) {
-        console.log('🔄 [FOCUS] Force refresh enabled, reloading messages from server...');
-        setTimeout(() => {
-          loadMessages(true); // Force refresh from server
-        }, 100);
-      }
+      // Always reload messages when focusing to catch missed messages
+      console.log('🔄 [FOCUS] Reloading messages to catch any missed updates...');
+      setTimeout(() => {
+        loadMessages(true); // Force refresh from server
+      }, 100);
       
       return () => {
         console.log('👋 [FOCUS] ChatScreen unfocused');

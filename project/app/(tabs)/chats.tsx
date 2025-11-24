@@ -10,6 +10,7 @@ import {
   RefreshControl,
   SafeAreaView,
   Platform,
+  AppState,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Search, MessageCircle, Plus, Users } from 'lucide-react-native';
@@ -66,6 +67,7 @@ const ChatsScreen = React.memo(function ChatsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [viewerImageUri, setViewerImageUri] = useState('');
+  const [lastActiveTime, setLastActiveTime] = useState(Date.now());
   const { user } = useAuth();
   const { chatReadCounts, markChatAsRead, refreshUnreadCounts, addMessageToChat } = useChatContext();
   const { colors, isDark } = useTheme();
@@ -335,6 +337,26 @@ const ChatsScreen = React.memo(function ChatsScreen() {
       loadChats();
     }
   }, [user, loadChats]);
+
+  // Background sync - reload when app comes back from background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active' && user?.id) {
+        const timeSinceBackground = Date.now() - lastActiveTime;
+        // If app was in background for more than 5 seconds, sync messages
+        if (timeSinceBackground > 5000) {
+          console.log('🔄 App returned from background, syncing chats...');
+          loadChats(true); // Force refresh
+          refreshUnreadCounts();
+        }
+      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        setLastActiveTime(Date.now());
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [user?.id, lastActiveTime, loadChats, refreshUnreadCounts]);
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadChats(true); // Force refresh on pull to refresh

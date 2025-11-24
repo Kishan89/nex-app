@@ -154,6 +154,7 @@ class SocketService {
         // 🚀 PERFORMANCE: Preload chat data for instant navigation
         const chatId = message.chatId;
         const { ultraFastChatCache } = require('./ChatCache');
+        const { notificationChatLoader } = require('./notificationChatLoader');
         
         // Cache the chat data immediately for instant loading when user clicks
         const chatData = {
@@ -175,9 +176,12 @@ class SocketService {
           sender: message.sender,
         });
         
+        // Preload chat data for smooth notification navigation
+        notificationChatLoader.preloadChatData(chatId).catch(() => {});
+        
         DeviceEventEmitter.emit('showNotificationBanner', {
           title: message.sender?.username || 'New Message',
-          body: message.text || message.content || 'sent you a message',
+          body: message.imageUrl ? '📷 Photo' : (message.text || message.content || 'sent you a message'),
           data: {
             type: 'message',
             chatId: message.chatId,
@@ -191,6 +195,8 @@ class SocketService {
             router.push({
               pathname: `/chat/${chatId}`,
               params: {
+                fromNotification: 'true',
+                timestamp: Date.now().toString(),
                 cachedName: chatData.name,
                 cachedAvatar: chatData.avatar,
                 cachedIsOnline: 'true',

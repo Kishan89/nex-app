@@ -366,8 +366,9 @@ async function sendFollowNotification(followedUserId, followerUserId, followerUs
  * @param {string} senderUsername - Username of the sender
  * @param {string} messageContent - Content of the message
  * @param {string} chatId - ID of the chat
+ * @param {string} imageUrl - Optional image URL if message contains image
  */
-async function sendMessageNotification(recipientUserIds, senderUserId, senderUsername, messageContent, chatId) {
+async function sendMessageNotification(recipientUserIds, senderUserId, senderUsername, messageContent, chatId, imageUrl = null) {
   if (!recipientUserIds || recipientUserIds.length === 0) {
     logger.warn('No recipients for message notification', { chatId });
     return { success: false, message: 'No recipients provided' };
@@ -392,14 +393,30 @@ async function sendMessageNotification(recipientUserIds, senderUserId, senderUse
     logger.error('Failed to get sender avatar', { error: error.message, senderUserId });
   }
 
-  // Truncate message content for notification
-  const truncatedMessage = messageContent.length > 50 
-    ? messageContent.substring(0, 50) + '...' 
-    : messageContent;
+  // Handle image messages vs text messages
+  let notificationBody;
+  if (imageUrl) {
+    // Image message
+    if (messageContent && messageContent.trim()) {
+      // Image with caption
+      const truncatedCaption = messageContent.length > 40 
+        ? messageContent.substring(0, 40) + '...' 
+        : messageContent;
+      notificationBody = `📷 ${truncatedCaption}`;
+    } else {
+      // Image only
+      notificationBody = '📷 Photo';
+    }
+  } else {
+    // Text message
+    notificationBody = messageContent.length > 50 
+      ? messageContent.substring(0, 50) + '...' 
+      : messageContent;
+  }
 
   const notification = {
     title: `${senderUsername}`,
-    body: truncatedMessage
+    body: notificationBody
   };
 
   const data = {
