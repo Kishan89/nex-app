@@ -99,28 +99,39 @@ class SocketService {
     // Handle sending messages with acknowledgment
     socket.on('send_message', async (data, callback) => {
       try {
-        const { chatId, content, tempMessageId } = data;
+        const { chatId, content, tempMessageId, imageUrl } = data;
         logger.info('📤 [SOCKET] Message send initiated', { 
           userId, 
           chatId, 
           tempMessageId, 
           contentLength: content?.length,
-          contentPreview: content?.substring(0, 50) + '...' 
+          contentPreview: content?.substring(0, 50) + '...',
+          hasImage: !!imageUrl
         });
 
-        // Validate input
-        if (!content || !chatId) {
-          logger.error('❌ [SOCKET] Invalid message data', { content: !!content, chatId: !!chatId });
-          throw new Error('Invalid message data: content and chatId are required');
+        // Validate input - allow messages with either content or imageUrl
+        if ((!content || !content.trim()) && !imageUrl) {
+          logger.error('❌ [SOCKET] Invalid message data', { 
+            hasContent: !!(content && content.trim()), 
+            hasImage: !!imageUrl, 
+            chatId: !!chatId 
+          });
+          throw new Error('Invalid message data: message must have either text content or an image');
+        }
+        
+        if (!chatId) {
+          logger.error('❌ [SOCKET] Missing chatId', { chatId });
+          throw new Error('Invalid message data: chatId is required');
         }
 
         // Save message to database with comprehensive error handling
         let message;
         try {
           message = await chatService.sendMessage({
-            content,
+            content: content || '', // Empty string for image-only messages
             chatId,
-            senderId: userId
+            senderId: userId,
+            imageUrl: imageUrl || undefined // Include image URL if present
           });
           
           if (!message || !message.id) {
@@ -211,7 +222,7 @@ class SocketService {
         }
 
         // Send FCM push notification to other chat participants (non-blocking)
-        this.sendFCMNotificationToOtherParticipants(chatId, userId, content, message)
+        this.sendFCMNotificationToOtherParticipants(chatId, userId, content || '', message)
           .catch(fcmError => {
             logger.error('❌ [SOCKET] FCM notification error', { 
               error: fcmError.message, 
@@ -367,14 +378,28 @@ class SocketService {
 
       // Send FCM push notification to ALL recipients
       // FCM will handle whether to show notification based on app state
+      logger.info('📤 [SOCKET FCM] Sending push notification', {
+        recipientCount: recipientIds.length,
+        senderUsername: sender.username,
+        chatId,
+        hasImage: !!message.imageUrl,
+        hasText: !!content.trim(),
+        messagePreview: content.substring(0, 20) + '...'
+      });
+      
       await sendMessageNotification(
         recipientIds,
         senderId,
         sender.username,
-        content,
+        content || '', // Ensure content is not null/undefined
         chatId,
         message.imageUrl || null
       );
+      
+      logger.info('✅ [SOCKET FCM] Push notification sent successfully', {
+        chatId,
+        recipientCount: recipientIds.length
+      });
 
       // Note: Socket real-time updates are already handled by new_message event
       // No need for duplicate socket notifications

@@ -18,6 +18,7 @@ export interface SocketMessage {
     avatar?: string;
   };
   chatId: string;
+  imageUrl?: string; // Support for image messages
 }
 export interface SocketNotification {
   type: 'MESSAGE' | 'LIKE' | 'COMMENT' | 'FOLLOW';

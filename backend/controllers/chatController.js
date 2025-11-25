@@ -340,28 +340,68 @@ class ChatController {
         return;
       }
 
+      // Ensure content is not null/undefined for image messages
+      const messageContent = content || '';
+      
+      logger.info('📤 [NOTIFICATION] Sending push notification', {
+        recipientCount: participantUserIds.length,
+        senderUsername: sender.username,
+        chatId,
+        hasImage: !!imageUrl,
+        hasText: !!messageContent.trim(),
+        messagePreview: messageContent ? messageContent.substring(0, 20) + '...' : '(image only)',
+        imageUrl: imageUrl ? 'present' : 'none'
+      });
+      
+      logger.info('📤 [CONTROLLER] Calling FCM notification', {
+        recipientCount: participantUserIds.length,
+        senderUsername: sender.username,
+        chatId,
+        hasImage: !!imageUrl,
+        hasText: !!messageContent.trim(),
+        messageContentLength: messageContent.length
+      });
+      
       const result = await sendMessageNotification(
         participantUserIds,
         senderId,
         sender.username,
-        content,
+        messageContent,
         chatId,
         imageUrl
       );
+      
+      logger.info('📤 [CONTROLLER] FCM notification result', {
+        success: result.success,
+        successCount: result.successCount,
+        failureCount: result.failureCount,
+        message: result.message
+      });
 
       if (!result.success && result.message !== 'No FCM tokens found') {
+        logger.warn('🔄 [NOTIFICATION] Retrying failed notification', {
+          chatId,
+          senderUsername: sender.username,
+          hasImage: !!imageUrl,
+          failureReason: result.message
+        });
+        
         setTimeout(async () => {
           try {
-            await sendMessageNotification(
+            const retryResult = await sendMessageNotification(
               participantUserIds,
               senderId,
               sender.username,
-              content,
+              messageContent,
               chatId,
               imageUrl
             );
+            logger.info('🔄 [NOTIFICATION] Retry result', {
+              success: retryResult.success,
+              message: retryResult.message
+            });
           } catch (retryError) {
-            logger.warn('Notification retry failed', retryError);
+            logger.error('❌ [NOTIFICATION] Retry failed', retryError);
           }
         }, NOTIFICATION.RETRY_DELAY_MS);
       }

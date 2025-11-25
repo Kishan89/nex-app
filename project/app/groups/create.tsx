@@ -146,28 +146,6 @@ const CreateGroupScreen = () => {
     }
   };
 
-  const renderUserItem = ({ item }: { item: UserItem }) => {
-    const selected = selectedIds.has(item.id);
-    return (
-      <TouchableOpacity
-        style={[styles.userItem, selected && styles.selectedUserItem]}
-        onPress={() => toggleUserSelection(item.id)}
-        activeOpacity={0.7}
-      >
-        <Image
-          source={item.avatar ? { uri: item.avatar } : require('@/assets/images/default-avatar.png')}
-          style={styles.userAvatar}
-        />
-        <View style={styles.userInfo}>
-          <Text style={[styles.username, selected && styles.selectedUsername]}>{item.username}</Text>
-        </View>
-        <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-          {selected && <Check size={16} color="#ffffff" />}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   const styles = createStyles(colors);
 
   if (loadingUsers) {
@@ -256,6 +234,9 @@ const CreateGroupScreen = () => {
               <Text style={[styles.memberCountText, { color: colors.primary }]}>{selectedIds.size}</Text>
             </View>
           </View>
+          <Text style={[styles.hintText, { color: colors.textMuted }]}>
+            Only followed users are shown here. Follow members to add them to the group.
+          </Text>
           <View style={styles.userList}>
             {users.map((item) => {
               const selected = selectedIds.has(item.id);
@@ -446,6 +427,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: FontWeights.semibold,
     marginLeft: Spacing.xs,
     color: '#3B8FE8',
+  },
+  hintText: {
+    fontSize: FontSizes.sm,
+    color: colors.textMuted,
+    marginBottom: Spacing.md,
+    fontStyle: 'italic',
   },
   userList: {
     flex: 1,

@@ -14,6 +14,7 @@ const searchRoutes = require('./searchRoutes');
 const xpRoutes = require('./xpRoutes');
 const versionRoutes = require('./version');
 const groupsRouter = require('./groups');
+const debugRouter = require('./debug');
 
 const userController = require('../controllers/userController'); 
 
@@ -45,5 +46,6 @@ router.use('/search', searchRoutes);
 router.use('/xp', xpRoutes);
 router.use('/version', versionRoutes);
 router.use('/groups', groupsRouter);
+router.use('/debug', debugRouter);
 
 module.exports = router;

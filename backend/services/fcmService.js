@@ -77,7 +77,7 @@ async function sendFCMNotification(userIds, notification, data = {}) {
       },
       android: {
         notification: {
-          channelId: data.type === 'message' ? 'nexeed_messages' : 'nexeed_notifications',
+          channelId: 'nexeed_messages', // Always use messages channel for chat notifications
           priority: 'high',
           defaultSound: true,
           defaultVibrateTimings: true,
@@ -161,12 +161,24 @@ async function sendFCMNotification(userIds, notification, data = {}) {
     };
 
     // Send to multiple tokens
-    logger.info('Sending FCM notification with payload', {
+    logger.info('📤 [FCM] Sending FCM notification with payload', {
       tokenCount: tokens.length,
       notificationTitle: message.notification.title,
       notificationBody: message.notification.body,
-      dataKeys: Object.keys(message.data)
+      dataKeys: Object.keys(message.data),
+      hasImage: data.hasImage === 'true',
+      messageType: data.messageType
     });
+    
+    // Special logging for image messages
+    if (data.hasImage === 'true') {
+      logger.info('📷 [FCM] Image message notification details', {
+        notificationBody: message.notification.body,
+        messageType: data.messageType,
+        hasImageData: data.hasImage,
+        androidChannelId: message.android.notification.channelId
+      });
+    }
 
     const response = await admin.messaging().sendEachForMulticast({
       tokens: tokens,
@@ -378,7 +390,8 @@ async function sendMessageNotification(recipientUserIds, senderUserId, senderUse
     recipientCount: recipientUserIds.length,
     senderUsername,
     chatId,
-    messagePreview: messageContent.substring(0, 20) + '...'
+    hasImage: !!(imageUrl && imageUrl.trim()),
+    messagePreview: messageContent ? messageContent.substring(0, 20) + '...' : '(image only)'
   });
 
   // Get sender's avatar
@@ -395,7 +408,7 @@ async function sendMessageNotification(recipientUserIds, senderUserId, senderUse
 
   // Handle image messages vs text messages
   let notificationBody;
-  if (imageUrl) {
+  if (imageUrl && imageUrl.trim() !== '') {
     // Image message
     if (messageContent && messageContent.trim()) {
       // Image with caption
@@ -409,15 +422,40 @@ async function sendMessageNotification(recipientUserIds, senderUserId, senderUse
     }
   } else {
     // Text message
-    notificationBody = messageContent.length > 50 
+    notificationBody = messageContent && messageContent.length > 50 
       ? messageContent.substring(0, 50) + '...' 
-      : messageContent;
+      : (messageContent || 'New message');
   }
+  
+  // Ensure notification body is never empty
+  if (!notificationBody || notificationBody.trim() === '') {
+    notificationBody = imageUrl ? '📷 Photo' : 'New message';
+  }
+  
+  logger.info('📱 [FCM] Prepared notification body', {
+    hasImage: !!(imageUrl && imageUrl.trim()),
+    hasText: !!(messageContent && messageContent.trim()),
+    notificationBody,
+    notificationBodyLength: notificationBody ? notificationBody.length : 0,
+    imageUrl: imageUrl ? imageUrl.substring(0, 50) + '...' : 'none',
+    messageContent: messageContent ? messageContent.substring(0, 30) + '...' : 'empty'
+  });
 
   const notification = {
     title: `${senderUsername}`,
     body: notificationBody
   };
+  
+  // Validate notification object
+  if (!notification.title || !notification.body) {
+    logger.error('❌ [FCM] Invalid notification object', {
+      title: notification.title,
+      body: notification.body,
+      senderUsername,
+      notificationBody
+    });
+    return { success: false, message: 'Invalid notification data' };
+  }
 
   const data = {
     type: 'message',
@@ -425,16 +463,20 @@ async function sendMessageNotification(recipientUserIds, senderUserId, senderUse
     senderId: senderUserId.toString(),
     username: senderUsername,
     avatar: senderAvatar,
-    action: 'open_chat'
+    action: 'open_chat',
+    hasImage: !!(imageUrl && imageUrl.trim()) ? 'true' : 'false',
+    messageType: (imageUrl && imageUrl.trim()) ? 'image' : 'text'
   };
 
-  logger.info('Sending message notification', {
+  logger.info('📤 [FCM] Sending message notification', {
     recipientCount: recipientUserIds.length,
     senderUsername,
     chatId,
-    messagePreview: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : ''),
-    notificationTitle: `${senderUsername}`,
-    notificationBody: messageContent.length > 50 ? messageContent.substring(0, 50) + '...' : messageContent
+    hasImage: !!(imageUrl && imageUrl.trim()),
+    messagePreview: messageContent ? messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : '') : '(no text)',
+    notificationTitle: notification.title,
+    notificationBody: notification.body,
+    dataKeys: Object.keys(data)
   });
 
   const result = await sendFCMNotification(recipientUserIds, notification, data);
