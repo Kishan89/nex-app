@@ -84,7 +84,12 @@ async function sendFCMNotification(userIds, notification, data = {}) {
           color: '#00d4ff',
           icon: 'ic_notification',
           tag: data.type || 'nexeed',
-          visibility: 'public'
+          visibility: 'public',
+          // Add image-specific styling if it's an image message
+          ...(data.hasImage === 'true' && {
+            style: 'bigText',
+            bigText: notification.body
+          })
           // Removed clickAction and autoCancel - React Native Firebase handles this automatically
         },
         // Enhanced Android message configuration
@@ -479,6 +484,19 @@ async function sendMessageNotification(recipientUserIds, senderUserId, senderUse
     dataKeys: Object.keys(data)
   });
 
+  // Special handling for image messages
+  if (imageUrl && imageUrl.trim() !== '') {
+    logger.info('📷 [IMAGE MESSAGE] Sending push notification for image message', {
+      recipientCount: recipientUserIds.length,
+      senderUsername,
+      chatId,
+      notificationTitle: notification.title,
+      notificationBody: notification.body,
+      hasImageUrl: true,
+      imageUrlPreview: imageUrl.substring(0, 50) + '...'
+    });
+  }
+  
   const result = await sendFCMNotification(recipientUserIds, notification, data);
   
   if (result.success) {

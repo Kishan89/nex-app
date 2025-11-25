@@ -341,7 +341,8 @@ class ChatController {
       }
 
       // Ensure content is not null/undefined for image messages
-      const messageContent = content || '';
+      // For image-only messages, provide a default text for notifications
+      const messageContent = content || (imageUrl ? '' : '');
       
       logger.info('📤 [NOTIFICATION] Sending push notification', {
         recipientCount: participantUserIds.length,
