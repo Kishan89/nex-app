@@ -417,7 +417,7 @@ export default function HomeScreen() {
           renderItem={renderPostItem}
           keyExtractor={(post) => `${item}-${post.id}`}
           ListHeaderComponent={
-            item === 'Latest' && user && (!user.avatar_url || !user.bio || !user.name || !user.banner_url) ? (
+            item === 'Latest' && user && !user.avatar_url ? (
               <ProfileCompletionBanner
                 userId={user.id}
                 hasAvatar={!!user.avatar_url}

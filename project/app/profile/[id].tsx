@@ -524,8 +524,8 @@ export default function ProfileScreen() {
             <ArrowLeft size={24} color="#ffffff" />
           </TouchableOpacity>
           
-          {/* Profile Completion Banner - Floating on banner image */}
-          {isMyProfile && showBanner && !profile.avatar_url && !profile.bio && !profile.banner_url && (
+          {/* Profile Completion Banner - Floating on banner image - UNSKIPPABLE for missing avatar */}
+          {isMyProfile && !profile.avatar_url && (
             <View style={styles.floatingBanner}>
               <LinearGradient
                 colors={[colors.primary, colors.secondary]}
@@ -535,34 +535,24 @@ export default function ProfileScreen() {
               >
                 <View style={styles.bannerContent}>
                   <View style={styles.bannerIconContainer}>
-                    <UserCircle size={28} color="#ffffff" strokeWidth={2} />
-                    <View style={styles.bannerSparkle}>
-                      <Text style={styles.sparkleEmoji}>✨</Text>
-                    </View>
+                    <Info size={32} color="#ffffff" strokeWidth={2.5} />
                   </View>
                   <View style={styles.bannerTextContainer}>
-                    <Text style={styles.bannerTitle}>Complete Your Profile</Text>
+                    <Text style={styles.bannerTitle}>⚠️ Profile Picture Required</Text>
                     <Text style={styles.bannerSubtitle}>
-                      Add photo, bio & banner to shine
+                      Add your photo to unlock all features
                     </Text>
                   </View>
-                  <TouchableOpacity 
-                    style={styles.bannerCloseButton}
-                    onPress={() => setShowBanner(false)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <X size={18} color="#ffffff" strokeWidth={2.5} />
-                  </TouchableOpacity>
+                  {/* NO CLOSE BUTTON - This is UNSKIPPABLE */}
                 </View>
                 <TouchableOpacity 
                   style={styles.bannerActionButton}
                   onPress={() => {
-                    setShowBanner(false);
                     router.push('/edit-profile');
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.bannerActionText}>Complete Now</Text>
+                  <Text style={styles.bannerActionText}>Add Photo Now</Text>
                   <View style={styles.bannerArrow}>
                     <Text style={styles.bannerArrowText}>→</Text>
                   </View>

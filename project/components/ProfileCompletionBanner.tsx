@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { UserCircle, X, Sparkles } from 'lucide-react-native';
+import { UserCircle, X, Sparkles, AlertCircle } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
@@ -30,54 +30,74 @@ export default function ProfileCompletionBanner({
 }: ProfileCompletionBannerProps) {
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-100)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Check if profile is incomplete
-  const isProfileIncomplete = !hasAvatar || !hasBio || !hasName || !hasBanner;
+  // 🎯 FOCUS MODE: Check if ONLY avatar is missing (critical)
+  const isAvatarMissing = !hasAvatar;
+  const isAvatarOnlyMode = isAvatarMissing; // This is the UNSKIPPABLE mode
   
-  // 🚀 NEW: Check if user is new (within 7 days of account creation)
-  const isNewUser = () => {
-    if (!userCreatedAt) {
-      console.log('⚠️ [BANNER] No userCreatedAt provided, assuming NEW user to show banner');
-      return true; // If no creation date, assume new user to be safe and show banner
-    }
-    
-    const createdDate = new Date(userCreatedAt);
-    const now = new Date();
-    const daysSinceCreation = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
-    
-    console.log(`📅 [BANNER] User created ${daysSinceCreation.toFixed(1)} days ago`);
-    return daysSinceCreation <= 7; // Show banner only for users created within last 7 days
-  };
+  // Check if profile is incomplete (for other optional fields)
+  const isProfileIncomplete = !hasAvatar || !hasBio || !hasName || !hasBanner;
 
   useEffect(() => {
-    if (isProfileIncomplete) {
+    if (isAvatarMissing) {
+      // For missing avatar - ALWAYS show, no time restrictions, UNSKIPPABLE
+      showBanner();
+    } else if (isProfileIncomplete) {
+      // For other incomplete fields - show with time/dismiss restrictions
       checkBannerStatus();
     }
-  }, [userId, isProfileIncomplete]); // Only check when userId changes or profile becomes incomplete
+  }, [userId, isAvatarMissing, isProfileIncomplete]);
+
+  // Start pulsing animation for avatar-only mode to draw attention
+  useEffect(() => {
+    if (visible && isAvatarOnlyMode) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.05,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [visible, isAvatarOnlyMode]);
+
+  const showBanner = () => {
+    console.log('🚨 [BANNER] AVATAR MISSING - Showing UNSKIPPABLE banner');
+    setVisible(true);
+    // Animate in
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   const checkBannerStatus = async () => {
-    // ✅ STRICT CHECK: Profile must be incomplete
-    if (!isProfileIncomplete) {
-      console.log('✅ [BANNER] Profile is complete - NOT showing banner');
-      return;
-    }
-    
-    // ✅ STRICT CHECK: User must be new (within 7 days)
-    if (!isNewUser()) {
-      console.log('🚫 [BANNER] User is old (>7 days) - NOT showing banner');
-      return;
-    }
-    
+    // For non-avatar fields, check if user dismissed
     try {
       const dismissedData = await AsyncStorage.getItem(`${BANNER_DISMISSED_KEY}_${userId}`);
       const hasShownBefore = await AsyncStorage.getItem(`${BANNER_DISMISSED_KEY}_shown_${userId}`);
       
       if (!dismissedData && !hasShownBefore) {
-        console.log('✅ [BANNER] Showing banner - User is NEW (<7 days) AND profile is INCOMPLETE');
-        console.log(`   hasAvatar: ${hasAvatar}, hasBio: ${hasBio}, hasName: ${hasName}, hasBanner: ${hasBanner}`);
+        console.log('✅ [BANNER] Showing banner for other incomplete fields');
         await AsyncStorage.setItem(`${BANNER_DISMISSED_KEY}_shown_${userId}`, 'true');
         setVisible(true);
         // Animate in
@@ -101,6 +121,12 @@ export default function ProfileCompletionBanner({
   };
 
   const handleDismiss = async () => {
+    // CANNOT dismiss if avatar is missing - this is UNSKIPPABLE
+    if (isAvatarOnlyMode) {
+      console.log('🚫 [BANNER] Cannot dismiss - Avatar is REQUIRED');
+      return;
+    }
+
     try {
       await AsyncStorage.setItem(`${BANNER_DISMISSED_KEY}_${userId}`, 'true');
       Animated.parallel([
@@ -116,47 +142,32 @@ export default function ProfileCompletionBanner({
         }),
       ]).start(() => {
         setVisible(false);
-        setDismissed(true);
       });
     } catch (error) {
       console.error('Error dismissing banner:', error);
     }
   };
 
-  const handleEditProfile = async () => {
-    try {
-      await AsyncStorage.setItem(`${BANNER_DISMISSED_KEY}_${userId}`, 'true');
-    } catch (error) {
-      console.error('Error setting banner dismissal:', error);
+  const handleEditProfile = () => {
+    // Navigate to edit profile - don't dismiss if avatar is missing
+    if (!isAvatarOnlyMode) {
+      try {
+        AsyncStorage.setItem(`${BANNER_DISMISSED_KEY}_${userId}`, 'true');
+      } catch (error) {
+        console.error('Error setting banner dismissal:', error);
+      }
     }
 
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: -100,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setVisible(false);
-      setDismissed(true);
-      router.push('/edit-profile');
-    });
+    router.push('/edit-profile');
   };
 
-  // ✅ FINAL SAFETY CHECK: Don't render if profile is complete OR user is old OR banner was dismissed
-  if (!visible || !isProfileIncomplete || dismissed) {
+  // Don't render if nothing is incomplete
+  if (!isProfileIncomplete || !visible) {
     return null;
   }
-  
-  // ✅ DOUBLE CHECK: User must be new (within 7 days)
-  if (!isNewUser()) {
-    return null;
-  }
+
+  // Use app's theme colors for consistency
+  const gradientColors: [string, string] = [colors.primary, colors.secondary];
 
   return (
     <Animated.View
@@ -164,58 +175,76 @@ export default function ProfileCompletionBanner({
         styles.container,
         {
           opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
+          transform: [
+            { translateY: slideAnim },
+            { scale: isAvatarOnlyMode ? pulseAnim : 1 }
+          ],
         },
       ]}
     >
       <LinearGradient
-        colors={[colors.primary, colors.secondary]}
+        colors={gradientColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
         <View style={styles.content}>
-          {/* Icon and Sparkle */}
+          {/* Icon - Use AlertCircle for avatar missing, UserCircle otherwise */}
           <View style={styles.iconContainer}>
-            <UserCircle size={32} color="#ffffff" strokeWidth={2} />
-            <View style={styles.sparkleIcon}>
-              <Sparkles size={16} color="#FFD700" fill="#FFD700" />
-            </View>
+            {isAvatarOnlyMode ? (
+              <AlertCircle size={36} color="#ffffff" strokeWidth={2.5} fill="#ffffff20" />
+            ) : (
+              <>
+                <UserCircle size={32} color="#ffffff" strokeWidth={2} />
+                <View style={styles.sparkleIcon}>
+                  <Sparkles size={16} color="#FFD700" fill="#FFD700" />
+                </View>
+              </>
+            )}
           </View>
 
           {/* Text Content */}
           <View style={styles.textContainer}>
-            <Text style={styles.title}>Complete Your Profile ✨</Text>
+            <Text style={[styles.title, isAvatarOnlyMode && styles.criticalTitle]}>
+              {isAvatarOnlyMode ? '⚠️ Profile Picture Required' : 'Complete Your Profile ✨'}
+            </Text>
             <Text style={styles.subtitle}>
-              Add your photo, name, bio, and cover banner to make your profile shine.
+              {isAvatarOnlyMode 
+                ? 'Add your profile picture to continue using all features'
+                : 'Add your photo, name, bio, and cover banner to make your profile shine.'}
             </Text>
           </View>
 
-          {/* Close Button */}
-          <TouchableOpacity 
-            style={styles.closeButton} 
-            onPress={handleDismiss}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <X size={20} color="#ffffff" strokeWidth={2.5} />
-          </TouchableOpacity>
+          {/* Close Button - ONLY show if NOT in avatar-only mode */}
+          {!isAvatarOnlyMode && (
+            <TouchableOpacity 
+              style={styles.closeButton} 
+              onPress={handleDismiss}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <X size={20} color="#ffffff" strokeWidth={2.5} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Action Button */}
         <TouchableOpacity 
-          style={styles.actionButton}
+          style={[styles.actionButton, isAvatarOnlyMode && styles.criticalActionButton]}
           onPress={handleEditProfile}
           activeOpacity={0.8}
         >
-          <Text style={styles.actionButtonText}>Complete Now</Text>
-          <View style={styles.actionButtonArrow}>
-            <Text style={styles.arrowText}>→</Text>
+          <Text style={[styles.actionButtonText, isAvatarOnlyMode && styles.criticalActionText]}>
+            {isAvatarOnlyMode ? 'Add Photo Now' : 'Complete Now'}
+          </Text>
+          <View style={[styles.actionButtonArrow, isAvatarOnlyMode && styles.criticalArrow]}>
+            <Text style={[styles.arrowText, isAvatarOnlyMode && styles.criticalArrowText]}>→</Text>
           </View>
         </TouchableOpacity>
       </LinearGradient>
     </Animated.View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -256,6 +285,11 @@ const styles = StyleSheet.create({
     fontWeight: FontWeights.bold,
     color: '#ffffff',
     marginBottom: 4,
+  },
+  criticalTitle: {
+    fontSize: FontSizes.xl,
+    fontWeight: FontWeights.extrabold,
+    letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: FontSizes.sm,
@@ -301,10 +335,23 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     gap: Spacing.xs,
   },
+  criticalActionButton: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
   actionButtonText: {
     fontSize: FontSizes.md,
     fontWeight: FontWeights.bold,
     color: '#3B8FE8',
+  },
+  criticalActionText: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.extrabold,
+    color: '#3B8FE8', // Use app's primary color
   },
   actionButtonArrow: {
     backgroundColor: '#3B8FE815',
@@ -314,9 +361,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  criticalArrow: {
+    backgroundColor: '#3B8FE815', // Use app's primary color
+  },
   arrowText: {
     fontSize: 16,
     fontWeight: FontWeights.bold,
     color: '#3B8FE8',
+  },
+  criticalArrowText: {
+    color: '#3B8FE8', // Use app's primary color
   },
 });
