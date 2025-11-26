@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Modal, Alert, Share as RNShare } from 'react-native';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Modal, Alert, Share as RNShare, Pressable } from 'react-native';
 import { Heart, MessageCircle, Bookmark, Share, MoreVertical, Flag, Trash2, Pin, Radio } from 'lucide-react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withRepeat, withTiming, withSequence } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withRepeat, withTiming, withSequence, runOnJS } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { NormalizedPost } from '@/types';
 import TruncatedText from './TruncatedText';
 import PollComponent from './PollComponent';
@@ -70,9 +71,14 @@ const PostCard = React.memo(function PostCard({
   const [localLikesCount, setLocalLikesCount] = useState(post.likesCount || post.likes || 0);
   const [localCommentsCount, setLocalCommentsCount] = useState(post.commentsCount || post.comments || 0);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showDoubleTapHeart, setShowDoubleTapHeart] = useState(false);
+  const lastTap = useRef<number | null>(null);
   
   // Blinking animation for Live indicator
   const liveOpacity = useSharedValue(1);
+  
+  // Double-tap heart animation
+  const doubleTapHeartScale = useSharedValue(0);
   
   useEffect(() => {
     if (post.isLive) {
@@ -98,6 +104,11 @@ const PostCard = React.memo(function PostCard({
   const likeAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeScale.value }],
   }));
+  
+  const doubleTapHeartAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: doubleTapHeartScale.value }],
+    opacity: doubleTapHeartScale.value,
+  }));
   // Update local state when post prop changes - immediate sync
   React.useEffect(() => {
     setLocalIsLiked(post.liked ?? isLiked ?? false);
@@ -115,6 +126,68 @@ const PostCard = React.memo(function PostCard({
       }).then(setOptimizedImageUri);
     }
   }, [post.image, optimizedImageUri]);
+  // Double-tap handler
+  const singleTapTimer = useRef<number | null>(null);
+  
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    
+    if (lastTap.current && (now - lastTap.current) < DOUBLE_TAP_DELAY) {
+      // Double tap detected!
+      lastTap.current = null;
+      
+      // Clear single tap timer to prevent opening post
+      if (singleTapTimer.current) {
+        clearTimeout(singleTapTimer.current);
+        singleTapTimer.current = null;
+      }
+      
+      // Trigger haptic feedback
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      // Show and animate the heart
+      setShowDoubleTapHeart(true);
+      doubleTapHeartScale.value = 0;
+      doubleTapHeartScale.value = withSequence(
+        withSpring(1.2, { damping: 10 }),
+        withSpring(1, { damping: 8 }),
+        withTiming(0, { duration: 300 }, (finished) => {
+          // Hide heart after animation - use runOnJS for state update
+          if (finished) {
+            runOnJS(setShowDoubleTapHeart)(false);
+          }
+        })
+      );
+      
+      // Auto-like if not already liked
+      if (!localIsLiked) {
+        handleLike();
+      }
+    } else {
+      lastTap.current = now;
+      
+      // Set timer for single tap - only open post if no second tap comes
+      if (singleTapTimer.current) {
+        clearTimeout(singleTapTimer.current);
+      }
+      singleTapTimer.current = setTimeout(() => {
+        // Single tap confirmed - open post detail
+        onPress?.();
+        singleTapTimer.current = null;
+      }, DOUBLE_TAP_DELAY);
+    }
+  };
+  
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (singleTapTimer.current) {
+        clearTimeout(singleTapTimer.current);
+      }
+    };
+  }, []);
+  
   // Throttle handlers to prevent rapid clicks
   const handleLike = useThrottledCallback(() => {
     // Animate heart
@@ -243,13 +316,14 @@ const PostCard = React.memo(function PostCard({
             </TouchableOpacity>
           </View>
           {/* Content under username with more space */}
-          <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+          {/* Pressable handles both single tap (open post) and double tap (like) */}
+          <Pressable onPress={handleDoubleTap}>
             {post.content && (
               <TruncatedText 
                 text={post.content}
                 maxLines={6}
                 style={styles.postContent}
-                onPress={onPress}
+                onPress={() => {}} // Disabled - handled by Pressable
                 onToggle={onTextToggle}
                 refreshKey={refreshKey}
                 forceExpand={forceExpandText}
@@ -303,7 +377,22 @@ const PostCard = React.memo(function PostCard({
                 onVote={onPollVote}
               />
             )}
-          </TouchableOpacity>
+          
+          {/* Double-tap heart overlay */}
+          {showDoubleTapHeart && (
+            <Animated.View 
+              style={[styles.doubleTapHeartContainer, doubleTapHeartAnimatedStyle]}
+              pointerEvents="none"
+            >
+              <Heart
+                size={100}
+                color="#ff3b5c"
+                fill="#ff3b5c"
+                strokeWidth={0}
+              />
+            </Animated.View>
+          )}
+        </Pressable>
         </View>
       </View>
       {/* Actions - Reply left, Like and Bookmark right */}
@@ -597,5 +686,18 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginLeft: Spacing.md,
     fontWeight: FontWeights.medium,
+  },
+  doubleTapHeartContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -50, // Half of heart size
+    marginTop: -50, // Half of heart size
+    zIndex: 1000,
+    pointerEvents: 'none',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
 });
