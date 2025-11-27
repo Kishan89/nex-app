@@ -68,21 +68,26 @@ class PostController {
       
       const post = await postService.createPost({ content, imageUrl, userId, pollData, isAnonymous });
       
+      // Check for achievement unlocks BEFORE sending response
+      try {
+        logger.info(`🏆 Checking achievements for user: ${userId}`);
+        const newlyUnlocked = await achievementService.handlePostCreated(userId);
+        if (newlyUnlocked && newlyUnlocked.length > 0) {
+          logger.info(`✨ Unlocked achievements: ${newlyUnlocked.join(', ')}`);
+        }
+      } catch (achievementError) {
+        logger.error('Error checking achievements:', achievementError);
+      }
+      
       res.status(HTTP_STATUS.CREATED).json(successResponse(post, 'Post created successfully'));
       
+      // Queue XP job in background
       setImmediate(async () => {
         try {
           await addXpJob(userId);
           logger.debug(`XP job queued for user: ${userId}`);
-          
-          // Check for achievement unlocks
-          logger.info(`🏆 Checking achievements for user: ${userId}`);
-          const newlyUnlocked = await achievementService.handlePostCreated(userId);
-          if (newlyUnlocked && newlyUnlocked.length > 0) {
-            logger.info(`✨ Unlocked achievements: ${newlyUnlocked.join(', ')}`);
-          }
         } catch (queueError) {
-          logger.error('Error queuing XP job or checking achievements:', queueError);
+          logger.error('Error queuing XP job:', queueError);
         }
       });
     } catch (error) {

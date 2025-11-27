@@ -272,15 +272,19 @@ class AchievementService {
   // Get unseen unlocked achievements
   async getUnseenAchievements(userId: string): Promise<string[]> {
     try {
+      console.log('📡 Fetching unseen achievements from API for user:', userId);
       const response = await apiService.getUnseenAchievements(userId) as any;
+      console.log('📥 API Response:', JSON.stringify(response));
       
       if (response?.success && response?.data) {
+        console.log('✅ Unseen achievements found:', response.data);
         return response.data;
       }
       
+      console.log('⚠️ No data in response or unsuccessful');
       return [];
     } catch (error) {
-      console.error('Error getting unseen achievements:', error);
+      console.error('❌ Error getting unseen achievements:', error);
       return [];
     }
   }

@@ -46,6 +46,7 @@ export default function ProfileScreen() {
   const [userPosts, setUserPosts] = useState<NormalizedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'Posts' | 'Bookmarks'>('Posts');
   const [postsPage, setPostsPage] = useState(1);
@@ -123,6 +124,7 @@ export default function ProfileScreen() {
       if (cachedProfile) {
         setProfile(cachedProfile.profile);
         setUserXPRank(cachedProfile.xpRank);
+        setProfileLoaded(true);
         if (!isMyProfile) {
           setIsFollowing(cachedProfile.isFollowing);
         }
@@ -484,10 +486,13 @@ export default function ProfileScreen() {
     },
     [postInteractions, toggleLike, toggleBookmark, handlePostPress, handleCommentPress, handleSharePost, handleReportPost, handleDeletePost, handlePollVote, user?.id, userId]
   );
-  if (loading) return <ProfileSkeleton />;
   // Create dynamic styles inside component to access colors
   const styles = createStyles(colors);
-  if (error || !profile) {
+  
+  // Show full skeleton only on initial load without profile data
+  if (loading && !profileLoaded) return <ProfileSkeleton />;
+  
+  if (error || (!profile && !loading)) {
     return (
       <View style={styles.centered}>
         <Text style={styles.errorText}>{error ?? 'Profile not found.'}</Text>
@@ -496,6 +501,11 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
     );
+  }
+  
+  // Show loading placeholder for profile data if not loaded yet
+  if (!profile) {
+    return <ProfileSkeleton />;
   }
   const bannerSource = profile.banner_url && profile.banner_url.trim() && !profile.banner_url.includes('placeholder') ? { uri: profile.banner_url } : DEFAULT_BANNER;
   const avatarUri = profile.avatar_url ?? 'https://via.placeholder.com/150';
@@ -666,7 +676,11 @@ export default function ProfileScreen() {
           {/* Stats Section */}
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{userPosts.length}</Text>
+              {loadingPosts && userPosts.length === 0 ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={styles.statNumber}>{userPosts.length}</Text>
+              )}
               <Text style={styles.statLabel}>Posts</Text>
             </View>
             <View style={styles.statItem}>
@@ -698,8 +712,29 @@ export default function ProfileScreen() {
           </View>
         )}
         <View style={styles.contentSection}>
-          {displayedPosts.length > 0 ? displayedPosts.map(renderPost) : <Text style={styles.emptyText}>No posts found.</Text>}
-          {loadingPosts && (
+          {loadingPosts && userPosts.length === 0 ? (
+            // Show skeleton posts only when initially loading posts
+            <View>
+              {[1, 2, 3].map((index) => (
+                <View key={index} style={[styles.postCard, { backgroundColor: colors.backgroundSecondary }]}>
+                  <View style={styles.postHeader}>
+                    <View style={[styles.skeletonAvatar, { backgroundColor: colors.backgroundTertiary }]} />
+                    <View style={styles.postHeaderText}>
+                      <View style={[styles.skeletonText, { backgroundColor: colors.backgroundTertiary, width: 100, height: 14 }]} />
+                      <View style={[styles.skeletonText, { backgroundColor: colors.backgroundTertiary, width: 60, height: 12, marginTop: 4 }]} />
+                    </View>
+                  </View>
+                  <View style={[styles.skeletonText, { backgroundColor: colors.backgroundTertiary, width: '100%', height: 16, marginBottom: 8 }]} />
+                  <View style={[styles.skeletonText, { backgroundColor: colors.backgroundTertiary, width: '85%', height: 16 }]} />
+                </View>
+              ))}
+            </View>
+          ) : displayedPosts.length > 0 ? (
+            displayedPosts.map(renderPost)
+          ) : (
+            <Text style={styles.emptyText}>No posts found.</Text>
+          )}
+          {loadingPosts && userPosts.length > 0 && (
             <View style={{ padding: 20, alignItems: 'center' }}>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
@@ -1210,6 +1245,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     fontWeight: FontWeights.bold,
     color: '#3B8FE8',
+  },
+  // Skeleton styles for posts
+  skeletonAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  skeletonText: {
+    borderRadius: 4,
   },
   editButton: {
     flexDirection: 'row',

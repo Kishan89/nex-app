@@ -33,7 +33,8 @@ export default function EditProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || 'https://via.placeholder.com/150');
   const [bannerUrl, setBannerUrl] = useState(user?.banner_url || '');
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -42,7 +43,6 @@ export default function EditProfileScreen() {
       setAvatarUrl(user.avatar_url || 'https://via.placeholder.com/150');
       setBannerUrl(user.banner_url || '');
       console.log('Banner URL:', user.banner_url, 'Will use default:', !user.banner_url || !user.banner_url.trim());
-      setInitialLoading(false);
     }
   }, [user]);
 
@@ -101,8 +101,9 @@ export default function EditProfileScreen() {
   };
 
   const pickImage = async (type: 'avatar' | 'banner') => {
-    if (loading || !user?.id) return;
-    setLoading(true);
+    if ((type === 'avatar' && uploadingAvatar) || (type === 'banner' && uploadingBanner) || !user?.id) return;
+    if (type === 'avatar') setUploadingAvatar(true);
+    else setUploadingBanner(true);
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission denied', 'We need gallery permissions to continue.');
@@ -130,17 +131,20 @@ export default function EditProfileScreen() {
       } catch (error: any) {
         Alert.alert('Error', 'Failed to upload image. Please try again.');
       } finally {
-        setLoading(false);
+        if (type === 'avatar') setUploadingAvatar(false);
+        else setUploadingBanner(false);
       }
     } else {
-      setLoading(false);
+      if (type === 'avatar') setUploadingAvatar(false);
+      else setUploadingBanner(false);
     }
   };
 
   // Create dynamic styles inside component to access colors
   const styles = createStyles(colors);
 
-  if (initialLoading) {
+  // Show UI immediately, no need for initial loading screen
+  if (!user) {
     return (
       <View style={styles.centeredContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -171,9 +175,13 @@ export default function EditProfileScreen() {
                 onError={(e) => console.log('Banner image error:', e.nativeEvent.error)}
                 onLoad={() => console.log('Banner image loaded successfully')}
               />
-              <TouchableOpacity onPress={() => pickImage('banner')} style={[styles.bannerIcon, { borderColor: '#3B8FE8' }]} disabled={loading}>
+              <TouchableOpacity onPress={() => pickImage('banner')} style={[styles.bannerIcon, { borderColor: '#3B8FE8' }]} disabled={uploadingBanner}>
                 <View style={[styles.iconGradient, { backgroundColor: '#3B8FE8' }]}>
-                  <ImageIcon size={20} color="#ffffff" />
+                  {uploadingBanner ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <ImageIcon size={20} color="#ffffff" />
+                  )}
                 </View>
               </TouchableOpacity>
             </View>
@@ -183,8 +191,12 @@ export default function EditProfileScreen() {
                 source={avatarUrl && avatarUrl !== 'https://via.placeholder.com/150' ? { uri: avatarUrl } : require('@/assets/images/default-avatar.png')}
                 style={styles.profileImage}
               />
-              <TouchableOpacity onPress={() => pickImage('avatar')} style={[styles.cameraIcon, { backgroundColor: colors.primary, borderColor: colors.background }]} disabled={loading}>
-                <Camera size={24} color="#ffffff" />
+              <TouchableOpacity onPress={() => pickImage('avatar')} style={[styles.cameraIcon, { backgroundColor: colors.primary, borderColor: colors.background }]} disabled={uploadingAvatar}>
+                {uploadingAvatar ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Camera size={24} color="#ffffff" />
+                )}
               </TouchableOpacity>
             </View>
             {/* Inputs */}
@@ -218,7 +230,14 @@ export default function EditProfileScreen() {
             {/* Save Button */}
             <TouchableOpacity onPress={handleSaveChanges} style={styles.saveButton} disabled={loading}>
               <View style={[styles.buttonGradient, {backgroundColor: '#3B8FE8'}]}>
-                <Text style={[styles.saveButtonText, { color: '#ffffff' }]}>{loading ? 'Saving...' : 'Save Changes'}</Text>
+                {loading ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 8 }} />
+                    <Text style={[styles.saveButtonText, { color: '#ffffff' }]}>Saving...</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.saveButtonText, { color: '#ffffff' }]}>Save Changes</Text>
+                )}
               </View>
             </TouchableOpacity>
           </ScrollView>

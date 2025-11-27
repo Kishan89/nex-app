@@ -62,21 +62,12 @@ export const ProfileSkeleton: React.FC = () => {
         <View style={styles.postsHeaderContainer}>
           <SkeletonText width={80} height={18} />
         </View>
-        {/* Posts Content */}
+        {/* Minimal loading indicator instead of full post skeletons */}
         <View style={styles.contentSection}>
-          {[1, 2, 3].map((index) => (
-            <View key={index} style={styles.postCard}>
-              <View style={styles.postHeader}>
-                <SkeletonAvatar size={40} />
-                <View style={styles.postHeaderText}>
-                  <SkeletonText width={100} height={14} />
-                  <SkeletonText width={60} height={12} style={styles.postTime} />
-                </View>
-              </View>
-              <SkeletonText width="100%" height={16} style={styles.postContent} />
-              <SkeletonText width="85%" height={16} style={styles.postContent} />
-            </View>
-          ))}
+          <View style={styles.loadingContainer}>
+            <SkeletonBase width={40} height={40} borderRadius={20} />
+            <SkeletonText width={120} height={16} style={{ marginLeft: 12 }} />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -192,5 +183,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   postContent: {
     marginBottom: 8,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
   },
 });

@@ -148,16 +148,18 @@ export default function CreatePostScreen() {
       if (user.id) {
         console.log('🏆 Checking for achievements after post creation...');
         
-        // Check for newly unlocked achievements
-        const newlyUnlocked = await achievementService.handlePostCreated(user.id);
+        // Check for newly unlocked achievements (backend already processed them)
+        const newlyUnlocked = await achievementService.getUnseenAchievements(user.id);
         
-        console.log('🎯 Newly unlocked achievements:', newlyUnlocked);
+        console.log('🎯 Unseen achievements from API:', newlyUnlocked);
+        console.log('🔍 Type:', typeof newlyUnlocked, 'Length:', newlyUnlocked?.length);
         
         // Show achievement modal if any were unlocked
         if (newlyUnlocked && newlyUnlocked.length > 0) {
           console.log('✨ Showing achievement modal for:', newlyUnlocked[0]);
           setUnlockedAchievement(newlyUnlocked[0]);
           setShowAchievementModal(true);
+          setIsPosting(false);
           
           // Don't navigate - let user see the celebration!
           return;
@@ -167,7 +169,6 @@ export default function CreatePostScreen() {
       }
       
       // Normal flow if no achievement
-      DeviceEventEmitter.emit('newPost:created', createdPost);
       router.back();
       // Alert removed for better UX
     } catch (err: any) {
@@ -391,8 +392,19 @@ export default function CreatePostScreen() {
         <AchievementUnlockModal
           visible={showAchievementModal}
           achievementId={unlockedAchievement}
-          onClose={() => {
+          onClose={async () => {
             console.log('🎉 Achievement modal closed');
+            
+            // Mark achievement as seen
+            if (user?.id && unlockedAchievement) {
+              try {
+                await apiService.markAchievementAsSeen(user.id, unlockedAchievement);
+                console.log('✅ Achievement marked as seen');
+              } catch (error) {
+                console.error('❌ Failed to mark as seen:', error);
+              }
+            }
+            
             setShowAchievementModal(false);
             setUnlockedAchievement(null);
             // Navigate back after celebration
