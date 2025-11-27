@@ -66,6 +66,14 @@ const API_ENDPOINTS = {
     REGISTER_PUSH_TOKEN: "/push-tokens",
     XP_RULES: "/xp/rules",
     USER_XP: (userId: string) => `/xp/user/${userId}`,
+    ACHIEVEMENTS_DEFINITIONS: "/achievements/definitions",
+    ACHIEVEMENTS_USER: (userId: string) => `/achievements/${userId}`,
+    ACHIEVEMENTS_STATS: (userId: string) => `/achievements/stats/${userId}`,
+    ACHIEVEMENTS_UNSEEN: (userId: string) => `/achievements/unseen/${userId}`,
+    ACHIEVEMENT_UNLOCK: (userId: string, achievementId: string) => `/achievements/${userId}/${achievementId}/unlock`,
+    ACHIEVEMENT_PROGRESS: (userId: string, achievementId: string) => `/achievements/${userId}/${achievementId}/progress`,
+    ACHIEVEMENT_SEEN: (userId: string, achievementId: string) => `/achievements/${userId}/${achievementId}/seen`,
+    ACHIEVEMENT_COMPLETION: (userId: string) => `/achievements/completion/${userId}`,
 };
 const API_ERRORS = {
     TIMEOUT_ERROR: "Request timed out. Please try again.",
@@ -673,6 +681,61 @@ class ApiService {
     }
     async getUserXP(userId: string) {
         return this.get(API_ENDPOINTS.USER_XP(userId));
+    }
+    
+    // Achievement methods
+    async getAchievementDefinitions() {
+        try {
+            return await this.get(API_ENDPOINTS.ACHIEVEMENTS_DEFINITIONS);
+        } catch (error) {
+            console.error('Error fetching achievement definitions:', error);
+            return { success: false, data: [] };
+        }
+    }
+    
+    async getUserAchievements(userId: string) {
+        try {
+            return await this.get(API_ENDPOINTS.ACHIEVEMENTS_USER(userId));
+        } catch (error) {
+            console.error('Error fetching user achievements:', error);
+            return { success: false, data: {} };
+        }
+    }
+    
+    async getAchievementStats(userId: string) {
+        try {
+            return await this.get(API_ENDPOINTS.ACHIEVEMENTS_STATS(userId));
+        } catch (error) {
+            console.error('Error fetching achievement stats:', error);
+            return { success: false, data: {} };
+        }
+    }
+    
+    async getUnseenAchievements(userId: string) {
+        try {
+            return await this.get(API_ENDPOINTS.ACHIEVEMENTS_UNSEEN(userId));
+        } catch (error) {
+            console.error('Error fetching unseen achievements:', error);
+            return { success: false, data: [] };
+        }
+    }
+    
+    async unlockAchievement(userId: string, achievementId: string) {
+        try {
+            return await this.post(API_ENDPOINTS.ACHIEVEMENT_UNLOCK(userId, achievementId), {});
+        } catch (error) {
+            console.error('Error unlocking achievement:', error);
+            return { success: false };
+        }
+    }
+    
+    async getCompletionPercentage(userId: string) {
+        try {
+            return await this.get(API_ENDPOINTS.ACHIEVEMENT_COMPLETION(userId));
+        } catch (error) {
+            console.error('Error fetching completion percentage:', error);
+            return { success: false, data: { percentage: 0 } };
+        }
     }
     // Post management methods
     async reportPost(postId: string) {

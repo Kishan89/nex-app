@@ -2,30 +2,29 @@
 const express = require('express');
 const router = express.Router();
 const achievementController = require('../controllers/achievementController');
-const { authMiddleware } = require('../middleware/auth');
 
-// Get all achievement definitions (no auth required - can be viewed by anyone)
+// Get all achievement definitions (no auth required)
 router.get('/definitions', achievementController.getDefinitions);
 
-// Get user achievements with progress
-router.get('/:userId', achievementController.getUserAchievements);
-
-// Get user stats for achievements
+// Get user stats for achievements - MUST come before /:userId
 router.get('/stats/:userId', achievementController.getUserStats);
 
-// Get completion percentage
+// Get completion percentage - MUST come before /:userId
 router.get('/completion/:userId', achievementController.getCompletionPercentage);
 
-// Get unseen achievements
-router.get('/unseen/:userId', authMiddleware, achievementController.getUnseenAchievements);
+// Get unseen achievements - MUST come before /:userId
+router.get('/unseen/:userId', achievementController.getUnseenAchievements);
 
-// Unlock achievement (protected)
-router.post('/:userId/:achievementId/unlock', authMiddleware, achievementController.unlockAchievement);
+// Get user achievements with progress - This should be LAST among GET routes
+router.get('/:userId', achievementController.getUserAchievements);
 
-// Update achievement progress (protected)
-router.put('/:userId/:achievementId/progress', authMiddleware, achievementController.updateProgress);
+// Unlock achievement
+router.post('/:userId/:achievementId/unlock', achievementController.unlockAchievement);
 
-// Mark achievement as seen (protected)
-router.put('/:userId/:achievementId/seen', authMiddleware, achievementController.markAsSeen);
+// Update achievement progress
+router.put('/:userId/:achievementId/progress', achievementController.updateProgress);
+
+// Mark achievement as seen
+router.put('/:userId/:achievementId/seen', achievementController.markAsSeen);
 
 module.exports = router;

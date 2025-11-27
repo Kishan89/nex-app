@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Info, Heart, MessageCircle, Bookmark, Edit, ArrowLeft, PenTool, UserPlus, UserMinus, UserCircle, X } from 'lucide-react-native';
+import { Info, Heart, MessageCircle, Bookmark, Edit, ArrowLeft, PenTool, UserPlus, UserMinus, UserCircle, X, Trophy } from 'lucide-react-native';
 import PostCard from '../../components/PostCard';
 import ProfileCompletionBanner from '../../components/ProfileCompletionBanner';
 import ImageViewer from '@/components/ImageViewer';
@@ -406,7 +406,7 @@ export default function ProfileScreen() {
         setShowCommentsModal(false);
         // Refresh profile data to remove deleted post
         await fetchProfileData();
-        Alert.alert('Post Deleted', 'Your post has been deleted successfully.');
+        // Alert removed for better UX
       } catch (error) {
         Alert.alert('Error', 'Failed to delete post. Please try again.');
       }
@@ -422,7 +422,7 @@ export default function ProfileScreen() {
       await apiService.deletePost(postId);
       // Refresh profile data after deletion
       onRefresh();
-      Alert.alert('Post Deleted', 'Your post has been deleted successfully.');
+      // Alert removed for better UX
     } catch (error) {
       Alert.alert('Error', 'Failed to delete post. Please try again.');
     }
@@ -599,12 +599,9 @@ export default function ProfileScreen() {
               </View>
             </View>
             {/* Action Buttons */}
-            <View style={styles.actionButtonsContainer}>
-              {isMyProfile ? (
-                <TouchableOpacity style={styles.editButton} onPress={handleEditProfilePress}>
-                  <Edit size={20} color={colors.primary} />
-                </TouchableOpacity>
-              ) : (
+            {/* Action Buttons for Non-Owner */}
+            {!isMyProfile && (
+              <View style={styles.actionButtonsContainer}>
                 <View style={styles.actionButtons}>
                   <TouchableOpacity 
                     style={[styles.followButton, isFollowing && styles.followingButton]} 
@@ -631,11 +628,41 @@ export default function ProfileScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
-              )}
-            </View>
+              </View>
+            )}
           </View>
           {/* Bio Section */}
           <Text style={styles.bioText}>{profile.bio ?? 'No bio yet.'}</Text>
+          
+          {/* Action Buttons for Owner - Full Width Row */}
+          {isMyProfile && (
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+              <TouchableOpacity style={[styles.editButton, { flex: 1 }]} onPress={handleEditProfilePress}>
+                <Edit size={18} color={colors.primary} />
+                <Text style={[styles.editButtonText, { marginLeft: 8 }]}>Edit Profile</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.editButton, { flex: 1, backgroundColor: colors.backgroundTertiary, borderColor: colors.border }]} 
+                onPress={() => router.push('/achievements')}
+              >
+                <Trophy size={18} color={colors.text} />
+                <Text style={[styles.editButtonText, { marginLeft: 8, color: colors.text }]}>Achievements</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+
+          {/* Action Buttons for Non-Owner - View Achievements */}
+          {!isMyProfile && (
+            <TouchableOpacity 
+              style={[styles.editButton, { marginBottom: 20, width: '100%', backgroundColor: colors.backgroundTertiary, borderColor: colors.border }]} 
+              onPress={() => router.push({ pathname: '/achievements', params: { userId: userId } })}
+            >
+              <Trophy size={18} color={colors.text} />
+              <Text style={[styles.editButtonText, { marginLeft: 8, color: colors.text }]}>View Achievements</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Stats Section */}
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
@@ -808,16 +835,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     // Ensure image is properly centered and visible
     alignSelf: 'center',
   },
-  editButton: { 
-    width: 44, 
-    height: 44, 
-    borderRadius: 22, 
-    backgroundColor: colors.backgroundTertiary, 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
+  // editButton style removed (duplicate)
+
   nameXpContainer: { 
     flexDirection: 'row', 
     alignItems: 'center', 
@@ -1191,5 +1210,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     fontWeight: FontWeights.bold,
     color: '#3B8FE8',
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  editButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
+    color: colors.primary,
   },
 });

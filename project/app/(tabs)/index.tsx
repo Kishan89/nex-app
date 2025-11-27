@@ -197,7 +197,7 @@ export default function HomeScreen() {
         await apiService.deletePost(selectedPost.id);
         setShowCommentsModal(false);
         await onRefresh(); // Reload posts to remove deleted post
-        Alert.alert('Post Deleted', 'Your post has been deleted successfully.');
+        // Alert removed for better UX
       } catch (error) {
         Alert.alert('Error', 'Failed to delete post. Please try again.');
       }

@@ -29,6 +29,10 @@ import { Spacing, FontSizes, FontWeights, BorderRadius, ComponentStyles, Shadows
 import { useTheme } from '@/context/ThemeContext';
 import KeyboardWrapper from '@/components/ui/KeyboardWrapper';
 import ImageCompressionService, { CompressionResult } from '../lib/imageCompression';
+import { achievementService } from '@/lib/achievementService';
+import AchievementUnlockModal from '@/components/AchievementUnlockModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export default function CreatePostScreen() {
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
@@ -39,6 +43,10 @@ export default function CreatePostScreen() {
   const [compressionResult, setCompressionResult] = useState<CompressionResult | null>(null);
   const [showFullImage, setShowFullImage] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
+  
+  // Achievement state
+  const [unlockedAchievement, setUnlockedAchievement] = useState<string | null>(null);
+  const [showAchievementModal, setShowAchievementModal] = useState(false);
   
   // Word count validation
   const MAX_WORDS = 500;
@@ -132,9 +140,36 @@ export default function CreatePostScreen() {
         ...(pollData ? { pollData } : {}),
       };
       const createdPost = await apiService.createPost(payload);
+      
+      // Track achievement for post creation
+      if (user.id) {
+        console.log('🏆 Checking achievements...');
+        const newlyUnlocked = await achievementService.handlePostCreated(user.id);
+        
+        console.log('🎯 Newly unlocked:', newlyUnlocked);
+        
+        // Show achievement modal if any were unlocked
+        if (newlyUnlocked.length > 0) {
+          setUnlockedAchievement(newlyUnlocked[0]);
+          setShowAchievementModal(true);
+          
+          // Don't navigate immediately - let user see the celebration!
+          console.log('✨ Achievement modal showing!');
+          
+          // Emit event but stay on screen
+          DeviceEventEmitter.emit('newPost:created', createdPost);
+          
+          // Show success but don't navigate yet
+          // Alert removed for better UX
+          
+          return; // Don't navigate - user will close modal manually
+        }
+      }
+      
+      // Normal flow if no achievement
       DeviceEventEmitter.emit('newPost:created', createdPost);
       router.back();
-      setTimeout(() => Alert.alert('Posted', 'Your post was created successfully.'), 500);
+      // Alert removed for better UX
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to create post.');
     } finally {
@@ -161,6 +196,26 @@ export default function CreatePostScreen() {
           >
             {isPosting ? <ActivityIndicator color={colors.background} /> : <Text style={[styles.postText, { color: colors.background }]}>Post</Text>}
           </TouchableOpacity>
+          
+          {/* Debug: Reset achievements (DEV ONLY) */}
+          {__DEV__ && (
+            <TouchableOpacity
+              style={[styles.debugButton, { backgroundColor: colors.error }]}
+              onPress={async () => {
+                if (user?.id) {
+                  try {
+                    await AsyncStorage.removeItem(`@achievements_${user.id}`);
+                    await AsyncStorage.removeItem(`@user_stats_${user.id}`);
+                    Alert.alert('✅ Reset', 'Achievement data cleared! Create post again for first post achievement.');
+                  } catch (e) {
+                    Alert.alert('Error', 'Failed to reset');
+                  }
+                }
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 10 }}>🔄</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <KeyboardWrapper
           extraHeight={Platform.OS === 'android' ? 20 : 0}
@@ -350,6 +405,21 @@ export default function CreatePostScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
+      
+      {/* Achievement Unlock Modal */}
+      {unlockedAchievement && (
+        <AchievementUnlockModal
+          visible={showAchievementModal}
+          achievementId={unlockedAchievement}
+          onClose={() => {
+            console.log('🎉 Achievement modal closed');
+            setShowAchievementModal(false);
+            setUnlockedAchievement(null);
+            // Navigate back after celebration
+            router.back();
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -396,6 +466,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.background, 
     fontWeight: FontWeights.bold, 
     fontSize: FontSizes.md 
+  },
+  debugButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
   },
   scrollContent: { 
     paddingHorizontal: Spacing.md, 
