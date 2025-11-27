@@ -806,8 +806,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'flex-start', 
     justifyContent: 'space-between', 
-    marginBottom: Spacing.xs, // Minimal margin to bring bio very close
-    minHeight: 50, // Ensure enough height for proper alignment
+    marginBottom: 0,
+    minHeight: 50,
   },
   profileInfo: {
     flex: 1,
@@ -823,7 +823,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    marginBottom: 2, // Minimal margin between name and bio
+    marginBottom: 0,
   },
   profileImage: { 
     width: ComponentStyles.avatar.xlarge, 
@@ -870,8 +870,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   bioText: { 
     fontSize: FontSizes.sm, 
     color: colors.textSecondary, 
-    marginBottom: Spacing.lg,
-    marginTop: 0, // No top margin for minimal spacing with username
+    marginBottom: Spacing.md,
+    marginTop: -8,
     lineHeight: 20,
   },
   statsContainer: { 

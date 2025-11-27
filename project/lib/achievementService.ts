@@ -260,32 +260,11 @@ class AchievementService {
   // Mark achievement as seen
   async markAsSeen(userId: string, achievementId: string): Promise<void> {
     try {
-      // Call backend to mark as seen
-      await apiService.markAchievementAsSeen(userId, achievementId);
-      // Invalidate cache to force refresh next time
+      // No need to call backend - handled by modal close
       await this.invalidateCache(userId);
     } catch (error) {
       console.error('Error marking achievement as seen:', error);
     }
-  }
-
-  // Validate if an achievement is valid based on current time/conditions
-  // This is a client-side check to prevent incorrect unlocks due to server timezone issues
-  validateAchievementTime(achievementId: string): boolean {
-    const now = new Date();
-    const hours = now.getHours();
-    
-    if (achievementId === 'early_bird') {
-      // Early Bird: 5 AM - 7 AM
-      return hours >= 5 && hours < 7;
-    }
-    
-    if (achievementId === 'night_owl') {
-      // Night Owl: 12 AM - 4 AM
-      return hours >= 0 && hours < 4;
-    }
-    
-    return true;
   }
 
   // Get unseen unlocked achievements
@@ -317,6 +296,18 @@ class AchievementService {
     } catch (error) {
       console.error('Error getting completion percentage:', error);
       return 0;
+    }
+  }
+
+  // Handle post created - check for newly unlocked achievements
+  async handlePostCreated(userId: string): Promise<string[]> {
+    try {
+      await this.invalidateCache(userId);
+      const unseen = await this.getUnseenAchievements(userId);
+      return unseen;
+    } catch (error) {
+      console.error('Error handling post created:', error);
+      return [];
     }
   }
   

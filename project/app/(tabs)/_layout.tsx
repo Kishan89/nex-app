@@ -13,9 +13,6 @@ import { useAuth } from '@/context/AuthContext';
 import { useChatContext } from '@/context/ChatContext';
 import { useNotificationCount } from '@/context/NotificationCountContext';
 import { socketService } from '@/lib/socketService';
-import { achievementService } from '@/lib/achievementService';
-import AchievementUnlockModal from '@/components/AchievementUnlockModal';
-import { useFocusEffect } from 'expo-router';
 const TabBarIcon = ({ focused, children, badge, colors }: { focused: boolean; children: React.ReactNode; badge?: number; colors: any }) => (
   <View style={styles.tabIconContainer}>
    
@@ -31,46 +28,6 @@ export default function TabLayout() {
   const { colors, isDark } = useTheme();
   const { totalUnreadCount } = useChatContext();
   const { unreadNotificationCount } = useNotificationCount();
-  
-  // Achievement State
-  const [unlockedAchievement, setUnlockedAchievement] = useState<string | null>(null);
-  const [showAchievementModal, setShowAchievementModal] = useState(false);
-
-  // Check for achievements whenever the tab layout is focused or periodically
-  useFocusEffect(
-    React.useCallback(() => {
-      const checkAchievements = async () => {
-        if (!user?.id) return;
-        
-        try {
-          // Get unseen achievements
-          const unseen = await achievementService.getUnseenAchievements(user.id);
-          
-          if (unseen.length > 0) {
-            // Validate time-based achievements client-side
-            const validAchievements = unseen.filter(id => achievementService.validateAchievementTime(id));
-            
-            if (validAchievements.length > 0) {
-              // Show the first valid one
-              setUnlockedAchievement(validAchievements[0]);
-              setShowAchievementModal(true);
-            }
-          }
-        } catch (error) {
-          console.error('Error checking achievements:', error);
-        }
-      };
-
-      // Check immediately
-      checkAchievements();
-      
-      // Set up a small interval to check periodically while active (e.g. every 30 seconds)
-      // This helps catch achievements unlocked by background events or other interactions
-      const interval = setInterval(checkAchievements, 30000);
-      
-      return () => clearInterval(interval);
-    }, [user?.id])
-  );
   // Redirect to login if not authenticated
   if (!user) {
     return <Redirect href="/login" />;
@@ -191,22 +148,6 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-      
-      {/* Global Achievement Modal */}
-      {unlockedAchievement && (
-        <AchievementUnlockModal
-          visible={showAchievementModal}
-          achievementId={unlockedAchievement}
-          onClose={() => {
-            console.log('🎉 Global achievement modal closed');
-            if (unlockedAchievement && user?.id) {
-              achievementService.markAsSeen(user.id, unlockedAchievement);
-            }
-            setShowAchievementModal(false);
-            setUnlockedAchievement(null);
-          }}
-        />
-      )}
     </View>
   );
 }

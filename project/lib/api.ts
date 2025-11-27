@@ -737,15 +737,6 @@ class ApiService {
             return { success: false, data: { percentage: 0 } };
         }
     }
-    
-    async markAchievementAsSeen(userId: string, achievementId: string) {
-        try {
-            return await this.post(API_ENDPOINTS.ACHIEVEMENT_SEEN(userId, achievementId), {});
-        } catch (error) {
-            console.error('Error marking achievement as seen:', error);
-            return { success: false };
-        }
-    }
     // Post management methods
     async reportPost(postId: string) {
         return this.post(API_ENDPOINTS.REPORT_POST(postId), {});

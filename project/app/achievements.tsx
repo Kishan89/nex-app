@@ -22,8 +22,8 @@ import {
   UserAchievement,
   AchievementCategory,
 } from '@/lib/achievementService';
-import { AchievementSkeleton } from '@/components/skeletons/AchievementSkeleton';
 import AchievementCard from '@/components/AchievementCard';
+import { AchievementSkeleton } from '@/components/skeletons/AchievementSkeleton';
 
 type FilterType = 'all' | AchievementCategory;
 
@@ -104,10 +104,6 @@ export default function AchievementsScreen() {
   };
 
   const styles = createStyles(colors, isDark);
-
-  if (loading) {
-    return <AchievementSkeleton />;
-  }
 
   return (
     <SafeAreaView style={styles.container}>

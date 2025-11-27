@@ -11,8 +11,7 @@
     "db:migrate": "npx prisma migrate deploy",
     "db:push": "npx prisma db push",
     "db:studio": "npx prisma studio",
-    "db:seed": "node prisma/seed.js",
-    "test:achievements": "node test-achievements.js"
+    "db:seed": "node prisma/seed.js"
   },
   "keywords": ["social-media", "backend", "api"],
   "author": "Kishan",

@@ -76,20 +76,18 @@ export const SkeletonText: React.FC<{
 export const SkeletonButton: React.FC<{ 
   width?: number | string; 
   height?: number; 
-  borderRadius?: number;
   style?: any;
   animationType?: 'pulse' | 'wave' | 'shimmer';
 }> = ({ 
   width = 100, 
   height = 40, 
-  borderRadius = BorderRadius.lg,
   style,
   animationType = 'pulse'
 }) => (
   <SkeletonBase 
     width={width} 
     height={height} 
-    borderRadius={borderRadius} 
+    borderRadius={BorderRadius.lg} 
     animationType={animationType}
     style={style} 
   />
