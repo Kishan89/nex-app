@@ -141,28 +141,28 @@ export default function CreatePostScreen() {
       };
       const createdPost = await apiService.createPost(payload);
       
+      // Emit event first
+      DeviceEventEmitter.emit('newPost:created', createdPost);
+      
       // Track achievement for post creation
       if (user.id) {
-        console.log('🏆 Checking achievements...');
+        console.log('🏆 Checking for achievements after post creation...');
+        
+        // Check for newly unlocked achievements
         const newlyUnlocked = await achievementService.handlePostCreated(user.id);
         
-        console.log('🎯 Newly unlocked:', newlyUnlocked);
+        console.log('🎯 Newly unlocked achievements:', newlyUnlocked);
         
         // Show achievement modal if any were unlocked
-        if (newlyUnlocked.length > 0) {
+        if (newlyUnlocked && newlyUnlocked.length > 0) {
+          console.log('✨ Showing achievement modal for:', newlyUnlocked[0]);
           setUnlockedAchievement(newlyUnlocked[0]);
           setShowAchievementModal(true);
           
-          // Don't navigate immediately - let user see the celebration!
-          console.log('✨ Achievement modal showing!');
-          
-          // Emit event but stay on screen
-          DeviceEventEmitter.emit('newPost:created', createdPost);
-          
-          // Show success but don't navigate yet
-          // Alert removed for better UX
-          
-          return; // Don't navigate - user will close modal manually
+          // Don't navigate - let user see the celebration!
+          return;
+        } else {
+          console.log('ℹ️ No new achievements unlocked');
         }
       }
       

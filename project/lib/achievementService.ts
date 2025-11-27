@@ -304,11 +304,27 @@ class AchievementService {
   // Handle post created - check for newly unlocked achievements
   async handlePostCreated(userId: string): Promise<string[]> {
     try {
+      console.log('🏆 Checking for new achievements...');
+      
+      // Invalidate cache to force fresh data
       await this.invalidateCache(userId);
+      
+      // Wait for backend to process achievement unlock
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get unseen achievements directly from backend
       const unseen = await this.getUnseenAchievements(userId);
+      console.log('🎯 Unseen achievements from backend:', unseen);
+      
+      if (unseen.length > 0) {
+        console.log('✨ Found unseen achievements! Showing popup...');
+      } else {
+        console.log('ℹ️ No new achievements to show');
+      }
+      
       return unseen;
     } catch (error) {
-      console.error('Error handling post created:', error);
+      console.error('❌ Error handling post created:', error);
       return [];
     }
   }

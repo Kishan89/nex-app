@@ -314,19 +314,19 @@ const unlockAchievement = async (userId, achievementId) => {
       update: {
         unlocked: true,
         unlockedAt: new Date(),
-        seen: false
+        seen: false // IMPORTANT: Mark as unseen when unlocking
       },
       create: {
         userId,
         achievementId,
         unlocked: true,
         unlockedAt: new Date(),
-        seen: false,
+        seen: false, // IMPORTANT: Mark as unseen when creating
         progress: 0
       }
     });
     
-    logger.info(`Achievement unlocked: ${achievementId} for user ${userId}`);
+    logger.info(`✨ Achievement unlocked: ${achievementId} for user ${userId} (seen: false)`);
     return userAch;
   } catch (error) {
     logger.error('Error unlocking achievement:', error.message);
