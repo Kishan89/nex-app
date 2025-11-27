@@ -22,6 +22,7 @@ import {
   UserAchievement,
   AchievementCategory,
 } from '@/lib/achievementService';
+import { AchievementSkeleton } from '@/components/skeletons/AchievementSkeleton';
 import AchievementCard from '@/components/AchievementCard';
 
 type FilterType = 'all' | AchievementCategory;
@@ -103,6 +104,10 @@ export default function AchievementsScreen() {
   };
 
   const styles = createStyles(colors, isDark);
+
+  if (loading) {
+    return <AchievementSkeleton />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -223,10 +228,7 @@ export default function AchievementsScreen() {
 
       {/* Achievements List */}
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading achievements...</Text>
-        </View>
+        <AchievementSkeleton />
       ) : (
         <FlatList
           data={filteredAchievements()}

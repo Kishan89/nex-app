@@ -144,25 +144,31 @@ export default function CreatePostScreen() {
       // Track achievement for post creation
       if (user.id) {
         console.log('🏆 Checking achievements...');
-        const newlyUnlocked = await achievementService.handlePostCreated(user.id);
+        // Check for any unseen achievements that might have been unlocked
+        const newlyUnlocked = await achievementService.getUnseenAchievements(user.id);
         
         console.log('🎯 Newly unlocked:', newlyUnlocked);
         
         // Show achievement modal if any were unlocked
         if (newlyUnlocked.length > 0) {
-          setUnlockedAchievement(newlyUnlocked[0]);
-          setShowAchievementModal(true);
+          // Validate time-based achievements client-side
+          const validAchievements = newlyUnlocked.filter(id => achievementService.validateAchievementTime(id));
           
-          // Don't navigate immediately - let user see the celebration!
-          console.log('✨ Achievement modal showing!');
-          
-          // Emit event but stay on screen
-          DeviceEventEmitter.emit('newPost:created', createdPost);
-          
-          // Show success but don't navigate yet
-          // Alert removed for better UX
-          
-          return; // Don't navigate - user will close modal manually
+          if (validAchievements.length > 0) {
+            setUnlockedAchievement(validAchievements[0]);
+            setShowAchievementModal(true);
+            
+            // Don't navigate immediately - let user see the celebration!
+            console.log('✨ Achievement modal showing!');
+            
+            // Emit event but stay on screen
+            DeviceEventEmitter.emit('newPost:created', createdPost);
+            
+            // Show success but don't navigate yet
+            // Alert removed for better UX
+            
+            return; // Don't navigate - user will close modal manually
+          }
         }
       }
       
@@ -197,25 +203,7 @@ export default function CreatePostScreen() {
             {isPosting ? <ActivityIndicator color={colors.background} /> : <Text style={[styles.postText, { color: colors.background }]}>Post</Text>}
           </TouchableOpacity>
           
-          {/* Debug: Reset achievements (DEV ONLY) */}
-          {__DEV__ && (
-            <TouchableOpacity
-              style={[styles.debugButton, { backgroundColor: colors.error }]}
-              onPress={async () => {
-                if (user?.id) {
-                  try {
-                    await AsyncStorage.removeItem(`@achievements_${user.id}`);
-                    await AsyncStorage.removeItem(`@user_stats_${user.id}`);
-                    Alert.alert('✅ Reset', 'Achievement data cleared! Create post again for first post achievement.');
-                  } catch (e) {
-                    Alert.alert('Error', 'Failed to reset');
-                  }
-                }
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 10 }}>🔄</Text>
-            </TouchableOpacity>
-          )}
+          {/* Debug button removed */}
         </View>
         <KeyboardWrapper
           extraHeight={Platform.OS === 'android' ? 20 : 0}
@@ -413,6 +401,9 @@ export default function CreatePostScreen() {
           achievementId={unlockedAchievement}
           onClose={() => {
             console.log('🎉 Achievement modal closed');
+            if (unlockedAchievement && user?.id) {
+              achievementService.markAsSeen(user.id, unlockedAchievement);
+            }
             setShowAchievementModal(false);
             setUnlockedAchievement(null);
             // Navigate back after celebration

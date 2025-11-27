@@ -1,26 +1,34 @@
 import React from 'react';
 import { View, StyleSheet, SafeAreaView, ScrollView, Dimensions } from 'react-native';
 import { SkeletonAvatar, SkeletonText, SkeletonButton, SkeletonBase } from './SkeletonBase';
-import { PostSkeleton } from './PostSkeleton';
 import { useTheme } from '@/context/ThemeContext';
+import { Spacing, BorderRadius, ComponentStyles } from '@/constants/theme';
+
 const { width } = Dimensions.get('window');
+
 export const ProfileSkeleton: React.FC = () => {
   const { colors } = useTheme();
   const styles = createStyles(colors);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Banner Section with Back Button */}
+        {/* Banner Section */}
         <View style={styles.bannerSection}>
           <SkeletonBase width="100%" height={200} borderRadius={0} />
+          {/* Floating Back Button */}
           <View style={styles.floatingBackButton}>
-            <SkeletonBase width={32} height={32} borderRadius={16} />
+            <SkeletonBase width={ComponentStyles.avatar.medium} height={ComponentStyles.avatar.medium} borderRadius={ComponentStyles.avatar.medium / 2} />
           </View>
         </View>
+
         {/* Profile Image Section - Overlapping Banner */}
         <View style={styles.profileImageSection}>
-          <SkeletonAvatar size={100} style={styles.profileImage} />
+          <View style={styles.profileImageContainer}>
+            <SkeletonAvatar size={ComponentStyles.avatar.xlarge + 8} />
+          </View>
         </View>
+
         {/* Profile Section */}
         <View style={styles.profileSection}>
           {/* Profile Header with Username, XP, and Action Buttons */}
@@ -29,52 +37,91 @@ export const ProfileSkeleton: React.FC = () => {
               {/* Username and XP Row */}
               <View style={styles.usernameXpRow}>
                 <SkeletonText width={140} height={28} />
-                <SkeletonBase width={80} height={28} borderRadius={14} style={styles.xpBadge} />
+                <SkeletonBase width={80} height={24} borderRadius={12} style={styles.xpBadge} />
               </View>
             </View>
-            {/* Action Buttons */}
+            
+            {/* Top Action Buttons (Non-Owner) */}
             <View style={styles.actionButtonsContainer}>
-              <SkeletonBase width={44} height={44} borderRadius={22} />
+              <SkeletonButton width={40} height={36} borderRadius={BorderRadius.round} />
+              <SkeletonButton width={40} height={36} borderRadius={BorderRadius.round} style={{ marginLeft: 8 }} />
             </View>
           </View>
+
           {/* Bio Section */}
           <View style={styles.bioSection}>
             <SkeletonText width="90%" height={16} style={styles.bioLine} />
             <SkeletonText width="75%" height={16} style={styles.bioLine} />
           </View>
+
+          {/* Main Action Buttons (Edit/Achievements) */}
+          <View style={styles.mainActionsContainer}>
+            <SkeletonButton width="48%" height={44} borderRadius={BorderRadius.lg} />
+            <SkeletonButton width="48%" height={44} borderRadius={BorderRadius.lg} />
+          </View>
+
           {/* Stats Section */}
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <SkeletonText width={40} height={20} />
-              <SkeletonText width={50} height={14} />
+              <SkeletonText width={30} height={24} style={{ marginBottom: 4 }} />
+              <SkeletonText width={40} height={14} />
             </View>
             <View style={styles.statItem}>
-              <SkeletonText width={40} height={20} />
+              <SkeletonText width={30} height={24} style={{ marginBottom: 4 }} />
               <SkeletonText width={60} height={14} />
             </View>
             <View style={styles.statItem}>
-              <SkeletonText width={40} height={20} />
+              <SkeletonText width={30} height={24} style={{ marginBottom: 4 }} />
               <SkeletonText width={60} height={14} />
             </View>
           </View>
         </View>
-        {/* Posts Section Header */}
-        <View style={styles.postsHeaderContainer}>
-          <SkeletonText width={80} height={18} />
+
+        {/* Tabs Section (Owner) */}
+        <View style={styles.tabsContainer}>
+          <View style={styles.tabItem}>
+            <SkeletonText width={60} height={20} />
+            <View style={styles.activeTabIndicator} />
+          </View>
+          <View style={styles.tabItem}>
+            <SkeletonText width={80} height={20} />
+          </View>
         </View>
+
         {/* Posts Content */}
         <View style={styles.contentSection}>
           {[1, 2, 3].map((index) => (
             <View key={index} style={styles.postCard}>
+              {/* Post Header */}
               <View style={styles.postHeader}>
                 <SkeletonAvatar size={40} />
                 <View style={styles.postHeaderText}>
-                  <SkeletonText width={100} height={14} />
-                  <SkeletonText width={60} height={12} style={styles.postTime} />
+                  <SkeletonText width={120} height={16} style={{ marginBottom: 4 }} />
+                  <SkeletonText width={80} height={12} />
                 </View>
               </View>
-              <SkeletonText width="100%" height={16} style={styles.postContent} />
-              <SkeletonText width="85%" height={16} style={styles.postContent} />
+
+              {/* Post Content (Text First) */}
+              <View style={styles.postContentContainer}>
+                <SkeletonText width="95%" height={16} style={styles.postContentLine} />
+                <SkeletonText width="80%" height={16} style={styles.postContentLine} />
+              </View>
+
+              {/* Post Image */}
+              <SkeletonBase width="100%" height={200} borderRadius={BorderRadius.md} style={styles.postImage} />
+
+              {/* Post Actions */}
+              <View style={styles.postActions}>
+                {/* Left: Reply Text */}
+                <SkeletonText width={60} height={14} />
+                
+                {/* Right: Icons */}
+                <View style={styles.rightActions}>
+                  <SkeletonBase width={20} height={20} borderRadius={10} />
+                  <SkeletonText width={20} height={14} style={{ marginLeft: 6 }} />
+                  <SkeletonBase width={20} height={20} borderRadius={10} style={{ marginLeft: 16 }} />
+                </View>
+              </View>
             </View>
           ))}
         </View>
@@ -82,6 +129,7 @@ export const ProfileSkeleton: React.FC = () => {
     </SafeAreaView>
   );
 };
+
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
@@ -90,33 +138,28 @@ const createStyles = (colors: any) => StyleSheet.create({
   bannerSection: {
     position: 'relative',
     backgroundColor: colors.background,
-    overflow: 'visible',
+    marginTop: -Spacing.md,
   },
   floatingBackButton: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    top: Spacing.lg,
+    left: Spacing.md,
     zIndex: 10,
   },
   profileImageSection: {
     alignItems: 'flex-start',
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.md,
     marginTop: -50,
-    marginBottom: 8,
+    marginBottom: Spacing.xs,
     zIndex: 2,
   },
-  profileImage: {
-    borderWidth: 3,
-    borderColor: colors.primary,
+  profileImageContainer: {
+    zIndex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.md,
     marginTop: 0,
     backgroundColor: colors.background,
   },
@@ -124,8 +167,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 8,
-    minHeight: 50,
+    marginBottom: Spacing.md,
   },
   profileInfo: {
     flex: 1,
@@ -141,56 +183,86 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginLeft: 8,
   },
   actionButtonsContainer: {
-    alignItems: 'flex-end',
-    justifyContent: 'flex-start',
-    marginTop: -30,
-    zIndex: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   bioSection: {
-    marginBottom: 20,
+    marginBottom: Spacing.md,
   },
   bioLine: {
     marginBottom: 6,
+  },
+  mainActionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.lg,
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: colors.backgroundTertiary,
-    borderRadius: 16,
-    paddingVertical: 16,
-    marginBottom: 0,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   statItem: {
     alignItems: 'center',
   },
-  postsHeaderContainer: {
+  tabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tabItem: {
+    marginRight: Spacing.xl,
+    paddingBottom: Spacing.sm,
     alignItems: 'center',
-    paddingVertical: 12,
-    marginTop: 8,
-    marginBottom: 16,
-    backgroundColor: colors.background,
+  },
+  activeTabIndicator: {
+    width: '100%',
+    height: 3,
+    backgroundColor: colors.primary,
+    marginTop: 4,
+    borderRadius: 2,
   },
   contentSection: {
     paddingBottom: 80,
     backgroundColor: colors.background,
   },
   postCard: {
-    padding: 16,
+    padding: Spacing.md,
     backgroundColor: colors.backgroundSecondary,
-    marginBottom: 1,
+    marginBottom: Spacing.sm,
+    // Removed horizontal margin to match full width list style usually
+    marginBottom: 1, 
   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: Spacing.sm,
   },
   postHeaderText: {
     marginLeft: 12,
   },
-  postTime: {
-    marginTop: 4,
+  postContentContainer: {
+    marginBottom: Spacing.sm,
   },
-  postContent: {
-    marginBottom: 8,
+  postContentLine: {
+    marginBottom: 6,
+  },
+  postImage: {
+    marginBottom: Spacing.sm,
+  },
+  postActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.xs,
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

@@ -260,11 +260,32 @@ class AchievementService {
   // Mark achievement as seen
   async markAsSeen(userId: string, achievementId: string): Promise<void> {
     try {
-      // No need to call backend - handled by modal close
+      // Call backend to mark as seen
+      await apiService.markAchievementAsSeen(userId, achievementId);
+      // Invalidate cache to force refresh next time
       await this.invalidateCache(userId);
     } catch (error) {
       console.error('Error marking achievement as seen:', error);
     }
+  }
+
+  // Validate if an achievement is valid based on current time/conditions
+  // This is a client-side check to prevent incorrect unlocks due to server timezone issues
+  validateAchievementTime(achievementId: string): boolean {
+    const now = new Date();
+    const hours = now.getHours();
+    
+    if (achievementId === 'early_bird') {
+      // Early Bird: 5 AM - 7 AM
+      return hours >= 5 && hours < 7;
+    }
+    
+    if (achievementId === 'night_owl') {
+      // Night Owl: 12 AM - 4 AM
+      return hours >= 0 && hours < 4;
+    }
+    
+    return true;
   }
 
   // Get unseen unlocked achievements
