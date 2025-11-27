@@ -138,6 +138,23 @@ class ProfileStoreManager {
       await this.saveToStorage(userId, updated);
     }
   }
+
+  // Update XP specifically - invalidates cache to force fresh fetch
+  async updateXP(userId: string, newXP: number): Promise<void> {
+    const existing = this.store.profiles.get(userId);
+    if (existing) {
+      const updated = {
+        ...existing,
+        profile: {
+          ...existing.profile,
+          xp: newXP
+        },
+        timestamp: Date.now()
+      };
+      this.store.profiles.set(userId, updated);
+      await this.saveToStorage(userId, updated);
+    }
+  }
   // Update follow counts specifically
   async updateFollowCounts(userId: string, followers: number, following: number): Promise<void> {
     const existing = this.store.profiles.get(userId);

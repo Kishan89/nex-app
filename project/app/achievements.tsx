@@ -47,7 +47,8 @@ export default function AchievementsScreen() {
     
     setLoading(true);
     try {
-      const achievements = await achievementService.getAllAchievements(targetUserId);
+      // Force refresh to get latest data from backend
+      const achievements = await achievementService.getAllAchievements(targetUserId, true);
       setUserAchievements(achievements);
       
       const percent = await achievementService.getCompletionPercentage(targetUserId);

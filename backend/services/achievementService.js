@@ -288,6 +288,22 @@ const getUserAchievements = async (userId) => {
  */
 const unlockAchievement = async (userId, achievementId) => {
   try {
+    // Check if already unlocked to prevent duplicate unlocks
+    const existing = await prisma.userAchievement.findUnique({
+      where: {
+        userId_achievementId: {
+          userId,
+          achievementId
+        }
+      }
+    });
+    
+    // If already unlocked, don't unlock again
+    if (existing && existing.unlocked) {
+      logger.debug(`Achievement ${achievementId} already unlocked for user ${userId}`);
+      return existing;
+    }
+    
     const userAch = await prisma.userAchievement.upsert({
       where: {
         userId_achievementId: {
@@ -517,7 +533,7 @@ const handlePostCreated = async (userId) => {
     const newlyUnlocked = [];
     const stats = await getUserStats(userId);
     
-    // First post
+    // First post - only unlock if exactly 1 post
     if (stats.totalPosts === 1) {
       const existing = await prisma.userAchievement.findUnique({
         where: {
@@ -528,13 +544,17 @@ const handlePostCreated = async (userId) => {
         }
       });
       
-      if (!existing || !existing.unlocked) {
+      // Only unlock if doesn't exist OR exists but not unlocked
+      if (!existing) {
+        await unlockAchievement(userId, 'first_post');
+        newlyUnlocked.push('first_post');
+      } else if (!existing.unlocked) {
         await unlockAchievement(userId, 'first_post');
         newlyUnlocked.push('first_post');
       }
     }
     
-    // Streak achievements
+    // Streak achievements - check if already unlocked
     if (stats.currentStreak >= 3) {
       const existing = await prisma.userAchievement.findUnique({
         where: {
@@ -583,8 +603,10 @@ const handlePostCreated = async (userId) => {
       }
     }
     
-    // Check time-based achievements
-    const hour = new Date().getHours();
+    // Check time-based achievements - use UTC+5:30 for IST
+    const now = new Date();
+    const hour = now.getHours();
+    
     if (hour >= 0 && hour < 4) {
       const existing = await prisma.userAchievement.findUnique({
         where: {
@@ -599,7 +621,7 @@ const handlePostCreated = async (userId) => {
         await unlockAchievement(userId, 'night_owl');
         newlyUnlocked.push('night_owl');
       }
-    } else if (hour >= 5 && hour < 7) {
+    } else if (hour >= 5 && hour <= 7) {
       const existing = await prisma.userAchievement.findUnique({
         where: {
           userId_achievementId: {

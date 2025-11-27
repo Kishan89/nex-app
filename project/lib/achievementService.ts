@@ -193,12 +193,14 @@ const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
 class AchievementService {
   // Get all achievements with user progress from backend
-  async getAllAchievements(userId: string): Promise<Record<string, UserAchievement>> {
+  async getAllAchievements(userId: string, forceRefresh = false): Promise<Record<string, UserAchievement>> {
     try {
-      // Try to get from cache first
-      const cached = await this.getFromCache(userId);
-      if (cached) {
-        return cached;
+      // Try to get from cache first (skip if force refresh)
+      if (!forceRefresh) {
+        const cached = await this.getFromCache(userId);
+        if (cached) {
+          return cached;
+        }
       }
       
       // Fetch from backend
