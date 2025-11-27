@@ -45,6 +45,7 @@ model User {
   pushTokens             PushToken[]
   blockedBy              UserBlock[]       @relation("UserBlocked")
   blocking               UserBlock[]       @relation("UserBlocking")
+  achievements           UserAchievement[]
 
   @@map("users")
 }
@@ -317,4 +318,52 @@ model AppVersion {
 
   @@index([platform])
   @@map("app_version")
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  achievementId String         @unique // e.g., 'first_post', '10_likes'
+  title       String
+  description String
+  icon        String            // emoji
+  category    AchievementCategory
+  target      Int?              // target value for progress-based achievements
+  rarity      AchievementRarity
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  unlocked      Boolean     @default(false)
+  progress      Int         @default(0)
+  unlockedAt    DateTime?
+  seen          Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [achievementId], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@map("user_achievements")
+}
+
+enum AchievementCategory {
+  first_steps
+  engagement
+  streak
+  xp
+  special
+}
+
+enum AchievementRarity {
+  common
+  rare
+  legendary
 }

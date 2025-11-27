@@ -15,6 +15,8 @@ const xpRoutes = require('./xpRoutes');
 const versionRoutes = require('./version');
 const groupsRouter = require('./groups');
 const debugRouter = require('./debug');
+const achievementRoutes = require('./achievementRoutes');
+
 
 const userController = require('../controllers/userController'); 
 
@@ -47,5 +49,7 @@ router.use('/xp', xpRoutes);
 router.use('/version', versionRoutes);
 router.use('/groups', groupsRouter);
 router.use('/debug', debugRouter);
+router.use('/achievements', achievementRoutes);
+
 
 module.exports = router;

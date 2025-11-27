@@ -45,7 +45,19 @@ const awardXP = async (userId, xpAmount, reason = 'Unknown') => {
  * @param {string} userId - User ID who created the post
  */
 const awardPostCreationXP = async (userId) => {
-  return await awardXP(userId, XP_RULES.POST_CREATED, 'Post created');
+  const updatedUser = await awardXP(userId, XP_RULES.POST_CREATED, 'Post created');
+  
+  // Trigger achievement checks
+  try {
+    const achievementService = require('./achievementService');
+    await achievementService.handlePostCreated(userId);
+    await achievementService.handleXPUpdated(userId, updatedUser.xp);
+  } catch (error) {
+    logger.error('Failed to trigger achievements:', error.message);
+    // Don't fail XP award if achievement check fails
+  }
+  
+  return updatedUser;
 };
 
 /**
@@ -53,7 +65,19 @@ const awardPostCreationXP = async (userId) => {
  * @param {string} postOwnerId - User ID who owns the post that was liked
  */
 const awardLikeReceivedXP = async (postOwnerId) => {
-  return await awardXP(postOwnerId, XP_RULES.LIKE_RECEIVED, 'Like received on post');
+  const updatedUser = await awardXP(postOwnerId, XP_RULES.LIKE_RECEIVED, 'Like received on post');
+  
+  // Trigger achievement checks
+  try {
+    const achievementService = require('./achievementService');
+    await achievementService.handleLikeReceived(postOwnerId);
+    await achievementService.handleXPUpdated(postOwnerId, updatedUser.xp);
+  } catch (error) {
+    logger.error('Failed to trigger achievements:', error.message);
+    // Don't fail XP award if achievement check fails
+  }
+  
+  return updatedUser;
 };
 
 /**
@@ -97,7 +121,17 @@ const removeLikeXP = async (postOwnerId) => {
  * @param {string} postOwnerId - User ID who owns the post that was commented on
  */
 const awardCommentReceivedXP = async (postOwnerId) => {
-  return await awardXP(postOwnerId, XP_RULES.COMMENT_RECEIVED, 'Comment received on post');
+  const updatedUser = await awardXP(postOwnerId, XP_RULES.COMMENT_RECEIVED, 'Comment received on post');
+  
+  // Trigger achievement checks for XP
+  try {
+    const achievementService = require('./achievementService');
+    await achievementService.handleXPUpdated(postOwnerId, updatedUser.xp);
+  } catch (error) {
+    logger.error('Failed to trigger achievements:', error.message);
+  }
+  
+  return updatedUser;
 };
 
 /**

@@ -187,11 +187,21 @@ async function startServer() {
         });
 
         // Connect to database AFTER server starts (async)
-        connectDatabase().then((dbConnected) => {
+        connectDatabase().then(async (dbConnected) => {
             if (!dbConnected) {
                 console.log('⚠️ Database connection delayed, but server is running');
             } else {
                 console.log('✅ Database connected and verified successfully');
+                
+                // Seed achievement definitions
+                try {
+                    const achievementService = require('./services/achievementService');
+                    await achievementService.seedAchievements();
+                    console.log('✅ Achievement definitions seeded');
+                } catch (error) {
+                    console.error('⚠️ Failed to seed achievements:', error.message);
+                }
+                
                 // Start database monitoring
                 dbMonitor.startMonitoring();
             }
