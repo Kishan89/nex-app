@@ -147,12 +147,15 @@ export default function CreatePostScreen() {
       // Track achievement for post creation
       if (user.id) {
         console.log('🏆 Checking for achievements after post creation...');
+        console.log('👤 User ID:', user.id);
+        console.log('📝 Post created:', createdPost.id);
         
         // Check for newly unlocked achievements (backend already processed them)
         const newlyUnlocked = await achievementService.getUnseenAchievements(user.id);
         
         console.log('🎯 Unseen achievements from API:', newlyUnlocked);
         console.log('🔍 Type:', typeof newlyUnlocked, 'Length:', newlyUnlocked?.length);
+        console.log('📦 Raw response:', JSON.stringify(newlyUnlocked));
         
         // Show achievement modal if any were unlocked
         if (newlyUnlocked && newlyUnlocked.length > 0) {

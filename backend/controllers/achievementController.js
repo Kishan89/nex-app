@@ -120,11 +120,15 @@ const getUnseenAchievements = async (req, res) => {
   try {
     const { userId } = req.params;
     
+    logger.info(`🔍 getUnseenAchievements called for userId: ${userId}`);
+    
     if (!userId) {
       return res.status(400).json({ success: false, error: 'User ID is required' });
     }
     
     const unseen = await achievementService.getUnseenAchievements(userId);
+    logger.info(`🎯 Unseen achievements found: ${JSON.stringify(unseen)}`);
+    
     res.json({ success: true, data: unseen });
   } catch (error) {
     logger.error('Error getting unseen achievements:', error.message);
