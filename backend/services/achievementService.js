@@ -413,7 +413,7 @@ const getUserStats = async (userId) => {
       where: { followingId: userId }
     });
     
-    // Calculate streak (simplified - would need more complex logic for real streaks)
+    // Calculate streak (FIXED VERSION)
     const recentPosts = await prisma.post.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -423,31 +423,70 @@ const getUserStats = async (userId) => {
     
     let currentStreak = 0;
     let longestStreak = 0;
-    let streak = 0;
-    let lastDate = null;
     
-    for (const post of recentPosts) {
-      const postDate = new Date(post.createdAt).toDateString();
+    if (recentPosts.length > 0) {
+      // Group posts by date (ignore time)
+      const postsByDate = new Map();
+      recentPosts.forEach(post => {
+        const dateStr = new Date(post.createdAt).toDateString();
+        if (!postsByDate.has(dateStr)) {
+          postsByDate.set(dateStr, true);
+        }
+      });
       
-      if (!lastDate) {
-        streak = 1;
-        lastDate = postDate;
-      } else {
-        const dayDiff = Math.floor((new Date(lastDate) - new Date(postDate)) / (1000 * 60 * 60 * 24));
+      // Get unique dates sorted DESC (newest first)
+      const uniqueDates = Array.from(postsByDate.keys())
+        .map(d => new Date(d))
+        .sort((a, b) => b - a);
+      
+      // Check if streak is still active (posted today or yesterday)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const mostRecentDate = new Date(uniqueDates[0]);
+      mostRecentDate.setHours(0, 0, 0, 0);
+      
+      const isStreakActive = mostRecentDate >= yesterday;
+      
+      if (isStreakActive) {
+        // Calculate current streak
+        let expectedDate = new Date(mostRecentDate);
+        
+        for (const postDate of uniqueDates) {
+          const normalizedPostDate = new Date(postDate);
+          normalizedPostDate.setHours(0, 0, 0, 0);
+          
+          if (normalizedPostDate.getTime() === expectedDate.getTime()) {
+            currentStreak++;
+            expectedDate.setDate(expectedDate.getDate() - 1);
+          } else {
+            break;
+          }
+        }
+      }
+      
+      // Calculate longest streak
+      let tempStreak = 1;
+      for (let i = 1; i < uniqueDates.length; i++) {
+        const prevDate = new Date(uniqueDates[i - 1]);
+        const currDate = new Date(uniqueDates[i]);
+        prevDate.setHours(0, 0, 0, 0);
+        currDate.setHours(0, 0, 0, 0);
+        
+        const dayDiff = Math.floor((prevDate - currDate) / (1000 * 60 * 60 * 24));
         
         if (dayDiff === 1) {
-          streak++;
-        } else if (dayDiff > 1) {
-          longestStreak = Math.max(longestStreak, streak);
-          streak = 1;
+          tempStreak++;
+          longestStreak = Math.max(longestStreak, tempStreak);
+        } else {
+          tempStreak = 1;
         }
-        
-        lastDate = postDate;
       }
+      
+      longestStreak = Math.max(longestStreak, currentStreak);
     }
-    
-    currentStreak = streak;
-    longestStreak = Math.max(longestStreak, streak);
     
     return {
       totalPosts,

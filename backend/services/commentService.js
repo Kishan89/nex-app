@@ -337,6 +337,22 @@ class CommentService {
         }
       }
 
+      // Check if this is user's first comment (for first_comment achievement)
+      try {
+        const userCommentsCount = await prisma.comment.count({
+          where: { userId }
+        });
+        
+        if (userCommentsCount === 1) {
+          const achievementService = require('./achievementService');
+          await achievementService.unlockAchievement(userId, 'first_comment');
+          logger.info('first_comment achievement unlocked for user', { userId });
+        }
+      } catch (achievementError) {
+        logger.error('Failed to check/unlock first_comment achievement:', achievementError);
+        // Don't fail comment creation
+      }
+
       return {
         ...transformedComment,
         postOwnerId: postOwner?.userId

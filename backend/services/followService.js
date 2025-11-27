@@ -50,6 +50,22 @@ class FollowService {
         }
       });
 
+      // Check if this is the user's first follower (for first_follower achievement)
+      try {
+        const followerCount = await prisma.follow.count({
+          where: { followingId }
+        });
+        
+        if (followerCount === 1) {
+          const achievementService = require('./achievementService');
+          await achievementService.unlockAchievement(followingId, 'first_follower');
+          logger.info('first_follower achievement unlocked for user', { userId: followingId });
+        }
+      } catch (achievementError) {
+        logger.error('Failed to check/unlock first_follower achievement:', achievementError);
+        // Don't fail follow operation
+      }
+
       // INSTANT RETURN: Skip count updates for speed
       // Count updates will be handled by background queue
       return follow;

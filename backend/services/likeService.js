@@ -82,6 +82,22 @@ class LikeService {
       ]);
       logger.debug('Like added');
 
+      // Check if this is user's first like given (for first_like achievement)
+      try {
+        const userLikesCount = await prisma.like.count({
+          where: { userId }
+        });
+        
+        if (userLikesCount === 1) {
+          const achievementService = require('./achievementService');
+          await achievementService.unlockAchievement(userId, 'first_like');
+          logger.info('first_like achievement unlocked for user', { userId });
+        }
+      } catch (achievementError) {
+        logger.error('Failed to check/unlock first_like achievement:', achievementError);
+        // Don't fail the like operation
+      }
+
       // Fetch post owner with more details
       const post = await prisma.post.findUnique({
         where: { id: postId },
