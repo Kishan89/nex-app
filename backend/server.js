@@ -50,9 +50,18 @@ if (process.env.NODE_ENV === 'development') {
     });
 }
 
-// Health check endpoint (before API routes) - Railway compatible
-app.get('/health', async (req, res) => {
-    console.log('🔍 Health check requested');
+// Simple health check endpoint for Railway (no DB check to avoid timeouts)
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
+// Detailed health check with database (separate endpoint)
+app.get('/health/detailed', async (req, res) => {
+    console.log('🔍 Detailed health check requested');
     
     const healthStatus = {
         status: 'healthy',
@@ -71,7 +80,7 @@ app.get('/health', async (req, res) => {
         return res.status(200).json(healthStatus);
     }
 
-    // Try database connection (with very short timeout for Railway)
+    // Try database connection (with very short timeout)
     try {
         const { prisma } = require('./config/database');
         await Promise.race([
@@ -79,12 +88,11 @@ app.get('/health', async (req, res) => {
             new Promise((_, reject) => setTimeout(() => reject(new Error('DB timeout')), 2000))
         ]);
         healthStatus.database = 'connected';
-        console.log('✅ Health check passed - database connected');
+        console.log('✅ Detailed health check passed - database connected');
     } catch (error) {
         console.log('⚠️ Database check failed:', error.message);
         healthStatus.database = 'connecting';
         healthStatus.database_note = 'May still be initializing';
-        // Still return 200 OK for Railway health check
     }
 
     res.status(200).json(healthStatus);
