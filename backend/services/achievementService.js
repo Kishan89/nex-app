@@ -530,11 +530,14 @@ const getUserStats = async (userId) => {
  */
 const handlePostCreated = async (userId) => {
   try {
+    logger.info(`🎯 handlePostCreated called for user: ${userId}`);
     const newlyUnlocked = [];
     const stats = await getUserStats(userId);
+    logger.info(`📊 User stats:`, stats);
     
     // First post - only unlock if exactly 1 post
     if (stats.totalPosts === 1) {
+      logger.info(`✅ User has exactly 1 post, checking first_post achievement...`);
       const existing = await prisma.userAchievement.findUnique({
         where: {
           userId_achievementId: {
@@ -544,14 +547,22 @@ const handlePostCreated = async (userId) => {
         }
       });
       
+      logger.info(`🔍 Existing achievement record:`, existing);
+      
       // Only unlock if doesn't exist OR exists but not unlocked
       if (!existing) {
+        logger.info(`🆕 No existing record, unlocking first_post...`);
         await unlockAchievement(userId, 'first_post');
         newlyUnlocked.push('first_post');
       } else if (!existing.unlocked) {
+        logger.info(`🔓 Existing record but not unlocked, unlocking first_post...`);
         await unlockAchievement(userId, 'first_post');
         newlyUnlocked.push('first_post');
+      } else {
+        logger.info(`⏭️ Achievement already unlocked, skipping`);
       }
+    } else {
+      logger.info(`ℹ️ User has ${stats.totalPosts} posts, not unlocking first_post`);
     }
     
     // Streak achievements - check if already unlocked
@@ -637,9 +648,10 @@ const handlePostCreated = async (userId) => {
       }
     }
     
+    logger.info(`🎉 Newly unlocked achievements:`, newlyUnlocked);
     return newlyUnlocked;
   } catch (error) {
-    logger.error('Error handling post created:', error.message);
+    logger.error('❌ Error handling post created:', error.message, error.stack);
     return [];
   }
 };

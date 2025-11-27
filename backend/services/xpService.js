@@ -45,15 +45,19 @@ const awardXP = async (userId, xpAmount, reason = 'Unknown') => {
  * @param {string} userId - User ID who created the post
  */
 const awardPostCreationXP = async (userId) => {
+  logger.info(`🎯 awardPostCreationXP called for user: ${userId}`);
   const updatedUser = await awardXP(userId, XP_RULES.POST_CREATED, 'Post created');
+  logger.info(`✅ XP awarded, new XP: ${updatedUser.xp}`);
   
   // Trigger achievement checks
   try {
+    logger.info(`🏆 Triggering achievement checks...`);
     const achievementService = require('./achievementService');
     await achievementService.handlePostCreated(userId);
     await achievementService.handleXPUpdated(userId, updatedUser.xp);
+    logger.info(`✅ Achievement checks completed`);
   } catch (error) {
-    logger.error('Failed to trigger achievements:', error.message);
+    logger.error('❌ Failed to trigger achievements:', error.message, error.stack);
     // Don't fail XP award if achievement check fails
   }
   
