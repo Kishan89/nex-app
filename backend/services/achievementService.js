@@ -197,12 +197,48 @@ const getAchievementDefinitions = async () => {
 /**
  * Get user's achievements with progress
  */
+/**
+ * Get user's achievements with progress
+ * Automatically checks and unlocks achievements based on current stats
+ */
 const getUserAchievements = async (userId) => {
   try {
-    // Get all achievement definitions
+    // 1. Get current user stats to check for retroactive unlocks
+    const stats = await getUserStats(userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { xp: true }
+    });
+    const currentXP = user ? user.xp : 0;
+
+    // 2. Check for retroactive unlocks (sync existing stats with achievements)
+    const promises = [];
+
+    // Check XP Achievements
+    if (currentXP >= 100) promises.push(unlockAchievement(userId, '100_xp').catch(() => {}));
+    if (currentXP >= 250) promises.push(unlockAchievement(userId, '250_xp').catch(() => {}));
+    if (currentXP >= 1000) promises.push(unlockAchievement(userId, '1000_xp').catch(() => {}));
+
+    // Check Post Achievements
+    if (stats.totalPosts >= 1) promises.push(unlockAchievement(userId, 'first_post').catch(() => {}));
+    
+    // Check Like Achievements
+    if (stats.totalLikesReceived >= 10) promises.push(unlockAchievement(userId, '10_likes').catch(() => {}));
+    if (stats.totalLikesReceived >= 25) promises.push(unlockAchievement(userId, '25_likes').catch(() => {}));
+    if (stats.totalLikesReceived >= 50) promises.push(unlockAchievement(userId, '50_likes').catch(() => {}));
+    if (stats.totalLikesReceived >= 100) promises.push(unlockAchievement(userId, '100_likes').catch(() => {}));
+
+    // Check Streak Achievements
+    if (stats.currentStreak >= 3) promises.push(unlockAchievement(userId, '3_day_streak').catch(() => {}));
+    if (stats.currentStreak >= 7) promises.push(unlockAchievement(userId, '7_day_streak').catch(() => {}));
+    if (stats.currentStreak >= 60) promises.push(unlockAchievement(userId, '60_day_streak').catch(() => {}));
+
+    // Execute all checks in parallel (ignore errors for already unlocked ones)
+    await Promise.all(promises);
+
+    // 3. Now fetch the updated list of achievements
     const allAchievements = await getAchievementDefinitions();
     
-    // Get user's achievement progress
     const userAchievements = await prisma.userAchievement.findMany({
       where: { userId },
       include: { achievement: true }
@@ -223,10 +259,19 @@ const getUserAchievements = async (userId) => {
     // Return all achievements with user progress
     const result = {};
     allAchievements.forEach(ach => {
+      // Calculate progress based on current stats if not explicitly stored
+      let progress = userAchMap[ach.achievementId]?.progress || 0;
+      
+      if (!userAchMap[ach.achievementId]?.unlocked) {
+        if (ach.category === 'xp') progress = currentXP;
+        else if (ach.category === 'engagement' && ach.achievementId.includes('likes')) progress = stats.totalLikesReceived;
+        else if (ach.category === 'streak') progress = stats.currentStreak;
+      }
+
       result[ach.achievementId] = userAchMap[ach.achievementId] || {
         id: ach.achievementId,
         unlocked: false,
-        progress: 0,
+        progress: progress,
         seen: false
       };
     });
