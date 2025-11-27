@@ -4,6 +4,7 @@ const { successResponse, errorResponse } = require('../utils/helpers');
 const { createLogger } = require('../utils/logger');
 const { HTTP_STATUS, ERROR_MESSAGES, PAGINATION } = require('../constants');
 const { BadRequestError, UnauthorizedError, NotFoundError } = require('../utils/errors');
+const achievementService = require('../services/achievementService');
 
 const logger = createLogger('PostController');
 
@@ -73,8 +74,15 @@ class PostController {
         try {
           await addXpJob(userId);
           logger.debug(`XP job queued for user: ${userId}`);
+          
+          // Check for achievement unlocks
+          logger.info(`🏆 Checking achievements for user: ${userId}`);
+          const newlyUnlocked = await achievementService.handlePostCreated(userId);
+          if (newlyUnlocked && newlyUnlocked.length > 0) {
+            logger.info(`✨ Unlocked achievements: ${newlyUnlocked.join(', ')}`);
+          }
         } catch (queueError) {
-          logger.error('Error queuing XP job:', queueError);
+          logger.error('Error queuing XP job or checking achievements:', queueError);
         }
       });
     } catch (error) {
