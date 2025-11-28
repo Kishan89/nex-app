@@ -106,12 +106,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (nextAppState === 'active' && user && token) {
         try {
           // Fetch fresh user data to check ban status
+          console.log('🔍 [AuthContext] Checking ban status on resume...');
           const freshUser = await apiService.getAuthenticatedUserProfile();
+          console.log('🔍 [AuthContext] Fresh user ban status:', freshUser?.isBanned);
           
           if (freshUser?.isBanned) {
             // User was banned while logged in - update user data and redirect
             setUser(freshUser);
-            router.replace('/banned');
+            // Use setTimeout to ensure navigation is ready and break render cycle
+            setTimeout(() => {
+              router.replace('/banned');
+            }, 100);
           }
         } catch (error) {
           // If fetch fails, ignore - user may be offline

@@ -45,7 +45,7 @@ const findUserByEmail = async (email) => {
   try {
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, username: true, password: true, avatar: true, bio: true, banner_url: true, xp: true },
+      select: { id: true, email: true, username: true, password: true, avatar: true, bio: true, banner_url: true, xp: true, isBanned: true, banReason: true, bannedAt: true },
     });
     return user;
   } catch (error) {
@@ -58,7 +58,7 @@ const findUserByUsername = async (username) => {
   try {
     const user = await prisma.user.findUnique({
       where: { username },
-      select: { id: true, username: true, email: true, avatar: true, bio: true, website: true, location: true, verified: true, banner_url: true, xp: true },
+      select: { id: true, username: true, email: true, avatar: true, bio: true, website: true, location: true, verified: true, banner_url: true, xp: true, isBanned: true, banReason: true, bannedAt: true },
     });
     return user;
   } catch (error) {
@@ -75,7 +75,7 @@ const findUserById = async (id) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, username: true, avatar: true, bio: true, website: true, location: true, verified: true, banner_url: true, xp: true },
+      select: { id: true, email: true, username: true, avatar: true, bio: true, website: true, location: true, verified: true, banner_url: true, xp: true, isBanned: true, banReason: true, bannedAt: true },
     });
     return user;
   } catch (error) {

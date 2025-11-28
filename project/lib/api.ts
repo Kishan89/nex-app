@@ -5,7 +5,10 @@ import { ErrorHandler } from './errorHandler';
 const getApiBaseUrl = () => {
     // Check if we're in development mode
     if (__DEV__) {
-        // In development, always use Railway URL for consistency
+        // Uncomment this line to use local backend for testing
+        // return 'http://192.168.1.X:3001'; // Replace with your computer's local IP
+        
+        // Default to Railway URL
         return process.env.EXPO_PUBLIC_API_URL || 'https://nex-app-production.up.railway.app';
     }
     // In production/release, use Railway URL
@@ -297,7 +300,12 @@ class ApiService {
     }
     async getAuthenticatedUserProfile(): Promise<ProfileData> {
         try {
-            const profile = await this.get<ProfileData>(API_ENDPOINTS.AUTHENTICATED_USER_PROFILE);
+            // Add timestamp to prevent caching
+            const url = `${API_ENDPOINTS.AUTHENTICATED_USER_PROFILE}?t=${Date.now()}`;
+            console.log('🔍 [API] Fetching profile from:', url);
+            const profile = await this.get<ProfileData>(url);
+            console.log('🔍 [API] Profile response:', JSON.stringify(profile, null, 2));
+            console.log('🔍 [API] Ban status:', profile?.isBanned, 'Reason:', profile?.banReason);
             return profile;
         } catch (error: any) {
             // If it's a 500 error or authentication error, clear the token

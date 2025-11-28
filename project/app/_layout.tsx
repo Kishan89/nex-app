@@ -131,6 +131,27 @@ function AppWithNotifications() {
   // Initialize notification services and ultra-fast cache
   useEffect(() => {
     if (user) {
+      // 🛡️ AGGRESSIVE BAN CHECK: Check ban status immediately on mount/update
+      // This ensures even if AuthContext missed it, we catch it here
+      const checkBanStatus = async () => {
+        try {
+          // Use apiService directly to get fresh profile
+          const { apiService } = await import('@/lib/api');
+          const profile = await apiService.getAuthenticatedUserProfile();
+          if (profile?.isBanned) {
+            console.log('⛔ User is banned (detected in Layout), redirecting...');
+            // Force navigation to banned screen
+            const { router } = await import('expo-router');
+            router.replace('/banned');
+          }
+        } catch (e) {
+          console.log('Ban check failed:', e);
+        }
+      };
+      
+      // Run check immediately
+      checkBanStatus();
+
       // ⚡ Initialize ultra-fast chat cache for instant message loading
       ultraFastChatCache.initialize().catch(error => {
         });
