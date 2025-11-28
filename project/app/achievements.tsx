@@ -47,16 +47,29 @@ export default function AchievementsScreen() {
     
     setLoading(true);
     try {
-      // Force refresh to get latest data from backend
-      const achievements = await achievementService.getAllAchievements(targetUserId, true);
-      setUserAchievements(achievements);
+      // Load from cache first (instant), then refresh in background
+      const [achievements, percent] = await Promise.all([
+        achievementService.getAllAchievements(targetUserId, false),
+        achievementService.getCompletionPercentage(targetUserId),
+      ]);
       
-      const percent = await achievementService.getCompletionPercentage(targetUserId);
+      setUserAchievements(achievements);
       setCompletionPercent(percent);
+      setLoading(false);
+      
+      // Refresh in background if needed
+      setTimeout(async () => {
+        const [freshAchievements, freshPercent] = await Promise.all([
+          achievementService.getAllAchievements(targetUserId, true),
+          achievementService.getCompletionPercentage(targetUserId),
+        ]);
+        setUserAchievements(freshAchievements);
+        setCompletionPercent(freshPercent);
+      }, 100);
     } catch (error) {
       console.error('Error loading achievements:', error);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const filteredAchievements = useCallback(() => {

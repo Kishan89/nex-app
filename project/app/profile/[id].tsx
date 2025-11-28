@@ -719,7 +719,7 @@ export default function ProfileScreen() {
                 <View key={index} style={[styles.postCard, { backgroundColor: colors.backgroundSecondary }]}>
                   <View style={styles.postHeader}>
                     <View style={[styles.skeletonAvatar, { backgroundColor: colors.backgroundTertiary }]} />
-                    <View style={styles.postHeaderText}>
+                    <View style={styles.postsHeaderText}>
                       <View style={[styles.skeletonText, { backgroundColor: colors.backgroundTertiary, width: 100, height: 14 }]} />
                       <View style={[styles.skeletonText, { backgroundColor: colors.backgroundTertiary, width: 60, height: 12, marginTop: 4 }]} />
                     </View>

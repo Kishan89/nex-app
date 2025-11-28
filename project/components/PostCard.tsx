@@ -386,8 +386,8 @@ const PostCard = React.memo(function PostCard({
             >
               <Heart
                 size={100}
-                color="#ff3b5c"
-                fill="#ff3b5c"
+                color="#e385ec"
+                fill="#e385ec"
                 strokeWidth={0}
               />
             </Animated.View>

@@ -189,16 +189,31 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
 ];
 
 const CACHE_KEY = '@achievements_cache';
-const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
+const STATS_CACHE_KEY = '@achievement_stats';
+const COMPLETION_CACHE_KEY = '@achievement_completion';
 
 class AchievementService {
+  private memoryCache: Map<string, { data: any; timestamp: number }> = new Map();
+
   // Get all achievements with user progress from backend
   async getAllAchievements(userId: string, forceRefresh = false): Promise<Record<string, UserAchievement>> {
     try {
-      // Try to get from cache first (skip if force refresh)
+      const cacheKey = `${userId}_achievements`;
+      
+      // Check memory cache first (instant)
+      if (!forceRefresh && this.memoryCache.has(cacheKey)) {
+        const cached = this.memoryCache.get(cacheKey)!;
+        if (Date.now() - cached.timestamp < CACHE_EXPIRY) {
+          return cached.data;
+        }
+      }
+      
+      // Try AsyncStorage cache
       if (!forceRefresh) {
         const cached = await this.getFromCache(userId);
         if (cached) {
+          this.memoryCache.set(cacheKey, { data: cached, timestamp: Date.now() });
           return cached;
         }
       }
@@ -207,6 +222,8 @@ class AchievementService {
       const response = await apiService.getUserAchievements(userId) as any;
       
       if (response?.success && response?.data) {
+        // Save to both caches
+        this.memoryCache.set(cacheKey, { data: response.data, timestamp: Date.now() });
         await this.saveToCache(userId, response.data);
         return response.data;
       }
@@ -232,9 +249,20 @@ class AchievementService {
   // Get user stats from backend
   async getUserStats(userId: string): Promise<UserStats> {
     try {
+      const cacheKey = `${userId}_stats`;
+      
+      // Check memory cache
+      if (this.memoryCache.has(cacheKey)) {
+        const cached = this.memoryCache.get(cacheKey)!;
+        if (Date.now() - cached.timestamp < CACHE_EXPIRY) {
+          return cached.data;
+        }
+      }
+      
       const response = await apiService.getAchievementStats(userId) as any;
       
       if (response?.success && response?.data) {
+        this.memoryCache.set(cacheKey, { data: response.data, timestamp: Date.now() });
         return response.data;
       }
       
@@ -262,8 +290,8 @@ class AchievementService {
   // Mark achievement as seen
   async markAsSeen(userId: string, achievementId: string): Promise<void> {
     try {
-      // No need to call backend - handled by modal close
       await this.invalidateCache(userId);
+      this.memoryCache.delete(`${userId}_achievements`);
     } catch (error) {
       console.error('Error marking achievement as seen:', error);
     }
@@ -292,9 +320,20 @@ class AchievementService {
   // Get completion percentage
   async getCompletionPercentage(userId: string): Promise<number> {
     try {
+      const cacheKey = `${userId}_completion`;
+      
+      // Check memory cache
+      if (this.memoryCache.has(cacheKey)) {
+        const cached = this.memoryCache.get(cacheKey)!;
+        if (Date.now() - cached.timestamp < CACHE_EXPIRY) {
+          return cached.data;
+        }
+      }
+      
       const response = await apiService.getCompletionPercentage(userId) as any;
       
       if (response?.success && response?.data?.percentage !== undefined) {
+        this.memoryCache.set(cacheKey, { data: response.data.percentage, timestamp: Date.now() });
         return response.data.percentage;
       }
       
@@ -310,21 +349,18 @@ class AchievementService {
     try {
       console.log('🏆 Checking for new achievements...');
       
-      // Invalidate cache to force fresh data
+      // Clear all caches
+      this.memoryCache.delete(`${userId}_achievements`);
+      this.memoryCache.delete(`${userId}_stats`);
+      this.memoryCache.delete(`${userId}_completion`);
       await this.invalidateCache(userId);
       
-      // Wait for backend to process achievement unlock
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for backend to process
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      // Get unseen achievements directly from backend
+      // Get unseen achievements
       const unseen = await this.getUnseenAchievements(userId);
-      console.log('🎯 Unseen achievements from backend:', unseen);
-      
-      if (unseen.length > 0) {
-        console.log('✨ Found unseen achievements! Showing popup...');
-      } else {
-        console.log('ℹ️ No new achievements to show');
-      }
+      console.log('🎯 Unseen achievements:', unseen);
       
       return unseen;
     } catch (error) {
