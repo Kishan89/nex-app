@@ -7,7 +7,7 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
-import { Heart, MessageCircle, UserPlus, Mail } from 'lucide-react-native';
+import { Heart, MessageCircle, UserPlus, Mail, AlertTriangle } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
 const { width } = Dimensions.get('window');
 // Simple notification interface to match the one used in notifications screen
@@ -46,6 +46,8 @@ export const NotificationCard = ({
         return <UserPlus {...iconProps} />;
       case 'MESSAGE':
         return <Mail {...iconProps} />;
+      case 'WARNING':
+        return <AlertTriangle {...iconProps} />;
       default:
         return <Heart {...iconProps} />;
     }
@@ -61,6 +63,8 @@ export const NotificationCard = ({
         return '#5f27cd';
       case 'MESSAGE':
         return '#004aad';
+      case 'WARNING':
+        return '#ff9800';
       default:
         return '#e385ec';
     }

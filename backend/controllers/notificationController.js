@@ -38,9 +38,9 @@ const getNotificationsByUserId = async (req, res) => {
             const notifications = await prisma.notification.findMany({
                 where: { 
                     userId: userId,
-                    // Only include like, comment, follow notifications
+                    // Include warning notifications
                     type: {
-                        in: ['LIKE', 'COMMENT', 'FOLLOW']
+                        in: ['LIKE', 'COMMENT', 'FOLLOW', 'WARNING']
                     }
                 },
                 select: {
@@ -104,7 +104,7 @@ const getNotificationsByUserId = async (req, res) => {
                             userId: userId,
                             read: false,
                             type: {
-                                in: ['LIKE', 'COMMENT', 'FOLLOW']
+                                in: ['LIKE', 'COMMENT', 'FOLLOW', 'WARNING']
                             }
                         },
                         data: { 
@@ -176,7 +176,7 @@ const markNotificationsAsRead = async (req, res) => {
                 userId: userId,
                 read: false,
                 type: {
-                    in: ['LIKE', 'COMMENT', 'FOLLOW']
+                    in: ['LIKE', 'COMMENT', 'FOLLOW', 'WARNING']
                 }
             }
         });
@@ -330,10 +330,76 @@ const sendToSegment = async (req, res) => {
     }
 };
 
+/**
+ * Send warning notification to specific users
+ * Admin only endpoint
+ */
+const sendWarningNotification = async (req, res) => {
+    try {
+        const { userIds, message, title } = req.body;
+        
+        if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: 'userIds array is required' 
+            });
+        }
+
+        if (!message) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+                message: 'Warning message is required' 
+            });
+        }
+
+        logger.info('Sending warning notification to users:', { userIds, message });
+
+        // Create warning notifications in database
+        const notifications = await Promise.all(
+            userIds.map(userId => 
+                prisma.notification.create({
+                    data: {
+                        userId: userId,
+                        type: 'WARNING',
+                        message: message,
+                        read: false
+                    }
+                })
+            )
+        );
+
+        // Also send push notifications if oneSignalService exists
+        try {
+            const result = await oneSignalService.sendToSpecificUsers(userIds, {
+                title: title || '⚠️ Warning',
+                message: message,
+                data: { type: 'warning' }
+            });
+            logger.info('Push notifications sent:', result);
+        } catch (pushError) {
+            logger.error('Error sending push notifications:', pushError);
+            // Continue even if push fails
+        }
+
+        logger.info('Warning notifications created successfully:', notifications.length);
+
+        return res.status(HTTP_STATUS.OK).json({
+            message: 'Warning notifications sent successfully',
+            count: notifications.length
+        });
+
+    } catch (error) {
+        logger.error('Error sending warning notifications:', error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ 
+            message: 'Failed to send warning notifications',
+            error: error.message 
+        });
+    }
+};
+
 module.exports = {
     getNotificationsByUserId,
     markNotificationsAsRead,
     sendBroadcastNotification,
     sendToSpecificUsers,
-    sendToSegment
+    sendToSegment,
+    sendWarningNotification
 };

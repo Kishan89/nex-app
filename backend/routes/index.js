@@ -16,6 +16,8 @@ const versionRoutes = require('./version');
 const groupsRouter = require('./groups');
 const debugRouter = require('./debug');
 const achievementRoutes = require('./achievementRoutes');
+const adminRouter = require('./admin');
+
 
 
 const userController = require('../controllers/userController'); 
@@ -50,6 +52,8 @@ router.use('/version', versionRoutes);
 router.use('/groups', groupsRouter);
 router.use('/debug', debugRouter);
 router.use('/achievements', achievementRoutes);
+router.use('/admin', adminRouter);
+
 
 
 module.exports = router;

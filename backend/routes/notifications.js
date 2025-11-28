@@ -12,4 +12,7 @@ router.post('/broadcast', notificationController.sendBroadcastNotification);
 router.post('/send-to-users', notificationController.sendToSpecificUsers);
 router.post('/send-to-segment', notificationController.sendToSegment);
 
+// Warning notification route (admin only)
+router.post('/warning', notificationController.sendWarningNotification);
+
 module.exports = router;

@@ -27,6 +27,9 @@ model User {
   uuid_id                String?           @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   banner_url             String?
   xp                     Int               @default(0)
+  isBanned               Boolean           @default(false)
+  banReason              String?
+  bannedAt               DateTime?
   pollVotes              PollVote[]
   bookmarks              Bookmark[]
   chatParticipants       ChatParticipant[]
@@ -302,6 +305,7 @@ enum NotificationType {
   MESSAGE
   MENTION
   GROUP_INVITE
+  WARNING
 }
 
 model AppVersion {

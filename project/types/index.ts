@@ -9,6 +9,9 @@ export interface User {
   verified?: boolean;
   isOnline?: boolean;
   lastSeen?: Date;
+  isBanned?: boolean;
+  banReason?: string;
+  bannedAt?: Date;
 }
 // Post types
 export interface Post {
@@ -85,7 +88,7 @@ export interface CreateMessageData {
 // Notification types
 export interface Notification {
   id: string;
-  type: 'like' | 'comment' | 'follow' | 'message';
+  type: 'like' | 'comment' | 'follow' | 'message' | 'warning';
   user: string;
   action: string;
   time: string;

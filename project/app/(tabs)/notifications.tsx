@@ -13,7 +13,7 @@ import {
   Platform 
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Bell, Heart, MessageCircle, UserPlus } from 'lucide-react-native';
+import { Bell, Heart, MessageCircle, UserPlus, AlertTriangle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { apiService } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -40,6 +40,7 @@ const getNotificationIcon = (type: string) => {
     case 'like': return Heart;
     case 'comment': return MessageCircle;
     case 'follow': return UserPlus;
+    case 'warning': return AlertTriangle;
     default: return Bell;
   }
 };
@@ -76,10 +77,10 @@ export default function NotificationsScreen() {
       setLoading(true);
       const notificationsData = await apiService.getUserNotifications(user.id, forceRefresh);
       if (Array.isArray(notificationsData)) {
-        // Filter to show only like, comment, follow notifications (exclude chat/message)
+        // Filter to show like, comment, follow, and warning notifications (exclude chat/message)
         const filteredNotifications = notificationsData.filter((notification: SimpleNotification) => {
           const type = notification.type?.toLowerCase() || '';
-          const isAllowed = ['like', 'comment', 'follow'].includes(type);
+          const isAllowed = ['like', 'comment', 'follow', 'warning'].includes(type);
           return isAllowed;
         });
         setNotifications(filteredNotifications);

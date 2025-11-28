@@ -88,6 +88,7 @@ export type ProfileData = {
     avatar_url?: string; avatar?: string; banner_url?: string; xp?: number; 
     posts_count?: number; followers_count?: number; following_count?: number;
     website?: string; location?: string; verified?: boolean;
+    isBanned?: boolean; banReason?: string; bannedAt?: string;
 };
 type Post = any;
 type Comment = any;

@@ -66,6 +66,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           try {
             const fetchedUser = await apiService.getAuthenticatedUserProfile();
             setUser(fetchedUser);
+            
+            // Check if user is banned
+            if (fetchedUser?.isBanned) {
+              router.replace('/banned');
+              return;
+            }
           } catch (fetchError) {
             // If profile fetch fails, clear the stored token as it might be invalid
             if (fetchError?.message?.includes('500') || fetchError?.message?.includes('Internal server error')) {
@@ -121,6 +127,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!returnedToken || !returnedUser) {
         throw new Error((resp as AuthResponse)?.message || 'Authentication failed. Please check your credentials.');
       }
+
+      // Check if user is banned
+      if (returnedUser.isBanned) {
+        // Still persist auth so user can see banned screen with reason
+        await persistAuth(returnedToken, returnedUser);
+        router.replace('/banned');
+        return;
+      }
+
       await persistAuth(returnedToken, returnedUser);
       // Request notification permission with beautiful dialog after login
       try {
@@ -193,6 +208,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!returnedToken || !returnedUser) {
         throw new Error((resp as AuthResponse)?.message || 'Google authentication failed.');
       }
+
+      // Check if user is banned
+      if (returnedUser.isBanned) {
+        // Still persist auth so user can see banned screen with reason
+        await persistAuth(returnedToken, returnedUser);
+        router.replace('/banned');
+        return;
+      }
+
       await persistAuth(returnedToken, returnedUser);
       // Request notification permission with beautiful dialog after Google login
       try {
