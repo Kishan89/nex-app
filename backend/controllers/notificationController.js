@@ -88,7 +88,7 @@ const getNotificationsByUserId = async (req, res) => {
                 postImage: notification.post?.imageUrl,
                 read: notification.read || false,
                 time: formatTimeAgo(notification.createdAt),
-                createdAt: notification.createdAt
+                createdAt: notification.createdAt.toISOString() // Send ISO string for proper parsing
             }));
 
             res.set({
