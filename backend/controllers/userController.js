@@ -94,6 +94,9 @@ const login = async (req, res, next) => {
                 bio: user.bio || '',
                 avatar_url: user.avatar || null,
                 banner_url: user.banner_url || null,
+                isBanned: user.isBanned || false,
+                banReason: user.banReason || null,
+                bannedAt: user.bannedAt || null,
             },
         });
 
@@ -179,6 +182,9 @@ const googleLogin = async (req, res, next) => {
                 bio: user.bio || '',
                 avatar_url: user.avatar || null, 
                 banner_url: user.banner_url || null,
+                isBanned: user.isBanned || false,
+                banReason: user.banReason || null,
+                bannedAt: user.bannedAt || null,
             },
         });
 
@@ -298,7 +304,10 @@ const getMeProfile = async (req, res, next) => {
             xp: user.xp || 0,
             followers_count: followCounts.followers,
             following_count: followCounts.following,
-            createdAt: user.createdAt // 🚀 NEW: Include account creation date for banner logic
+            createdAt: user.createdAt, // 🚀 NEW: Include account creation date for banner logic
+            isBanned: user.isBanned || false, // Ban status
+            banReason: user.banReason || null, // Ban reason
+            bannedAt: user.bannedAt || null, // Ban timestamp
         };
 
         res.status(HTTP_STATUS.OK).json(userProfile);

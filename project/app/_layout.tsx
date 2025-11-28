@@ -269,6 +269,14 @@ function AppWithNotifications() {
             contentStyle: { backgroundColor: colors.background },
           }}
         />
+        <Stack.Screen 
+          name="banned" 
+          options={{
+            animation: 'fade',
+            contentStyle: { backgroundColor: colors.background },
+            gestureEnabled: false, // Prevent swipe back from banned screen
+          }}
+        />
         {/* Protected screens - only available when authenticated */}
         <Stack.Screen name="(tabs)" />
         <Stack.Screen

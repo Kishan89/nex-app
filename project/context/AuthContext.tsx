@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode, useCa
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../lib/api';
 import { router } from 'expo-router';
+import { AppState, AppStateStatus } from 'react-native';
 // import { setupPushNotifications } from '@/lib/notification'; // Removed - using clean FCM now
 import { appInitialization } from '@/lib/app-initialization';
 // --- Define User and Auth types ---
@@ -97,6 +98,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     initAuth();
   }, []);
+
+  // Check ban status when app becomes active (foreground)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
+      // When app comes to foreground, check if user is banned
+      if (nextAppState === 'active' && user && token) {
+        try {
+          // Fetch fresh user data to check ban status
+          const freshUser = await apiService.getAuthenticatedUserProfile();
+          
+          if (freshUser?.isBanned) {
+            // User was banned while logged in - update user data and redirect
+            setUser(freshUser);
+            router.replace('/banned');
+          }
+        } catch (error) {
+          // If fetch fails, ignore - user may be offline
+          console.log('Failed to check ban status on app resume:', error);
+        }
+      }
+    });
+
+    return () => subscription?.remove();
+  }, [user, token]);
   const persistAuth = async (authToken: string | null, authUser: User | null) => {
     try {
       if (authToken) {
