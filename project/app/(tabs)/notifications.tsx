@@ -44,6 +44,44 @@ const getNotificationIcon = (type: string) => {
     default: return Bell;
   }
 };
+
+const formatTimeAgo = (dateString: string) => {
+  if (!dateString) return 'Just now';
+  
+  const date = new Date(dateString);
+  const now = new Date();
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid date in formatTimeAgo:', dateString);
+    return 'Just now';
+  }
+  
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  // Handle future dates
+  if (diffInSeconds < 0) {
+    console.warn('Future date detected:', dateString, 'diff:', diffInSeconds);
+    return 'Just now';
+  }
+  
+  // Less than 1 minute
+  if (diffInSeconds < 60) return 'Just now';
+  
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) return `${diffInDays}d ago`;
+  
+  const diffInWeeks = Math.floor(diffInDays / 7);
+  if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
+  
+  return `${Math.floor(diffInDays / 30)}mo ago`;
+};
 export default function NotificationsScreen() {
   const { user } = useAuth();
   const { markNotificationsAsRead, refreshNotificationCount } = useNotificationCount();
@@ -152,12 +190,28 @@ export default function NotificationsScreen() {
       router.push(`/profile/${notification.userId}`);
     }
   }, []);
-  const renderNotification = useCallback(({ item }: { item: SimpleNotification }) => (
-    <NotificationCard
-      notification={item}
-      onPress={handleNotificationPress}
-    />
-  ), [handleNotificationPress]);
+  const renderNotification = useCallback(({ item }: { item: SimpleNotification }) => {
+    // Debug logging for timestamp issues
+    if (item.type === 'warning') {
+      console.log('⚠️ Warning Notification:', { 
+        id: item.id, 
+        createdAt: item.createdAt,
+        createdAtType: typeof item.createdAt,
+        parsedDate: new Date(item.createdAt).toISOString(),
+        formattedTime: formatTimeAgo(item.createdAt)
+      });
+    }
+    
+    return (
+      <NotificationCard
+        notification={{
+          ...item,
+          time: formatTimeAgo(item.createdAt)
+        }}
+        onPress={handleNotificationPress}
+      />
+    );
+  }, [handleNotificationPress]);
   // Create dynamic styles inside component to access colors
   const styles = createStyles(colors, isDark);
   const renderEmpty = () => (

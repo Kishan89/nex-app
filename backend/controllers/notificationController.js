@@ -360,7 +360,8 @@ const sendWarningNotification = async (req, res) => {
                         userId: userId,
                         type: 'WARNING',
                         message: message,
-                        read: false
+                        read: false,
+                        createdAt: new Date() // Explicitly set current timestamp
                     }
                 })
             )

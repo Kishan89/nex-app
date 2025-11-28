@@ -70,17 +70,31 @@ export const NotificationCard = ({
     }
   };
   const getBackgroundColor = () => {
+    if (notification.type?.toUpperCase() === 'WARNING') {
+      return isDark ? 'rgba(255, 152, 0, 0.15)' : 'rgba(255, 152, 0, 0.1)';
+    }
     if (notification.read) {
       return isDark ? 'rgba(255,255,255,0.02)' : colors.backgroundSecondary;
     } else {
       return isDark ? 'rgba(227,133,236,0.05)' : colors.primaryAlpha;
     }
   };
+
+  const isWarning = notification.type?.toUpperCase() === 'WARNING';
+  const warningColor = '#ff9800';
   // Create dynamic styles inside component to access colors
   const styles = createStyles(colors, isDark);
   return (
     <TouchableOpacity
-      style={[styles.container, { backgroundColor: getBackgroundColor() }]}
+      style={[
+        styles.container, 
+        { backgroundColor: getBackgroundColor() },
+        isWarning && { 
+          borderLeftWidth: 4, 
+          borderLeftColor: warningColor,
+          paddingVertical: 16 // Slightly larger padding for importance
+        }
+      ]}
       onPress={() => onPress(notification)}
       activeOpacity={0.7}
     >
@@ -88,7 +102,13 @@ export const NotificationCard = ({
       <View style={styles.leftSection}>
         <View style={styles.avatarContainer}>
           <Image
-            source={notification.userAvatar ? { uri: notification.userAvatar } : require('@/assets/images/default-avatar.png')}
+            source={
+              isWarning 
+                ? require('@/assets/images/logo.png')
+                : notification.userAvatar 
+                  ? { uri: notification.userAvatar } 
+                  : require('@/assets/images/default-avatar.png')
+            }
             style={styles.avatar}
           />
           <View style={[styles.iconBadge, { backgroundColor: getIconColor() }]}>
@@ -98,7 +118,24 @@ export const NotificationCard = ({
       </View>
       {/* Center - Content */}
       <View style={styles.centerSection}>
-        <Text style={[styles.message, { color: colors.text }]} numberOfLines={2}>
+        {isWarning && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            <Text style={{ 
+              color: warningColor, 
+              fontSize: 10, 
+              fontWeight: '800', 
+              letterSpacing: 0.5,
+              textTransform: 'uppercase'
+            }}>
+              ⚠️ Official Warning
+            </Text>
+          </View>
+        )}
+        <Text style={[
+          styles.message, 
+          { color: colors.text },
+          isWarning && { fontWeight: '600', fontSize: 15 }
+        ]} numberOfLines={isWarning ? 10 : 2}>
           {notification.message || 'No message'}
         </Text>
         {notification.postContent && (
