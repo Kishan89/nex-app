@@ -47,7 +47,7 @@ export const NotificationCountProvider: React.FC<{ children: React.ReactNode }> 
         // Count only like, comment, follow notifications that are unread (exclude message)
         const unreadCount = notificationsData.filter((notification: any) => {
           const type = notification.type?.toLowerCase() || '';
-          const isAllowedNotification = ['like', 'comment', 'follow'].includes(type);
+          const isAllowedNotification = ['like', 'comment', 'follow', 'warning'].includes(type);
           const isUnread = !notification.read;
           return isAllowedNotification && isUnread;
         }).length;

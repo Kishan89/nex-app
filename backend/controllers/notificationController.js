@@ -143,7 +143,7 @@ const markNotificationsAsRead = async (req, res) => {
                 userId: userId,
                 read: false,
                 type: {
-                    in: ['LIKE', 'COMMENT', 'FOLLOW']
+                    in: ['LIKE', 'COMMENT', 'FOLLOW', 'WARNING']
                 }
             },
             select: {
@@ -161,7 +161,7 @@ const markNotificationsAsRead = async (req, res) => {
                 userId: userId,
                 read: false,
                 type: {
-                    in: ['LIKE', 'COMMENT', 'FOLLOW']
+                    in: ['LIKE', 'COMMENT', 'FOLLOW', 'WARNING']
                 }
             },
             data: {

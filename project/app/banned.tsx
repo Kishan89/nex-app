@@ -74,7 +74,7 @@ export default function BannedScreen() {
             onPress={() => {/* TODO: Open email client */}}
           >
             <Text style={[styles.emailText, { color: colors.primary }]}>
-              support@nexeed.com
+              team@nexeed.in
             </Text>
           </TouchableOpacity>
 
