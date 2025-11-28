@@ -7,11 +7,11 @@ const {
   getBannedUsers, 
   checkBanStatus 
 } = require('../controllers/userAdminController');
-const { authenticate } = require('../middleware/auth');
+const { verifyAuthToken } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/requireAdmin');
 
 // All admin routes require authentication and admin privileges
-router.use(authenticate);
+router.use(verifyAuthToken);
 
 // Ban/unban user endpoints - require admin
 router.post('/users/ban', requireAdmin, banUser);
