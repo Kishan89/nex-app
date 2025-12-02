@@ -225,6 +225,13 @@ const getUserAchievements = async (userId) => {
     // Check Follower Achievement
     if (stats.totalFollowers >= 1) promises.push(unlockAchievement(userId, 'first_follower').catch(() => {}));
     
+    // Check First Like Achievement (user has given at least one like)
+    const userLikesGiven = await prisma.like.count({ where: { userId } });
+    if (userLikesGiven >= 1) promises.push(unlockAchievement(userId, 'first_like').catch(() => {}));
+    
+    // Check First Comment Achievement (user has made at least one comment)
+    if (stats.totalComments >= 1) promises.push(unlockAchievement(userId, 'first_comment').catch(() => {}));
+    
     // Check Like Achievements
     if (stats.totalLikesReceived >= 10) promises.push(unlockAchievement(userId, '10_likes').catch(() => {}));
     if (stats.totalLikesReceived >= 25) promises.push(unlockAchievement(userId, '25_likes').catch(() => {}));
