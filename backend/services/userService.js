@@ -222,6 +222,10 @@ const getUserPosts = async (userId, options = {}) => {
                 votesCount: true,
                 _count: { select: { votes: true } }
               }
+            },
+            votes: {
+              where: { userId },
+              select: { pollOptionId: true }
             }
           }
         },

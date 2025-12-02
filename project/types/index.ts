@@ -140,6 +140,7 @@ export interface Poll {
   id: string;
   question: string;
   options: PollOption[];
+  userVote?: string | null; // ID of the option the user voted for (from backend)
 }
 export interface NormalizedPost {
   id: string;

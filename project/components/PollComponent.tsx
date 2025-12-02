@@ -22,6 +22,7 @@ interface Poll {
   id: string;
   question: string;
   options: PollOption[];
+  userVote?: string | null; // ID of the option the user voted for (from backend)
 }
 interface PollComponentProps {
   poll: Poll;
@@ -39,25 +40,42 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
   const { hasVotedOnPoll, getUserVoteForPoll, syncPollVoteAcrossScreens } = usePollVote();
   const [isVoting, setIsVoting] = useState(false);
   
+  // CRITICAL: Prioritize backend vote data (poll.userVote) over local storage
+  // This ensures that when a user refreshes, they see their vote from the server
+  const backendUserVote = poll.userVote;
+  const backendHasVoted = Boolean(backendUserVote);
+  
   // Use global poll vote state with fallback to props - memoized to prevent recalculation
   const globalHasVoted = useMemo(() => hasVotedOnPoll(poll.id), [hasVotedOnPoll, poll.id]);
   const globalUserVote = useMemo(() => getUserVoteForPoll(poll.id), [getUserVoteForPoll, poll.id]);
   
-  // Prioritize stored vote state over props to maintain persistence
-  const [localHasVoted, setLocalHasVoted] = useState(globalHasVoted || hasVoted);
-  const [localUserVote, setLocalUserVote] = useState(globalUserVote || userVote);
+  // Prioritize: backend vote > local storage > props
+  const initialHasVoted = backendHasVoted || globalHasVoted || hasVoted;
+  const initialUserVote = backendUserVote || globalUserVote || userVote;
+  
+  const [localHasVoted, setLocalHasVoted] = useState(initialHasVoted);
+  const [localUserVote, setLocalUserVote] = useState(initialUserVote);
   const [localOptions, setLocalOptions] = useState(poll.options);
   
-  // Single effect to sync vote state - ONLY poll.id dependency to prevent re-renders
+  // Single effect to sync vote state - prioritize backend data
   useEffect(() => {
-    const storedHasVoted = hasVotedOnPoll(poll.id);
-    const storedUserVote = getUserVoteForPoll(poll.id);
-    
-    if (storedHasVoted && storedUserVote) {
+    // If backend has vote data, use it and update local storage
+    if (backendUserVote) {
       setLocalHasVoted(true);
-      setLocalUserVote(storedUserVote);
+      setLocalUserVote(backendUserVote);
+      // Also update local storage to keep it in sync
+      syncPollVoteAcrossScreens(poll.id, backendUserVote);
+    } else {
+      // Otherwise check local storage
+      const storedHasVoted = hasVotedOnPoll(poll.id);
+      const storedUserVote = getUserVoteForPoll(poll.id);
+      
+      if (storedHasVoted && storedUserVote) {
+        setLocalHasVoted(true);
+        setLocalUserVote(storedUserVote);
+      }
     }
-  }, [poll.id, hasVotedOnPoll, getUserVoteForPoll]);
+  }, [poll.id, backendUserVote, hasVotedOnPoll, getUserVoteForPoll, syncPollVoteAcrossScreens]);
   // Listen for poll vote sync events from other screens
   useEffect(() => {
     const handlePollVoteSync = (data: { pollId: string; optionId: string }) => {

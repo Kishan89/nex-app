@@ -571,6 +571,42 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+        
+        {/* Action Buttons - Outside banner for proper touch handling */}
+        {!isMyProfile && (
+          <View style={styles.bannerActionButtons}>
+            <TouchableOpacity 
+              style={[styles.followButton, isFollowing && styles.followingButton]} 
+              onPress={handleFollowToggle}
+              disabled={followLoading}
+              activeOpacity={0.7}
+            >
+              {followLoading ? (
+                <ActivityIndicator size="small" color={isFollowing ? colors.text : colors.background} />
+              ) : (
+                <>
+                  {isFollowing ? (
+                    <UserMinus size={20} color={colors.text} />
+                  ) : (
+                    <UserPlus size={20} color={colors.background} />
+                  )}
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.chatButton} 
+              onPress={handleStartChat} 
+              disabled={chatLoading}
+              activeOpacity={0.7}
+            >
+              {chatLoading ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <MessageCircle size={20} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
         {/* Profile Image Section - Separate from banner */}
         <View style={styles.profileImageSection}>
           <TouchableOpacity 
@@ -591,12 +627,12 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.profileSection}>
-          {/* Profile Header with Action Buttons */}
+          {/* Profile Header */}
           <View style={styles.profileHeader}>
             <View style={styles.profileInfo}>
-              {/* Username and XP Section - Inline */}
-              <View style={styles.usernameXpRow}>
-                <Text style={styles.userName}>{profile.username}</Text>
+              {/* Username and XP in same row */}
+              <View style={styles.usernameRow}>
+                <Text style={styles.userName} numberOfLines={1}>{profile.username}</Text>
                 {getXPMedal(userXPRank) && (
                   <Text style={styles.xpMedal}>{getXPMedal(userXPRank)}</Text>
                 )}
@@ -608,38 +644,6 @@ export default function ProfileScreen() {
                 </View>
               </View>
             </View>
-            {/* Action Buttons */}
-            {/* Action Buttons for Non-Owner */}
-            {!isMyProfile && (
-              <View style={styles.actionButtonsContainer}>
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity 
-                    style={[styles.followButton, isFollowing && styles.followingButton]} 
-                    onPress={handleFollowToggle}
-                    disabled={followLoading}
-                  >
-                    {followLoading ? (
-                      <ActivityIndicator size="small" color={isFollowing ? colors.text : colors.background} />
-                    ) : (
-                      <>
-                        {isFollowing ? (
-                          <UserMinus size={20} color={colors.text} />
-                        ) : (
-                          <UserPlus size={20} color={colors.background} />
-                        )}
-                      </>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.backgroundTertiary, borderColor: colors.primary }]} onPress={handleStartChat} disabled={chatLoading}>
-                    {chatLoading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <MessageCircle size={20} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
           </View>
           {/* Bio Section */}
           <Text style={styles.bioText}>{profile.bio ?? 'No bio yet.'}</Text>
@@ -797,9 +801,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   bannerSection: {
     position: 'relative',
     backgroundColor: colors.background,
-    overflow: 'visible', // Ensure profile image and action buttons are not clipped
-    zIndex: 1, // Lower z-index than action buttons
-    marginTop: -Spacing.md, // Slight negative margin to extend banner upward
+    marginTop: -Spacing.md,
   },
   banner: { 
     width: '100%', 
@@ -823,12 +825,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: Spacing.md,
     marginTop: -50, // Negative margin to overlap banner
     marginBottom: Spacing.xs, // Reduced margin for tighter spacing
-    zIndex: 2,
+    zIndex: 3,
+    elevation: 3,
   },
   profileImageContainer: {
     zIndex: 2,
-    width: ComponentStyles.avatar.xlarge + 8,
-    height: ComponentStyles.avatar.xlarge + 8,
+    width: 108,
+    height: 108,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -848,26 +851,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     marginRight: Spacing.md,
   },
-  actionButtonsContainer: {
-    alignItems: 'flex-end',
-    justifyContent: 'flex-start',
-    marginTop: -30, // Move buttons up more to overlap with banner (better overlap)
-    zIndex: 3, // Ensure buttons appear above banner
+  bannerActionButtons: {
+    position: 'absolute',
+    top: 195,
+    right: Spacing.md,
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    zIndex: 100,
+    elevation: 100,
   },
-  usernameXpRow: {
+  usernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
     marginBottom: 0,
   },
   profileImage: { 
-    width: ComponentStyles.avatar.xlarge, 
-    height: ComponentStyles.avatar.xlarge, 
-    borderRadius: ComponentStyles.avatar.xlarge / 2, 
+    width: 100, 
+    height: 100, 
+    borderRadius: 50, 
     borderWidth: 3, 
     borderColor: colors.primary,
     backgroundColor: colors.backgroundTertiary,
-    // Ensure image is properly centered and visible
     alignSelf: 'center',
   },
   // editButton style removed (duplicate)
@@ -884,9 +888,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.backgroundTertiary, 
     paddingHorizontal: Spacing.sm, 
     paddingVertical: 4, 
-    borderRadius: BorderRadius.lg, 
+    borderRadius: BorderRadius.lg,
     marginLeft: Spacing.sm,
-    height: 28, // Fixed height for better alignment with username
+    flexShrink: 0,
   },
   xpText: { 
     fontSize: FontSizes.xs, 
@@ -901,6 +905,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: FontSizes.xxl, 
     fontWeight: FontWeights.bold, 
     color: colors.text,
+    flexShrink: 1,
   },
   bioText: { 
     fontSize: FontSizes.sm, 
@@ -1105,11 +1110,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: FontSizes.md,
     fontWeight: FontWeights.medium,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
+
   followButton: {
     width: 44,
     height: 44,
@@ -1117,21 +1118,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Shadows.medium,
+    zIndex: 10,
+    elevation: 10,
   },
   followingButton: {
-    backgroundColor: colors.backgroundTertiary,
-    borderWidth: 1,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 2,
     borderColor: colors.border,
   },
   chatButton: {
     width: 44,
     height: 44,
-    backgroundColor: colors.backgroundTertiary,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.primary,
+    ...Shadows.medium,
+    zIndex: 10,
+    elevation: 10,
   },
   // Simple username with medal
   usernameContainer: {

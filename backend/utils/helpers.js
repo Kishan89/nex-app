@@ -72,7 +72,9 @@ function transformPost(post) {
                 text: option.text,
                 votesCount: option.votesCount || 0,
                 _count: { votes: option._count?.votes || 0 }
-            })) || []
+            })) || [],
+            // Include user's vote if they have voted
+            userVote: post.poll.userVote || null
         } : null,
         // Include YouTube data if present
         youtubeVideoId: post.youtubeVideoId || null,

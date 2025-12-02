@@ -41,7 +41,11 @@ class PostService {
                 votesCount: true,
                 _count: { select: { votes: true } }
               }
-            }
+            },
+            votes: userId ? {
+              where: { userId },
+              select: { pollOptionId: true }
+            } : false
           }
         },
         likes: userId ? {
@@ -68,6 +72,16 @@ class PostService {
         isLiked: userId ? post.likes.length > 0 : false,
         isBookmarked: userId ? post.bookmarks.length > 0 : false,
       };
+      
+      // If there's a poll with votes, extract the user's vote
+      if (postWithStatus.poll && postWithStatus.poll.votes && postWithStatus.poll.votes.length > 0) {
+        postWithStatus.poll.userVote = postWithStatus.poll.votes[0].pollOptionId;
+        delete postWithStatus.poll.votes;
+      } else if (postWithStatus.poll) {
+        postWithStatus.poll.userVote = null;
+        delete postWithStatus.poll.votes;
+      }
+      
       delete postWithStatus.likes;
       delete postWithStatus.bookmarks;
       return transformPost(postWithStatus);
@@ -93,7 +107,11 @@ class PostService {
                 votesCount: true,
                 _count: { select: { votes: true } }
               }
-            }
+            },
+            votes: userId ? {
+              where: { userId },
+              select: { pollOptionId: true }
+            } : false
           }
         },
         // Include like status for authenticated user
@@ -118,6 +136,15 @@ class PostService {
       isLiked: userId ? post.likes.length > 0 : false,
       isBookmarked: userId ? post.bookmarks.length > 0 : false,
     };
+    
+    // If there's a poll with votes, extract the user's vote
+    if (postWithStatus.poll && postWithStatus.poll.votes && postWithStatus.poll.votes.length > 0) {
+      postWithStatus.poll.userVote = postWithStatus.poll.votes[0].pollOptionId;
+      delete postWithStatus.poll.votes;
+    } else if (postWithStatus.poll) {
+      postWithStatus.poll.userVote = null;
+      delete postWithStatus.poll.votes;
+    }
 
     return transformPost(postWithStatus);
   }
@@ -409,7 +436,11 @@ class PostService {
                   votesCount: true,
                   _count: { select: { votes: true } }
                 }
-              }
+              },
+              votes: userId ? {
+                where: { userId },
+                select: { pollOptionId: true }
+              } : false
             }
           },
           likes: userId ? {
@@ -436,6 +467,16 @@ class PostService {
           isLiked: userId ? post.likes.length > 0 : false,
           isBookmarked: userId ? post.bookmarks.length > 0 : false,
         };
+        
+        // If there's a poll with votes, extract the user's vote
+        if (postWithStatus.poll && postWithStatus.poll.votes && postWithStatus.poll.votes.length > 0) {
+          postWithStatus.poll.userVote = postWithStatus.poll.votes[0].pollOptionId;
+          delete postWithStatus.poll.votes;
+        } else if (postWithStatus.poll) {
+          postWithStatus.poll.userVote = null;
+          delete postWithStatus.poll.votes;
+        }
+        
         delete postWithStatus.likes;
         delete postWithStatus.bookmarks;
         return transformPost(postWithStatus);
@@ -513,7 +554,11 @@ class PostService {
                 votesCount: true,
                 _count: { select: { votes: true } }
               }
-            }
+            },
+            votes: userId ? {
+              where: { userId },
+              select: { pollOptionId: true }
+            } : false
           }
         },
         likes: userId ? {
@@ -565,6 +610,16 @@ class PostService {
 
     return paginatedPosts.map((post) => {
       const postWithoutLikes = { ...post };
+      
+      // If there's a poll with votes, extract the user's vote
+      if (postWithoutLikes.poll && postWithoutLikes.poll.votes && postWithoutLikes.poll.votes.length > 0) {
+        postWithoutLikes.poll.userVote = postWithoutLikes.poll.votes[0].pollOptionId;
+        delete postWithoutLikes.poll.votes;
+      } else if (postWithoutLikes.poll) {
+        postWithoutLikes.poll.userVote = null;
+        delete postWithoutLikes.poll.votes;
+      }
+      
       delete postWithoutLikes.likes;
       delete postWithoutLikes.bookmarks;
       delete postWithoutLikes.trendingScore; // Remove score from response
