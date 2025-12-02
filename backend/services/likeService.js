@@ -133,6 +133,14 @@ class LikeService {
         // Don't fail the like operation if XP fails
       }
       
+      // Check like achievements for post owner
+      try {
+        const achievementService = require('./achievementService');
+        await achievementService.handleLikeReceived(post.userId);
+      } catch (achievementError) {
+        logger.error('Failed to check like achievements:', achievementError);
+      }
+      
       try {
           // Get the username and avatar of the person who liked the post
           const likerUser = await prisma.user.findUnique({

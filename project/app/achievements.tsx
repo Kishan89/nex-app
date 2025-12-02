@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
-  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Trophy, Award, Sparkles } from 'lucide-react-native';
@@ -35,6 +35,7 @@ export default function AchievementsScreen() {
   
   const [userAchievements, setUserAchievements] = useState<Record<string, UserAchievement>>({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
   const [completionPercent, setCompletionPercent] = useState(0);
 
@@ -42,34 +43,29 @@ export default function AchievementsScreen() {
     loadAchievements();
   }, [targetUserId]);
 
-  const loadAchievements = async () => {
+  const loadAchievements = async (forceRefresh = false) => {
     if (!targetUserId) return;
     
-    setLoading(true);
+    if (!forceRefresh) setLoading(true);
     try {
-      // Load from cache first (instant), then refresh in background
       const [achievements, percent] = await Promise.all([
-        achievementService.getAllAchievements(targetUserId, false),
+        achievementService.getAllAchievements(targetUserId, forceRefresh),
         achievementService.getCompletionPercentage(targetUserId),
       ]);
       
       setUserAchievements(achievements);
       setCompletionPercent(percent);
-      setLoading(false);
-      
-      // Refresh in background if needed
-      setTimeout(async () => {
-        const [freshAchievements, freshPercent] = await Promise.all([
-          achievementService.getAllAchievements(targetUserId, true),
-          achievementService.getCompletionPercentage(targetUserId),
-        ]);
-        setUserAchievements(freshAchievements);
-        setCompletionPercent(freshPercent);
-      }, 100);
     } catch (error) {
       console.error('Error loading achievements:', error);
+    } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadAchievements(true);
   };
 
   const filteredAchievements = useCallback(() => {
@@ -246,6 +242,14 @@ export default function AchievementsScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
         />
       )}
     </SafeAreaView>

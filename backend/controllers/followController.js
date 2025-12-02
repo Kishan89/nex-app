@@ -4,6 +4,7 @@ const { successResponse, errorResponse } = require('../utils/helpers');
 const { createLogger } = require('../utils/logger');
 const { HTTP_STATUS, ERROR_MESSAGES } = require('../constants');
 const { BadRequestError, UnauthorizedError } = require('../utils/errors');
+const achievementService = require('../services/achievementService');
 
 const logger = createLogger('FollowController');
 
@@ -29,6 +30,16 @@ class FollowController {
       const follow = await followService.followUser(followerId, userId);
 
       logger.info(`Follow successful: ${followerId} -> ${userId}`);
+      
+      // Check first follower achievement
+      setImmediate(async () => {
+        try {
+          await achievementService.handleFollowerReceived(userId);
+        } catch (err) {
+          logger.error('Achievement check failed:', err);
+        }
+      });
+      
       res.status(HTTP_STATUS.CREATED).json(successResponse(follow, 'User followed successfully'));
       
       setImmediate(async () => {

@@ -18,7 +18,7 @@ const ACHIEVEMENT_DEFINITIONS = [
   {
     achievementId: 'first_like',
     title: 'Spreading Love',
-    description: 'Like your first post',
+    description: 'Give your first like',
     icon: '❤️',
     category: 'first_steps',
     rarity: 'common',
@@ -221,6 +221,9 @@ const getUserAchievements = async (userId) => {
 
     // Check Post Achievements
     if (stats.totalPosts >= 1) promises.push(unlockAchievement(userId, 'first_post').catch(() => {}));
+    
+    // Check Follower Achievement
+    if (stats.totalFollowers >= 1) promises.push(unlockAchievement(userId, 'first_follower').catch(() => {}));
     
     // Check Like Achievements
     if (stats.totalLikesReceived >= 10) promises.push(unlockAchievement(userId, '10_likes').catch(() => {}));
@@ -774,6 +777,36 @@ const handleXPUpdated = async (userId, currentXP) => {
 };
 
 /**
+ * Handle follower received event - check first follower achievement
+ */
+const handleFollowerReceived = async (userId) => {
+  try {
+    const stats = await getUserStats(userId);
+    
+    if (stats.totalFollowers === 1) {
+      const existing = await prisma.userAchievement.findUnique({
+        where: {
+          userId_achievementId: {
+            userId,
+            achievementId: 'first_follower'
+          }
+        }
+      });
+      
+      if (!existing || !existing.unlocked) {
+        await unlockAchievement(userId, 'first_follower');
+        return ['first_follower'];
+      }
+    }
+    
+    return [];
+  } catch (error) {
+    logger.error('Error handling follower received:', error.message);
+    return [];
+  }
+};
+
+/**
  * Get completion percentage
  */
 const getCompletionPercentage = async (userId) => {
@@ -805,6 +838,7 @@ module.exports = {
   handlePostCreated,
   handleLikeReceived,
   handleXPUpdated,
+  handleFollowerReceived,
   getCompletionPercentage,
   ACHIEVEMENT_DEFINITIONS
 };

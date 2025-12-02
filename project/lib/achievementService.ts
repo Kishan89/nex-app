@@ -51,7 +51,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
   {
     id: 'first_like',
     title: 'Spreading Love',
-    description: 'Like your first post',
+    description: 'Give your first like',
     icon: '❤️',
     category: 'first_steps',
     rarity: 'common',
