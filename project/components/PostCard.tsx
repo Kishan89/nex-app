@@ -323,7 +323,7 @@ const PostCard = React.memo(function PostCard({
                 text={post.content}
                 maxLines={6}
                 style={styles.postContent}
-                onPress={() => {}} // Disabled - handled by Pressable
+                onPress={onPress} // Enabled - handled by TruncatedText's Read More button
                 onToggle={onTextToggle}
                 refreshKey={refreshKey}
                 forceExpand={forceExpandText}
