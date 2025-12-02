@@ -81,12 +81,16 @@ const normalizePost = (p: any): NormalizedPost => {
     isPinned,
     isLive,
     isAnonymous,
-    // Include poll data
+    // Include poll data with user vote from backend
     poll: p.poll ? {
       id: p.poll.id,
       question: p.poll.question,
-      options: p.poll.options || []
+      options: p.poll.options || [],
+      userVote: p.poll.userVote || null // Extract userVote from backend
     } : null,
+    // Extract poll vote data for easy access
+    hasVotedOnPoll: p.poll && p.poll.userVote ? true : false,
+    userPollVote: p.poll && p.poll.userVote ? p.poll.userVote : undefined,
     // Additional fields for enhanced functionality
     likesCount: likes,
     commentsCount,
@@ -272,38 +276,10 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
           bookmarked: p.bookmarked 
         };
       });
-      // Check poll votes from global context first, then local storage
-      const postsWithPollVotes = await Promise.all(normalized.map(async (p) => {
-        if (p.poll) {
-          // Check global context first
-          const globalHasVoted = hasVotedOnPoll(p.poll.id);
-          const globalUserVote = getUserVoteForPoll(p.poll.id);
-          // Fallback to local storage if not in global context
-          let hasVoted = globalHasVoted;
-          let userVote = globalUserVote;
-          if (!hasVoted) {
-            hasVoted = await pollVoteStorage.hasVotedOnPoll(p.poll.id);
-            userVote = hasVoted ? await pollVoteStorage.getUserVoteForPoll(p.poll.id) : undefined;
-            // Sync with global context if found in local storage
-            if (hasVoted && userVote) {
-              syncPollVoteAcrossScreens(p.poll.id, userVote);
-            }
-          }
-          return {
-            ...p,
-            liked: combinedInteractions[p.id].liked,
-            bookmarked: combinedInteractions[p.id].bookmarked,
-            hasVotedOnPoll: hasVoted,
-            userPollVote: userVote
-          };
-        }
-        return {
-          ...p,
-          liked: combinedInteractions[p.id].liked,
-          bookmarked: combinedInteractions[p.id].bookmarked,
-          hasVotedOnPoll: false,
-          userPollVote: undefined
-        };
+      const postsWithPollVotes = normalized.map((p) => ({
+        ...p,
+        liked: combinedInteractions[p.id].liked,
+        bookmarked: combinedInteractions[p.id].bookmarked,
       }));
       // Use fresh server data for posts (including like counts and status)
       if (append && page > 1) {
@@ -338,7 +314,7 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
       setLoading(false); 
       setLoadingMore(false);
     }
-  }, [loadSavedInteractions, loadSavedComments, loadSavedPollVotes, hasVotedOnPoll, getUserVoteForPoll, syncPollVoteAcrossScreens]);
+  }, [loadSavedInteractions, loadSavedComments]);
   const loadMorePosts = useCallback(async () => {
     if (loadingMore || !hasMorePosts) return;
     const nextPage = currentPage + 1;
@@ -350,42 +326,21 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
     setError(null);
     try {
       const savedInteractions = await loadSavedInteractions();
-      const savedPollVotes = await loadSavedPollVotes();
       const postsData = await apiService.getFollowingPosts();
       const normalized = (postsData || []).map(normalizePost);
-      // Use server data for like counts and status - prioritize server truth
       const combinedInteractions: Record<string, { liked: boolean; bookmarked: boolean }> = {};
       normalized.forEach(p => {
-        // Always use server data for like/bookmark status (server is source of truth)
         combinedInteractions[p.id] = { 
           liked: p.liked, 
           bookmarked: p.bookmarked 
         };
       });
-      // Check local storage for poll votes
-      const postsWithPollVotes = await Promise.all(normalized.map(async (p) => {
-        if (p.poll) {
-          const hasVoted = await pollVoteStorage.hasVotedOnPoll(p.poll.id);
-          const userVote = hasVoted ? await pollVoteStorage.getUserVoteForPoll(p.poll.id) : undefined;
-          return {
-            ...p,
-            liked: combinedInteractions[p.id].liked,
-            bookmarked: combinedInteractions[p.id].bookmarked,
-            hasVotedOnPoll: hasVoted,
-            userPollVote: userVote
-          };
-        }
-        return {
-          ...p,
-          liked: combinedInteractions[p.id].liked,
-          bookmarked: combinedInteractions[p.id].bookmarked,
-          hasVotedOnPoll: false,
-          userPollVote: undefined
-        };
+      const postsWithPollVotes = normalized.map((p) => ({
+        ...p,
+        liked: combinedInteractions[p.id].liked,
+        bookmarked: combinedInteractions[p.id].bookmarked,
       }));
-      // Use fresh server data for following posts
       setFollowingPosts(postsWithPollVotes);
-      // Update interactions for following posts too
       setPostInteractions(prev => ({ ...prev, ...combinedInteractions }));
     } catch (err) {
       setError('Failed to load following posts.');
@@ -393,7 +348,7 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
     } finally {
       setLoadingFollowing(false);
     }
-  }, [loadSavedInteractions, loadSavedPollVotes]);
+  }, [loadSavedInteractions]);
   const loadTrendingPosts = useCallback(async (loadMore = false) => {
     // Prevent loading if already loading or no more posts
     if (loadMore && (!hasMoreTrendingPosts || loadingMore)) {
@@ -431,35 +386,17 @@ export const ListenContextProvider = ({ children }: { children: React.ReactNode 
         setHasMoreTrendingPosts(false);
       }
       
-      // Use server data for like counts and status - prioritize server truth
       const combinedInteractions: Record<string, { liked: boolean; bookmarked: boolean }> = {};
       normalized.forEach(p => {
-        // Always use server data for like/bookmark status (server is source of truth)
         combinedInteractions[p.id] = { 
           liked: p.liked, 
           bookmarked: p.bookmarked 
         };
       });
-      // Check local storage for poll votes
-      const postsWithPollVotes = await Promise.all(normalized.map(async (p) => {
-        if (p.poll) {
-          const hasVoted = await pollVoteStorage.hasVotedOnPoll(p.poll.id);
-          const userVote = hasVoted ? await pollVoteStorage.getUserVoteForPoll(p.poll.id) : undefined;
-          return {
-            ...p,
-            liked: combinedInteractions[p.id].liked,
-            bookmarked: combinedInteractions[p.id].bookmarked,
-            hasVotedOnPoll: hasVoted,
-            userPollVote: userVote
-          };
-        }
-        return {
-          ...p,
-          liked: combinedInteractions[p.id].liked,
-          bookmarked: combinedInteractions[p.id].bookmarked,
-          hasVotedOnPoll: false,
-          userPollVote: undefined
-        };
+      const postsWithPollVotes = normalized.map((p) => ({
+        ...p,
+        liked: combinedInteractions[p.id].liked,
+        bookmarked: combinedInteractions[p.id].bookmarked,
       }));
       
       // Append or replace based on loadMore flag

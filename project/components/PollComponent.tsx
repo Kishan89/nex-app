@@ -74,15 +74,17 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
     initialUserVote
   });
   
-  // Single effect to sync vote state - prioritize backend data
+  // Single effect to sync vote state - ALWAYS prioritize backend data
   useEffect(() => {
     console.log('🔄 Poll useEffect triggered:', { pollId: poll.id, backendUserVote, userVote });
     
+    // CRITICAL: Backend data is the source of truth
     // Priority: backend vote > props > local storage
     if (backendUserVote) {
       console.log('✅ Using backend vote:', backendUserVote);
       setLocalHasVoted(true);
       setLocalUserVote(backendUserVote);
+      // Sync to local storage to keep it in sync with backend
       syncPollVoteAcrossScreens(poll.id, backendUserVote);
     } else if (userVote) {
       console.log('✅ Using props vote:', userVote);
@@ -90,6 +92,7 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
       setLocalUserVote(userVote);
       syncPollVoteAcrossScreens(poll.id, userVote);
     } else {
+      // Only check local storage if backend has no vote data
       const storedHasVoted = hasVotedOnPoll(poll.id);
       const storedUserVote = getUserVoteForPoll(poll.id);
       
@@ -100,7 +103,10 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
         setLocalHasVoted(true);
         setLocalUserVote(storedUserVote);
       } else {
-        console.log('❌ No vote found anywhere');
+        console.log('❌ No vote found - user has not voted');
+        // Ensure state is reset if no vote exists anywhere
+        setLocalHasVoted(false);
+        setLocalUserVote(undefined);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +134,12 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
   }, [localOptions]);
   // Handle vote submission
   const handleVote = async (optionId: string) => {
-    if (localHasVoted || isVoting) return;
+    if (localHasVoted || isVoting) {
+      if (localHasVoted) {
+        Alert.alert('Already Voted', 'You have already voted on this poll.');
+      }
+      return;
+    }
     
     // OPTIMISTIC UPDATE - Update UI immediately for instant feedback
     setLocalHasVoted(true);
@@ -144,9 +155,11 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
     
     try {
       setIsVoting(true);
-      // Submit to backend in background
+      // Submit to backend
       await onVote(poll.id, optionId);
+      console.log('✅ Vote submitted successfully:', { pollId: poll.id, optionId });
     } catch (error: any) {
+      console.error('❌ Vote submission failed:', error);
       // Revert optimistic update on error
       setLocalHasVoted(false);
       setLocalUserVote(undefined);

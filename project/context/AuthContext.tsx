@@ -288,17 +288,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await clearGoogleSignInState();
       } catch (googleError) {
         }
-      // Clear ALL chat-related cache including user-specific data
+      // Clear ALL user-specific cache (chats, polls, etc.)
       try {
         const keys = await AsyncStorage.getAllKeys();
-        const chatKeys = keys.filter(key => 
+        const userKeys = keys.filter(key => 
           key.startsWith('chat_messages_') || 
           key.startsWith('chat_read_counts_') ||
           key.includes('chat_') ||
-          key.includes('unread_')
+          key.includes('unread_') ||
+          key === '@poll_votes' // Clear poll votes on logout
         );
-        if (chatKeys.length > 0) {
-          await AsyncStorage.multiRemove(chatKeys);
+        if (userKeys.length > 0) {
+          await AsyncStorage.multiRemove(userKeys);
         }
       } catch (cacheError) {
         }

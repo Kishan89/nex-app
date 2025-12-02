@@ -565,7 +565,7 @@ const handlePostCreated = async (userId) => {
       logger.info(`ℹ️ User has ${stats.totalPosts} posts, not unlocking first_post`);
     }
     
-    // Streak achievements - check if already unlocked
+    // Streak achievements - check if already unlocked BEFORE adding to newlyUnlocked
     if (stats.currentStreak >= 3) {
       const existing = await prisma.userAchievement.findUnique({
         where: {
@@ -576,6 +576,7 @@ const handlePostCreated = async (userId) => {
         }
       });
       
+      // Only add to newlyUnlocked if it wasn't already unlocked
       if (!existing || !existing.unlocked) {
         await unlockAchievement(userId, '3_day_streak');
         newlyUnlocked.push('3_day_streak');
@@ -614,11 +615,29 @@ const handlePostCreated = async (userId) => {
       }
     }
     
-    // Check time-based achievements - use UTC+5:30 for IST
+    // Check time-based achievements - Convert UTC to IST (UTC+5:30)
     const now = new Date();
-    const hour = now.getHours();
+    const utcHours = now.getUTCHours();
+    const utcMinutes = now.getUTCMinutes();
     
-    if (hour >= 0 && hour < 4) {
+    // Convert to IST: Add 5 hours 30 minutes
+    let istHours = utcHours + 5;
+    let istMinutes = utcMinutes + 30;
+    
+    if (istMinutes >= 60) {
+      istHours += 1;
+      istMinutes -= 60;
+    }
+    
+    if (istHours >= 24) {
+      istHours -= 24;
+    }
+    
+    logger.info(`⏰ Time check - UTC: ${utcHours}:${utcMinutes}, IST: ${istHours}:${istMinutes}`);
+    
+    // Night Owl: 12 AM - 4 AM IST (0-3 hours)
+    if (istHours >= 0 && istHours < 4) {
+      logger.info(`🦉 Night Owl time detected (${istHours}:${istMinutes} IST)`);
       const existing = await prisma.userAchievement.findUnique({
         where: {
           userId_achievementId: {
@@ -629,10 +648,16 @@ const handlePostCreated = async (userId) => {
       });
       
       if (!existing || !existing.unlocked) {
+        logger.info(`✨ Unlocking Night Owl achievement`);
         await unlockAchievement(userId, 'night_owl');
         newlyUnlocked.push('night_owl');
+      } else {
+        logger.info(`⏭️ Night Owl already unlocked`);
       }
-    } else if (hour >= 5 && hour <= 7) {
+    }
+    // Early Bird: 5 AM - 7 AM IST
+    else if (istHours >= 5 && istHours <= 7) {
+      logger.info(`🐦 Early Bird time detected (${istHours}:${istMinutes} IST)`);
       const existing = await prisma.userAchievement.findUnique({
         where: {
           userId_achievementId: {
@@ -643,9 +668,14 @@ const handlePostCreated = async (userId) => {
       });
       
       if (!existing || !existing.unlocked) {
+        logger.info(`✨ Unlocking Early Bird achievement`);
         await unlockAchievement(userId, 'early_bird');
         newlyUnlocked.push('early_bird');
+      } else {
+        logger.info(`⏭️ Early Bird already unlocked`);
       }
+    } else {
+      logger.info(`⏰ Not in special time window (${istHours}:${istMinutes} IST)`);
     }
     
     logger.info(`🎉 Newly unlocked achievements:`, newlyUnlocked);
