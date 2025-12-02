@@ -42,8 +42,17 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
   
   // CRITICAL: Prioritize backend vote data (poll.userVote) over local storage
   // This ensures that when a user refreshes, they see their vote from the server
-  const backendUserVote = poll.userVote;
-  const backendHasVoted = Boolean(backendUserVote);
+  const backendUserVote = poll.userVote || userVote;
+  const backendHasVoted = Boolean(backendUserVote) || hasVoted;
+  
+  // Debug logging
+  console.log('🗳️ Poll Debug:', {
+    pollId: poll.id,
+    backendUserVote,
+    backendHasVoted,
+    propsUserVote: userVote,
+    propsHasVoted: hasVoted
+  });
   
   // Use global poll vote state with fallback to props - memoized to prevent recalculation
   const globalHasVoted = useMemo(() => hasVotedOnPoll(poll.id), [hasVotedOnPoll, poll.id]);
@@ -57,25 +66,45 @@ export const PollComponent: React.FC<PollComponentProps> = React.memo(({
   const [localUserVote, setLocalUserVote] = useState(initialUserVote);
   const [localOptions, setLocalOptions] = useState(poll.options);
   
+  console.log('🗳️ Poll State:', {
+    pollId: poll.id,
+    localHasVoted,
+    localUserVote,
+    initialHasVoted,
+    initialUserVote
+  });
+  
   // Single effect to sync vote state - prioritize backend data
   useEffect(() => {
-    // If backend has vote data, use it and update local storage
+    console.log('🔄 Poll useEffect triggered:', { pollId: poll.id, backendUserVote, userVote });
+    
+    // Priority: backend vote > props > local storage
     if (backendUserVote) {
+      console.log('✅ Using backend vote:', backendUserVote);
       setLocalHasVoted(true);
       setLocalUserVote(backendUserVote);
-      // Also update local storage to keep it in sync
       syncPollVoteAcrossScreens(poll.id, backendUserVote);
+    } else if (userVote) {
+      console.log('✅ Using props vote:', userVote);
+      setLocalHasVoted(true);
+      setLocalUserVote(userVote);
+      syncPollVoteAcrossScreens(poll.id, userVote);
     } else {
-      // Otherwise check local storage
       const storedHasVoted = hasVotedOnPoll(poll.id);
       const storedUserVote = getUserVoteForPoll(poll.id);
       
+      console.log('📦 Checking local storage:', { storedHasVoted, storedUserVote });
+      
       if (storedHasVoted && storedUserVote) {
+        console.log('✅ Using stored vote:', storedUserVote);
         setLocalHasVoted(true);
         setLocalUserVote(storedUserVote);
+      } else {
+        console.log('❌ No vote found anywhere');
       }
     }
-  }, [poll.id, backendUserVote, hasVotedOnPoll, getUserVoteForPoll, syncPollVoteAcrossScreens]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poll.id, backendUserVote, userVote]);
   // Listen for poll vote sync events from other screens
   useEffect(() => {
     const handlePollVoteSync = (data: { pollId: string; optionId: string }) => {

@@ -31,9 +31,7 @@ class PostService {
           }
         },
         poll: {
-          select: {
-            id: true,
-            question: true,
+          include: {
             options: {
               select: {
                 id: true,
@@ -43,8 +41,9 @@ class PostService {
               }
             },
             votes: userId ? {
-              where: { userId },
-              select: { pollOptionId: true }
+              where: { userId: String(userId) },
+              select: { pollOptionId: true },
+              take: 1
             } : false
           }
         },
@@ -97,9 +96,7 @@ class PostService {
           select: { id: true, username: true, name: true, avatar: true, verified: true },
         },
         poll: {
-          select: {
-            id: true,
-            question: true,
+          include: {
             options: {
               select: {
                 id: true,
@@ -109,8 +106,9 @@ class PostService {
               }
             },
             votes: userId ? {
-              where: { userId },
-              select: { pollOptionId: true }
+              where: { userId: String(userId) },
+              select: { pollOptionId: true },
+              take: 1
             } : false
           }
         },
@@ -426,9 +424,7 @@ class PostService {
             }
           },
           poll: {
-            select: {
-              id: true,
-              question: true,
+            include: {
               options: {
                 select: {
                   id: true,
@@ -438,8 +434,9 @@ class PostService {
                 }
               },
               votes: userId ? {
-                where: { userId },
-                select: { pollOptionId: true }
+                where: { userId: String(userId) },
+                select: { pollOptionId: true },
+                take: 1
               } : false
             }
           },
@@ -544,9 +541,7 @@ class PostService {
           }
         },
         poll: {
-          select: {
-            id: true,
-            question: true,
+          include: {
             options: {
               select: {
                 id: true,
@@ -556,8 +551,9 @@ class PostService {
               }
             },
             votes: userId ? {
-              where: { userId },
-              select: { pollOptionId: true }
+              where: { userId: String(userId) },
+              select: { pollOptionId: true },
+              take: 1
             } : false
           }
         },
