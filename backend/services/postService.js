@@ -74,9 +74,11 @@ class PostService {
       
       // If there's a poll with votes, extract the user's vote
       if (postWithStatus.poll && postWithStatus.poll.votes && postWithStatus.poll.votes.length > 0) {
+        logger.debug('🗳️ Poll vote found:', { postId: post.id, pollId: postWithStatus.poll.id, userId, votes: postWithStatus.poll.votes });
         postWithStatus.poll.userVote = postWithStatus.poll.votes[0].pollOptionId;
         delete postWithStatus.poll.votes;
       } else if (postWithStatus.poll) {
+        logger.debug('❌ No poll vote found:', { postId: post.id, pollId: postWithStatus.poll.id, userId, votes: postWithStatus.poll.votes });
         postWithStatus.poll.userVote = null;
         delete postWithStatus.poll.votes;
       }
